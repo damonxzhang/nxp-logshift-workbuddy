@@ -159,16 +159,22 @@
       <section class="card">
         <div class="card-head">
           <div class="card-title">${icon('bell', 19)} 最新告警处置流水</div>
-          <a class="btn btn-sm" href="alerts.html">通知配置</a>
+          <div class="toolbar">
+            <span class="sub-note">语音播报可在右上角开关</span>
+            <a class="btn btn-sm" href="alerts.html">通知配置</a>
+          </div>
         </div>
         <div class="card-body">
           <div class="timeline">
-            ${ALERT_FEED.map(a => {
+            ${ALERT_FEED.map((a, i) => {
               const st = statusInfo(a.level === 'critical' ? 'critical' : a.level === 'warn' ? 'warn' : 'normal');
               return `<div class="tl-item" style="--tl:${st.color}">
-                <div class="flex between acenter">
+                <div class="flex between acenter gap8">
                   <span class="tl-title">${a.title}</span>
-                  <span class="badge ${st.cls}">${a.level === 'critical' ? '特急' : a.level === 'warn' ? '重要' : '已恢复'}</span>
+                  <span class="flex acenter gap8">
+                    <button class="btn btn-sm btn-ghost" data-say="${i}" title="语音播报该条告警">${icon('volume', 16)}</button>
+                    <span class="badge ${st.cls}">${a.level === 'critical' ? '特急' : a.level === 'warn' ? '重要' : '已恢复'}</span>
+                  </span>
                 </div>
                 <div class="tl-time">${a.time} · ${a.sys} · ${a.handler}</div>
               </div>`;
@@ -192,4 +198,9 @@
 
   const b = document.getElementById('btnGenHandover');
   if (b) b.onclick = () => toast('已生成交接单 HO-20260923-02，含 9 项未闭环事项', 'success');
+
+  document.querySelectorAll('[data-say]').forEach(el => el.onclick = () => {
+    const a = ALERT_FEED[Number(el.dataset.say)];
+    Voice.speak(`${a.level === 'critical' ? '特急告警' : '告警'}：${a.sys}，${a.title}，${a.handler}。`);
+  });
 })();

@@ -50,6 +50,136 @@ const NOTIFY_RULES = [
   { sys: '仓储管理 WMS', dept: '仓储部', to: '田守义', mail: 'tian.sy@corp.example.com', level: 'Critical + 日报', voice: true, enabled: true }
 ];
 
+/* ============ 关键词联动：紧急联系人 / 关键词库 / 多对多绑定 ============
+   客户可在页面自行维护这三类数据，并按「关键词 × 子系统 × 紧急联系人」多对多绑定。
+   命中关键词的异常即视为紧急邮件，按绑定关系即时投递给对应紧急联系人。
+   字段说明：
+     contacts  level: 仅特急 / 特急+重要 / 全部
+     keywords  match: 包含 / 前缀 / 精确 / 正则 / 多词任一（以 | 分隔）
+               level: 特急 / 重要    dnd: 是否跳过免打扰时段
+     bindings  sys: 子系统 id 数组，含 'ALL' 表示全部子系统
+*/
+
+const CONTACTS_SEED = [
+  { id: 'C01', name: '钱志强', dept: '安保部', role: '值班班长', mail: 'qian.zq@corp.example.com', level: '仅特急', enabled: true },
+  { id: 'C02', name: '田守义', dept: '仓储部', role: '库管主管', mail: 'tian.sy@corp.example.com', level: '仅特急', enabled: true },
+  { id: 'C03', name: '孙立群', dept: '财务处', role: '支付业务负责人', mail: 'sun.lq@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C04', name: '周雅琴', dept: '结算中心', role: '结算主管', mail: 'zhou.yq@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C05', name: '李国栋', dept: '网络组', role: '网络工程师', mail: 'li.gd@corp.example.com', level: '全部', enabled: true },
+  { id: 'C06', name: '吴海涛', dept: '安全合规部', role: '安全经理', mail: 'wu.ht@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C07', name: '郑文斌', dept: '平台架构组', role: '系统架构师', mail: 'zheng.wb@corp.example.com', level: '全部', enabled: true },
+  { id: 'C08', name: '王海涛', dept: '信息中心', role: '夜间值班班长', mail: 'wang.ht@corp.example.com', level: '全部', enabled: true },
+  { id: 'C09', name: '刘振华', dept: '分管领导', role: '副总经理', mail: 'liu.zh@corp.example.com', level: '仅特急', enabled: true }
+];
+
+const KEYWORDS_SEED = [
+  { id: 'K01', word: '宕机', match: '包含', level: '特急', dnd: true, enabled: true, note: '全系统通用', hits: 2 },
+  { id: 'K02', word: '心跳中断', match: '包含', level: '特急', dnd: true, enabled: true, note: '主机 / 数据库主节点', hits: 3 },
+  { id: 'K03', word: '掉线', match: '包含', level: '特急', dnd: true, enabled: true, note: '设备与存储节点', hits: 2 },
+  { id: 'K04', word: '支付失败率|成功率跌破|渠道中断', match: '多词任一', level: '特急', dnd: true, enabled: true, note: '支付资金链路', hits: 4 },
+  { id: 'K05', word: '对账不平|资金挂账', match: '多词任一', level: '特急', dnd: false, enabled: true, note: '结算一致性', hits: 1 },
+  { id: 'K06', word: '主备切换|链路中断|丢包率', match: '多词任一', level: '特急', dnd: true, enabled: true, note: '网络与专线', hits: 2 },
+  { id: 'K07', word: '^\\s*(越权|提权|口令暴力)', match: '正则', level: '特急', dnd: true, enabled: true, note: '堡垒机安全事件', hits: 0 },
+  { id: 'K08', word: '作业中断|拣货阻塞|AGV 停摆', match: '多词任一', level: '特急', dnd: true, enabled: true, note: '仓储作业', hits: 1 },
+  { id: 'K09', word: '延迟', match: '包含', level: '重要', dnd: false, enabled: true, note: '副本同步与队列积压', hits: 5 },
+  { id: 'K10', word: '磁盘使用率超过 90%', match: '包含', level: '重要', dnd: false, enabled: true, note: '容量预警', hits: 2 },
+  { id: 'K11', word: '演练', match: '包含', level: '重要', dnd: false, enabled: false, note: '演练期临时关闭', hits: 0 }
+];
+
+const BINDINGS_SEED = [
+  { id: 'B01', name: '视频与存储类故障', kws: ['K01', 'K02', 'K03'], sys: ['VMS'], contacts: ['C01', 'C08'], enabled: true },
+  { id: 'B02', name: '资金支付链路阻断', kws: ['K04', 'K05'], sys: ['PAY', 'SET'], contacts: ['C03', 'C04', 'C09'], enabled: true },
+  { id: 'B03', name: '网络与安全事件', kws: ['K06', 'K07'], sys: ['NET', 'BAS', 'IAM'], contacts: ['C05', 'C06', 'C07'], enabled: true },
+  { id: 'B04', name: '仓储物流作业中断', kws: ['K08', 'K01'], sys: ['WMS', 'TMS'], contacts: ['C02', 'C08'], enabled: true },
+  { id: 'B05', name: '全局兜底（事后复盘）', kws: ['K01', 'K09', 'K10'], sys: ['ALL'], contacts: ['C08', 'C09'], enabled: true }
+];
+
+/* ============ RBAC 用户与权限管理 ============
+   标准的「用户 - 角色 - 权限」三层模型：
+     USERS      用户（可归属多个角色）
+     ROLES      角色（一组权限点的集合）
+     PERMS      权限点 = 功能模块 × 操作动作
+     AUDIT      权限变更审计日志
+   页面支持客户自行维护用户、角色与授权关系。
+   ============ */
+
+const PERM_ACTIONS = [
+  { id: 'view', label: '查看' },
+  { id: 'create', label: '新增' },
+  { id: 'edit', label: '编辑' },
+  { id: 'delete', label: '删除' },
+  { id: 'export', label: '导出' },
+  { id: 'approve', label: '审批授权' }
+];
+
+const PERM_MODULES = [
+  { id: 'overview', name: '监控总览', desc: '健康度、告警流水、交接态势大盘' },
+  { id: 'systems', name: '子系统管理', desc: '接入子系统清单与底座信息' },
+  { id: 'ingest', name: '数据采集与日志', desc: '对接情况与调用日志' },
+  { id: 'evidence', name: '存证与岗位交接', desc: '附件存证、交接单与责任书' },
+  { id: 'alerts', name: '预警通知', desc: '邮件策略、语音播报、分发规则' },
+  { id: 'keyword', name: '关键词与紧急联系人', desc: '关键词命中规则与绑定关系' },
+  { id: 'user', name: '用户与权限', desc: '用户、角色、权限矩阵管理' },
+  { id: 'system', name: '系统设置', desc: '基础参数、字典、备份与升级' }
+];
+
+const ROLES_SEED = [
+  {
+    id: 'R01', name: '系统管理员', builtin: true, level: '系统级', users: 2, color: '#1d4ed8',
+    desc: '拥有全部功能的全部权限，可创建角色并授权他人',
+    perms: { overview: ['view', 'create', 'edit', 'delete', 'export', 'approve'], systems: ['view', 'create', 'edit', 'delete', 'export', 'approve'], ingest: ['view', 'create', 'edit', 'delete', 'export', 'approve'], evidence: ['view', 'create', 'edit', 'delete', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'delete', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'delete', 'export', 'approve'], user: ['view', 'create', 'edit', 'delete', 'export', 'approve'], system: ['view', 'create', 'edit', 'delete', 'export', 'approve'] }
+  },
+  {
+    id: 'R02', name: '信息中心主任', builtin: false, level: '管理级', users: 1, color: '#0b6a86',
+    desc: '全局查看与审批，可管理本部门用户，不可修改系统参数',
+    perms: { overview: ['view', 'export'], systems: ['view', 'edit', 'export'], ingest: ['view', 'export'], evidence: ['view', 'create', 'edit', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'export', 'approve'], user: ['view', 'create', 'edit'], system: ['view'] }
+  },
+  {
+    id: 'R03', name: '值班班长', builtin: false, level: '执行级', users: 2, color: '#12805a',
+    desc: '负责日常值守、异常处置与白晚班交接，可上传存证、认领责任书',
+    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit', 'export'], alerts: ['view', 'create', 'edit'], keyword: ['view'], user: ['view'], system: [] }
+  },
+  {
+    id: 'R04', name: '处室负责人', builtin: false, level: '执行级', users: 4, color: '#a8620b',
+    desc: '仅可见本处室相关数据，负责本处室异常签收与处置反馈',
+    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit'], alerts: ['view', 'edit'], keyword: ['view'], user: ['view'], system: [] }
+  },
+  {
+    id: 'R05', name: '安全审计员', builtin: false, level: '审计级', users: 1, color: '#8b5cf6',
+    desc: '只读 + 导出，用于合规审计与追溯，不可做任何写操作',
+    perms: { overview: ['view', 'export'], systems: ['view', 'export'], ingest: ['view', 'export'], evidence: ['view', 'export'], alerts: ['view', 'export'], keyword: ['view', 'export'], user: ['view', 'export'], system: ['view'] }
+  },
+  {
+    id: 'R06', name: '只读访客', builtin: false, level: '访客级', users: 1, color: '#8a95a5',
+    desc: '演示或参观用，仅可查看监控总览，不含任何导出能力',
+    perms: { overview: ['view'], systems: [], ingest: [], evidence: [], alerts: [], keyword: [], user: [], system: [] }
+  }
+];
+
+const USERS_SEED = [
+  { id: 'U01', account: 'admin', name: '张卫东', dept: '信息中心', post: '值班班长', phone: '138****6021', mail: 'zhang.wd@corp.example.com', roles: ['R01', 'R03'], scope: '全部数据', status: 'enabled', lastLogin: '2026-09-23 17:42', created: '2025-03-18', builtin: true, mfa: true },
+  { id: 'U02', account: 'zheng.wb', name: '郑文斌', dept: '平台架构组', post: '系统架构师', phone: '139****4478', mail: 'zheng.wb@corp.example.com', roles: ['R01'], scope: '全部数据', status: 'enabled', lastLogin: '2026-09-23 16:08', created: '2025-03-18', builtin: false, mfa: true },
+  { id: 'U03', account: 'wu.ht', name: '吴海涛', dept: '安全合规部', post: '安全经理', phone: '137****2255', mail: 'wu.ht@corp.example.com', roles: ['R02'], scope: '全部数据', status: 'enabled', lastLogin: '2026-09-23 15:31', created: '2025-05-06', builtin: false, mfa: true },
+  { id: 'U04', account: 'qian.zq', name: '钱志强', dept: '安保部', post: '值班班长', phone: '135****8830', mail: 'qian.zq@corp.example.com', roles: ['R03', 'R04'], scope: '本处室及下属', status: 'enabled', lastLogin: '2026-09-23 14:52', created: '2025-06-12', builtin: false, mfa: false },
+  { id: 'U05', account: 'sun.lq', name: '孙立群', dept: '财务处', post: '支付业务负责人', phone: '136****1190', mail: 'sun.lq@corp.example.com', roles: ['R04'], scope: '本处室及下属', status: 'enabled', lastLogin: '2026-09-23 13:05', created: '2025-06-12', builtin: false, mfa: false },
+  { id: 'U06', account: 'zhou.yq', name: '周雅琴', dept: '结算中心', post: '结算主管', phone: '134****6677', mail: 'zhou.yq@corp.example.com', roles: ['R04'], scope: '本处室及下属', status: 'enabled', lastLogin: '2026-09-23 11:38', created: '2025-07-01', builtin: false, mfa: false },
+  { id: 'U07', account: 'li.gd', name: '李国栋', dept: '网络组', post: '网络工程师', phone: '133****4412', mail: 'li.gd@corp.example.com', roles: ['R04'], scope: '本处室及下属', status: 'disabled', lastLogin: '2026-09-12 09:20', created: '2025-07-01', builtin: false, mfa: false },
+  { id: 'U08', account: 'tian.sy', name: '田守义', dept: '仓储部', post: '库管主管', phone: '132****9034', mail: 'tian.sy@corp.example.com', roles: ['R04'], scope: '本处室及下属', status: 'enabled', lastLogin: '2026-09-23 10:03', created: '2025-08-19', builtin: false, mfa: false },
+  { id: 'U09', account: 'audit01', name: '陈慧敏', dept: '审计部', post: '内审专员', phone: '131****5520', mail: 'chen.hm@corp.example.com', roles: ['R05'], scope: '全部数据', status: 'enabled', lastLogin: '2026-09-22 16:44', created: '2025-09-02', builtin: false, mfa: true },
+  { id: 'U10', account: 'guest', name: '参观账号', dept: '外部', post: '演示访客', phone: '—', mail: 'guest@corp.example.com', roles: ['R06'], scope: '仅本人相关', status: 'disabled', lastLogin: '2026-08-30 10:15', created: '2025-11-11', builtin: false, mfa: false }
+];
+
+const AUDIT_SEED = [
+  { time: '2026-09-23 17:42', user: '张卫东', action: '登录', target: '系统首页', result: '成功', ip: '10.20.31.45', detail: '密码 + 短信二次验证' },
+  { time: '2026-09-23 16:08', user: '郑文斌', action: '修改权限', target: '角色「值班班长」', result: '成功', ip: '10.20.31.28', detail: 'evidence: 增加【审批授权】' },
+  { time: '2026-09-23 15:31', user: '吴海涛', action: '新增用户', target: '账号 audit01', result: '成功', ip: '10.20.31.66', detail: '分配角色：安全审计员' },
+  { time: '2026-09-23 14:02', user: '郑文斌', action: '停用用户', target: '账号 guest', result: '成功', ip: '10.20.31.28', detail: '演示期结束后临时停用' },
+  { time: '2026-09-23 11:20', user: '张卫东', action: '角色变更', target: '钱志强', result: '成功', ip: '10.20.31.45', detail: '增加角色：处室负责人' },
+  { time: '2026-09-23 09:15', user: '李国栋', action: '登录', target: '系统首页', result: '失败', ip: '10.20.31.77', detail: '连续 3 次密码错误，账号被临时锁定' },
+  { time: '2026-09-22 16:44', user: '陈慧敏', action: '导出数据', target: '《9月告警流水台账》', result: '成功', ip: '10.20.31.90', detail: '导出 268 条记录，已留痕' },
+  { time: '2026-09-22 10:33', user: '吴海涛', action: '重置密码', target: '账号 li.gd', result: '成功', ip: '10.20.31.66', detail: '用户忘记密码，已重置并强制下次登录修改' }
+];
+
 const DEPT_STATS = [
   { label: '制造一处', value: 12, color: '#1d4ed8' },
   { label: '财务处', value: 9, color: '#0b6a86' },

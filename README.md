@@ -25,11 +25,12 @@
 | 页面 | 文件 | 问卷章节 | 演示要点 |
 |---|---|---|---|
 | 监控总览 | `index.html` | 全局态势 | 6 项 KPI、近 24h 健康度趋势、异常等级分布、子系统状态表、告警处置流水、白晚班交接态势 |
-| 子系统与数据库底座 | `systems.html` | **1.1 / 1.2** | 12 个样例子系统清单；数据库类型与版本、内网隔离、只读副本、接口能力；支持搜索筛选与现场登记新系统（选「未开放 / 仅内网 SQL」自动判定为模式 B） |
+| 子系统清单 | `systems.html` | **1.1** | 12 个样例子系统清单，含类别、采集模式、运行状态与负责人；支持按类别 / 状态 / 关键字筛选与导出 |
 | 数据采集与调用日志 | `ingest.html` | **2.1 / 3.1** | 调用成功率 / 耗时 / 异常 KPI + 各子系统对接情况总览 + 逐条调用日志与详情抽屉（可实时追加、手动全量采集） |
 | 存证与岗位交接 | `evidence.html` | **4.1** | 截图拖拽上传、自动提取分辨率与哈希指纹、超限实时拦截；交接单据与责任书认领签章 |
 | 预警通知配置 | `alerts.html` | **5.1 / 5.2** | 邮件投递策略、邮件通道运行概览、邮件内容预览、分权分处室分发规则、语音告警（女声/男声、语速、音量、重复次数，可真实发声） |
 | 邮件内容展示 | `mail.html` | **5.1** | 【演示页】两套邮件效果切换预览（主题、收件范围、正文）+ 近期投递记录 |
+| 用户与权限管理 | `users.html` | RBAC | 用户管理（新增/编辑/停用/删除/重置密码/多角色分配/数据范围）、角色权限矩阵（8 模块 × 6 操作 = 48 权限点）、操作日志留痕 |
 
 ## 四、实施参数在哪里改
 
@@ -45,6 +46,9 @@ CRON_FIXED      调度任务及其周期
 CALL_LOG_TPL    调用日志样例（组装函数 buildCallLogs）
 ```
 
+演示过程中可在页面上自行维护的业务数据同样集中在 `data.js`（种子数据），页面改动保存在浏览器 LocalStorage：
+`SUBSYSTEMS` / `NOTIFY_RULES` / `CONTACTS_SEED` / `KEYWORDS_SEED` / `BINDINGS_SEED` / `USERS_SEED` / `ROLES_SEED` / `AUDIT_SEED` / `PERM_MODULES` / `PERM_ACTIONS`。
+
 > 演示层的少量开关（语音语速、音量、规则的启用勾选）仍保存在浏览器 `LocalStorage`（键前缀 `ohd_`），**不影响任何真实生产系统**。
 
 ## 五、适老化设计（使用者以 40 岁左右为主）
@@ -59,7 +63,7 @@ CALL_LOG_TPL    调用日志样例（组装函数 buildCallLogs）
 
 ```
 ops-handover-demo/
-├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html
+├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html / users.html
 ├── assets/
 │   ├── css/style.css          浅色主题样式
 │   └── js/
@@ -71,7 +75,8 @@ ops-handover-demo/
 │       ├── page-ingest.js     各子系统对接调用日志
 │       ├── page-evidence.js   上传存证与交接逻辑
 │       ├── page-alerts.js     邮件通知与语音告警
-│       └── page-mail.js       邮件内容展示页
+│       ├── page-mail.js       邮件内容展示页
+│       └── page-users.js      RBAC 用户 / 角色 / 权限 / 日志
 └── README.md
 ```
 

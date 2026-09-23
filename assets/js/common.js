@@ -28,7 +28,9 @@ const ICONS = {
   layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 20a6.4 6.4 0 0 0-2-4.6"/>',
   lock: '<rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
-  speaker: '<rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><path d="M12 8.5h.01"/>'
+  speaker: '<rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><path d="M12 8.5h.01"/>',
+  close: '<path d="M18 6L6 18M6 6l12 12"/>',
+  zap: '<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13z"/>'
 };
 
 function icon(name, size = 19, sw = 1.7) {
@@ -43,16 +45,18 @@ const NAV = [
   { key: 'ingest', href: 'ingest.html', label: '数据采集与调度', icon: 'database' },
   { key: 'evidence', href: 'evidence.html', label: '存证与岗位交接', icon: 'image' },
   { key: 'alerts', href: 'alerts.html', label: '预警通知配置', icon: 'bell' },
-  { key: 'mail', href: 'mail.html', label: '邮件内容展示', icon: 'mail' }
+  { key: 'mail', href: 'mail.html', label: '邮件内容展示', icon: 'mail' },
+  { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
 ];
 
 const PAGE_TITLES = {
   index: ['监控总览', '全厂子系统健康度 · 异常处置 · 交接态势'],
-  systems: ['子系统与数据库底座', '问卷 1.1 / 1.2 · 接入规模与数据底座调研'],
+  systems: ['子系统清单', '问卷 1.1 · 待接入子系统规模'],
   ingest: ['数据采集与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
   evidence: ['存证与岗位交接', '问卷 4.1 · 附件存证规范与交接责任书'],
   alerts: ['预警通知配置', '问卷 5.1 / 5.2 · 邮件通知 + 语音告警'],
-  mail: ['邮件内容展示', '问卷 5.1 · 演示实际投递到邮箱的效果']
+  mail: ['邮件内容展示', '问卷 5.1 · 演示实际投递到邮箱的效果'],
+  users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕']
 };
 
 function renderShell(page) {
@@ -81,6 +85,11 @@ function renderShell(page) {
       <div class="page-desc">${title[1]}</div>
     </div>
     <div class="topbar-right">
+      <button class="vbtn ${Voice.cfg.on ? 'on' : ''}" id="vBtn" title="点击开启 / 关闭全站语音播报">
+        <span class="vbtn-icon">${icon(Voice.cfg.on ? 'volume' : 'speaker', 18)}</span>
+        <span class="vbtn-txt">语音播报</span>
+        <span class="vstate">${Voice.cfg.on ? '已开启' : '已关闭'}</span>
+      </button>
       <span class="shift-pill">${icon('clock', 16)} <span id="shiftName">白班</span> · <span id="shiftClock">--:--:--</span></span>
       <div class="who">
         <div class="avatar">张</div>
@@ -91,7 +100,13 @@ function renderShell(page) {
       </div>
     </div>`;
 
+  const vb = document.getElementById('vBtn');
+  if (vb) vb.onclick = () => Voice.toggle();
+
   startClock();
+  if (Voice.supported()) {
+    window.speechSynthesis.onvoiceschanged = () => { };
+  }
 }
 
 function currentShift() {
@@ -135,6 +150,134 @@ function toast(msg, type = 'primary') {
   wrap.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; el.style.transition = '.25s'; setTimeout(() => el.remove(), 250); }, 2600);
 }
+
+/* ================= 全站语音播报（右上角总开关，客户可自行控制） ================= */
+const VOICE_DEFAULTS = { on: false, gender: 'female', rate: 1.1, volume: 0.9, repeat: 1, sources: ['critical', 'keyword'], external: true };
+
+const Voice = {
+  cfg: Object.assign({}, VOICE_DEFAULTS, store.get('voice', {})),
+  listeners: [],
+
+  save() {
+    store.set('voice', this.cfg);
+    this.syncBtn();
+    this.listeners.forEach(f => { try { f(this.cfg); } catch (e) { } });
+  },
+  onChange(f) { this.listeners.push(f); },
+
+  supported() { return typeof window !== 'undefined' && 'speechSynthesis' in window; },
+  list() { return this.supported() ? window.speechSynthesis.getVoices() : []; },
+  zhVoices() { return this.list().filter(v => /^zh/i.test(v.lang)); },
+
+  pick() {
+    const vs = this.zhVoices();
+    if (!vs.length) return null;
+    const fw = ['female', 'xiaoxiao', 'yaoyao', 'huihui', 'tingting', '女', 'xiaoyi', 'meijia'];
+    const isF = v => fw.some(w => v.name.toLowerCase().includes(w));
+    const female = vs.find(isF), male = vs.find(v => !isF(v));
+    return (this.cfg.gender === 'female' ? (female || vs[0]) : (male || vs[0])) || null;
+  },
+
+  speak(text, _repeat) {
+    if (!this.cfg.on) { toast('语音播报当前为「已关闭」，可在页面右上角一键开启', 'warn'); return false; }
+    if (!text) return false;
+    if (!this.supported()) { toast('当前浏览器不支持语音合成，建议使用 Chrome / Edge', 'warn'); return false; }
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text));
+      const v = this.pick();
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'zh-CN'; }
+      u.rate = Math.max(0.5, Math.min(2, Number(this.cfg.rate) || 1));
+      u.volume = Math.max(0, Math.min(1, Number(this.cfg.volume) || 0.9));
+      u.pitch = this.cfg.gender === 'female' ? 1.15 : 0.9;
+      u.onend = () => this.syncBtn(false);
+      u.onerror = () => this.syncBtn(false);
+      window.speechSynthesis.speak(u);
+      this.syncBtn(true);
+      this.log(text);
+      return true;
+    } catch (e) { toast('语音合成失败：' + e.message, 'danger'); return false; }
+  },
+
+  speakTimes(text) {
+    const n = Math.max(1, Number(this.cfg.repeat) || 1);
+    for (let i = 0; i < n; i++) setTimeout(() => this.speak(text), i * 3200);
+  },
+
+  stop() {
+    if (this.supported()) window.speechSynthesis.cancel();
+    this.syncBtn(false);
+  },
+
+  log(text) {
+    const l = store.get('voiceLog', []);
+    l.unshift({ time: fmtDT(new Date()), text: String(text).slice(0, 120) });
+    store.set('voiceLog', l.slice(0, 20));
+  },
+
+  toggle() {
+    this.cfg.on = !this.cfg.on;
+    this.save();
+    if (this.cfg.on) {
+      toast('语音播报已开启 · 后续紧急告警将自动朗读', 'success');
+      setTimeout(() => this.speak('语音播报已开启，紧急告警将自动朗读。'), 120);
+    } else {
+      this.stop();
+      toast('语音播报已关闭 · 告警仅通过邮件通知', 'warn');
+    }
+  },
+
+  syncBtn(speaking) {
+    const b = document.getElementById('vBtn');
+    if (!b) return;
+    b.className = 'vbtn' + (this.cfg.on ? ' on' : '') + (speaking ? ' speaking' : '');
+    const st = b.querySelector('.vstate');
+    if (st) st.textContent = speaking ? '播报中…' : (this.cfg.on ? '已开启' : '已关闭');
+  }
+};
+
+/* ================= 通用弹窗 ================= */
+function openDialog(opt) {
+  const { title = '', sub = '', body = '', okText = '保存', cancelText = '取消', width = 640, onOk = null } = opt || {};
+  closeDialog();
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.id = 'globalDialog';
+  mask.innerHTML = `
+    <div class="modal" style="max-width:${width}px">
+      <div class="modal-head">
+        <div>
+          <div style="font-size:18px;font-weight:700">${title}</div>
+          ${sub ? `<div class="small muted" style="margin-top:2px">${sub}</div>` : ''}
+        </div>
+        <button class="btn btn-sm btn-ghost" id="dlgClose">${icon('close', 18)}</button>
+      </div>
+      <div class="modal-body">${body}</div>
+      <div class="card-foot" style="border-radius:0 0 var(--radius) var(--radius);display:flex;justify-content:flex-end;align-items:center;gap:10px">
+        <button class="btn" id="dlgCancel">${cancelText}</button>
+        <button class="btn btn-primary" id="dlgOk">${okText}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(mask);
+  const close = () => closeDialog();
+  mask.addEventListener('click', e => { if (e.target === mask) close(); });
+  mask.querySelector('#dlgClose').onclick = close;
+  mask.querySelector('#dlgCancel').onclick = close;
+  mask.querySelector('#dlgOk').onclick = () => { if (onOk) onOk(mask, close); else close(); };
+  const first = mask.querySelector('[autofocus]');
+  if (first) first.focus();
+  return mask;
+}
+
+function closeDialog() { const d = document.getElementById('globalDialog'); if (d) d.remove(); }
+
+const getVal = id => { const el = document.getElementById(id); return el ? String(el.value).trim() : ''; };
+const getChk = id => { const el = document.getElementById(id); return !!el && el.checked; };
+const getChkList = name => Array.from(document.querySelectorAll(`[data-pick="${name}"]:checked`)).map(el => el.value);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDialog(); }
+});
 
 /* ---------------- 工具函数 ---------------- */
 const pad = n => String(n).padStart(2, '0');
