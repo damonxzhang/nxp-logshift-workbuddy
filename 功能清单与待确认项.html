@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>统一监控与岗位交接中心 · 功能清单与待确认项</title>
+<style>
+  :root{
+    --bg:#f2f5fa; --surface:#ffffff; --surface-2:#f7f9fc; --surface-3:#eef2f8;
+    --border:#e1e7f0; --text:#1d2836; --text-2:#566375; --text-3:#8a95a5;
+    --primary:#1d4ed8; --primary-soft:#e7eeff;
+    --success:#12805a; --warn:#a8620b; --danger:#cc2f2a; --info:#0b6a86; --purple:#8b5cf6;
+    --radius:14px; --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.7; font-size:15px;
+  }
+  a{color:var(--primary);text-decoration:none}
+  .topbar-g{
+    position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#1d2836,#26323f);
+    color:#fff;padding:16px 28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap
+  }
+  .topbar-g .logo{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center}
+  .topbar-g h1{font-size:19px;margin:0;font-weight:700}
+  .topbar-g .sub{font-size:13px;color:#aeb9c8;margin-top:2px}
+  .topbar-g .tag{margin-left:auto;font-size:12.5px;background:rgba(255,255,255,.12);
+    padding:5px 12px;border-radius:999px;color:#dbe3ee}
+  .wrap{display:flex;gap:26px;max-width:var(--maxw);margin:0 auto;padding:26px 20px 60px}
+  .toc{position:sticky;top:84px;align-self:flex-start;width:240px;flex:0 0 240px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 12px;max-height:calc(100vh - 110px);overflow:auto}
+  .toc .t-title{font-size:12px;color:var(--text-3);letter-spacing:.5px;padding:6px 10px;font-weight:700}
+  .toc a{display:block;padding:8px 10px;border-radius:9px;color:var(--text-2);font-size:14px;margin:2px 0}
+  .toc a:hover{background:var(--surface-3);color:var(--text)}
+  .toc a.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+  .toc .t-sub{font-size:12.5px;padding:6px 10px 6px 22px;color:var(--text-3)}
+  .main{flex:1;min-width:0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:22px;box-shadow:0 1px 2px rgba(20,40,80,.03)}
+  .card h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .card h3{font-size:16.5px;margin:22px 0 10px;color:var(--text)}
+  .card .lead{color:var(--text-2);margin:0 0 14px;font-size:14.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 11px;
+    border-radius:999px;font-weight:600;background:var(--surface-3);color:var(--text-2)}
+  .pill.blue{background:var(--primary-soft);color:var(--primary)}
+  .pill.green{background:#e3f6ee;color:var(--success)}
+  .pill.amber{background:#fdf1e0;color:var(--warn)}
+  .pill.red{background:#fdecea;color:var(--danger)}
+  .pill.purple{background:#f1ebfe;color:var(--purple)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--surface-2);font-weight:600;color:var(--text-2);font-size:13.5px}
+  tbody tr:hover{background:var(--surface-2)}
+  .num{font-variant-numeric:tabular-nums}
+  .muted{color:var(--text-3)}
+  .small{font-size:13px}
+  .kbd{font-family:Consolas,Menlo,monospace;background:var(--surface-3);padding:1px 6px;
+    border-radius:5px;font-size:12.5px}
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .feat{counter-reset:fn}
+  .feat li{margin:7px 0;padding-left:4px}
+  .feat .f-ico{display:inline-block;width:22px;color:var(--primary);font-weight:700}
+  .note{border-left:4px solid var(--info);background:var(--surface-2);padding:12px 16px;
+    border-radius:0 10px 10px 0;margin:14px 0;font-size:14px;color:var(--text-2)}
+  .note.red{border-color:var(--danger);background:#fdf3f2}
+  .note.amber{border-color:var(--warn);background:#fef6ec}
+  .note.green{border-color:var(--success);background:#eef9f4}
+  .map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:6px}
+  .map-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface)}
+  .map-card .mc-top{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px}
+  .map-card .mc-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-size:15px;flex:0 0 34px}
+  .map-card .mc-meta{font-size:12.5px;color:var(--text-3);margin-top:6px}
+  .map-card .mc-desc{font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.6}
+  /* 待确认高亮模块 */
+  .confirm{background:linear-gradient(180deg,#fff,#fffdf8);border:1.5px solid #f3d9a8}
+  .confirm .c-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .confirm .c-flag{background:var(--warn);color:#fff;font-size:12px;font-weight:700;
+    padding:4px 12px;border-radius:999px;letter-spacing:.5px}
+  .confirm h2{color:#8a4b03}
+  .scn{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+  .scn .box{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface)}
+  .scn .box.a{border-top:4px solid var(--success)}
+  .scn .box.b{border-top:4px solid var(--info)}
+  .scn .box h4{margin:0 0 8px;font-size:15.5px}
+  .scn .box ul{margin:6px 0;padding-left:18px}
+  .scn .box li{margin:5px 0;font-size:13.5px;color:var(--text-2)}
+  .scn .box .tag-line{font-size:12.5px;color:var(--text-3);margin-top:8px}
+  .ask{background:#fff8ef;border:1px dashed #e0b878;border-radius:12px;padding:14px 18px;margin:14px 0}
+  .ask .q{font-weight:700;color:#8a4b03;margin-bottom:6px}
+  .ask ul{margin:6px 0;padding-left:20px}
+  .ask li{margin:5px 0;font-size:14px}
+  footer{max-width:var(--maxw);margin:0 auto;padding:0 20px 40px;color:var(--text-3);font-size:12.5px}
+  @media (max-width:900px){
+    .wrap{flex-direction:column}.toc{position:static;width:100%;flex:none;max-height:none}
+    .scn{grid-template-columns:1fr}.g3,.g2{grid-template-columns:1fr}
+  }
+  @media print{
+    .topbar-g{background:#1d2836 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .toc{display:none}.wrap{display:block;padding:0}
+    .card,.confirm{break-inside:avoid;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar-g">
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8.3-8 9.5C7.4 20.3 4 17 4 12V6z"/></svg>
+  </div>
+  <div>
+    <h1>统一监控与岗位交接中心</h1>
+    <div class="sub">功能清单（全量） · 需要跟客户确认的功能点</div>
+  </div>
+  <span class="tag">演示站 Demo v1.0.0 · 纯静态 HTML / 零依赖 / 离线可用</span>
+</div>
+
+<div class="wrap">
+  <!-- 目录 -->
+  <nav class="toc" id="toc">
+    <div class="t-title">目录</div>
+    <a href="#s1">1. 项目概述</a>
+    <a href="#s2">2. 功能地图</a>
+    <a href="#s3">3. 全量功能清单</a>
+    <div class="t-sub">3.1 监控总览</div>
+    <div class="t-sub">3.2 子系统与底座</div>
+    <div class="t-sub">3.3 数据采集与日志</div>
+    <div class="t-sub">3.4 存证与交接</div>
+    <div class="t-sub">3.5 预警通知配置</div>
+    <div class="t-sub">3.6 邮件内容展示</div>
+    <div class="t-sub">3.7 用户与权限</div>
+    <div class="t-sub">3.8 公共能力</div>
+    <a href="#s4">4. ★ 需跟客户确认的功能点</a>
+    <div class="t-sub">4.1 数据闭环（重点）</div>
+    <div class="t-sub">4.2 其他待确认事项</div>
+    <a href="#s5">5. 附录：已确认口径与实施参数</a>
+  </nav>
+
+  <div class="main">
+
+    <!-- 1. 概述 -->
+    <section class="card" id="s1">
+      <h2>1. 项目概述</h2>
+      <p class="lead">本系统是一套面向客户技术负责人的<strong>技术集成与需求调研</strong>演示原型，定位为「统一监控与岗位交接中心」。它把分散在 ERP、支付网关、结算、核心网络、堡垒机、IAM、TMS、ITSM、VMS、SCM、BI、WMS 等多个子系统中的健康度、异常与交接事项，汇聚到一个中心化大屏，并提供告警、存证、交接、权限等闭环管理能力。</p>
+      <div class="grid g3">
+        <div><span class="pill blue">技术栈</span> 纯静态站点：HTML + CSS + 原生 JS，零依赖、零构建、离线可用</div>
+        <div><span class="pill green">交付形态</span> 双击 <span class="kbd">index.html</span> 即可打开，或 <span class="kbd">python -m http.server</span></div>
+        <div><span class="pill purple">演示数据</span> 全部为虚构样例，页面改动存于浏览器 LocalStorage，不触达生产</div>
+      </div>
+      <div class="note">本清单依据项目源码（<span class="kbd">assets/js/*</span> 与 <span class="kbd">README.md</span>）逐页梳理，覆盖 7 个业务页面 + 公共引擎 + 邮件/关键词组件，共 <strong>10 个功能域</strong>、<strong>60+ 个功能点</strong>。</div>
+    </section>
+
+    <!-- 2. 功能地图 -->
+    <section class="card" id="s2">
+      <h2>2. 功能地图</h2>
+      <p class="lead">系统由 7 个业务页面与若干公共能力构成，导航顺序即业务主链路：总览 → 子系统 → 采集日志 → 存证交接 → 预警 → 邮件 → 权限。</p>
+      <div class="map-grid">
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--primary)">01</span>监控总览</div><div class="mc-meta">index.html</div><div class="mc-desc">KPI、健康度趋势、异常分布、子系统状态、交接态势、告警流水</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#0b6a86">02</span>子系统与底座</div><div class="mc-meta">systems.html</div><div class="mc-desc">待接入子系统清单、类别/状态筛选、模式 A/B、导出</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--purple)">03</span>数据采集与日志</div><div class="mc-meta">ingest.html</div><div class="mc-desc">对接总览、调用日志、实时刷新、详情报文、手动重放</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--warn)">04</span>存证与交接</div><div class="mc-meta">evidence.html</div><div class="mc-desc">截图上传存证、哈希指纹、交接单与责任书认领</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--danger)">05</span>预警通知配置</div><div class="mc-meta">alerts.html</div><div class="mc-desc">关键词联动、邮件通道、语音告警、命中试算</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--info)">06</span>邮件内容展示</div><div class="mc-meta">mail.html</div><div class="mc-desc">收件人视角的邮件效果、近期投递记录</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#1d6fb8">07</span>用户与权限</div><div class="mc-meta">users.html</div><div class="mc-desc">RBAC、权限矩阵（48 点）、操作审计日志</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#5b6b7e">08</span>公共能力</div><div class="mc-meta">common.js 等</div><div class="mc-desc">导航/顶栏、语音引擎、SVG 图表、弹窗、本地存储</div></div>
+      </div>
+    </section>
+
+    <!-- 3. 全量功能清单 -->
+    <section class="card" id="s3">
+      <h2>3. 全量功能清单</h2>
+      <p class="lead">以下按功能域列出系统已实现的所有功能点。每个功能域对应一个页面或公共组件；状态列中「✅ 已实现」表示演示原型中已具备可交互能力。</p>
+
+      <!-- 3.1 -->
+      <h3 id="s31">3.1 监控总览 <span class="pill blue">index.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:180px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>核心 KPI 看板（6 项）</td><td>接入子系统总数、系统在线率、今日异常事件、待处置待办、平均健康度、交接真空期风险</td></tr>
+          <tr><td>2</td><td>近 24h 健康度趋势</td><td>折线图（综合健康度 + 告警事件数双序列），按当前时间滚动生成标签</td></tr>
+          <tr><td>3</td><td>今日异常等级分布</td><td>环形图 + 图例：特急 / 重要 / 一般 / 提示</td></tr>
+          <tr><td>4</td><td>子系统实时状态表</td><td>类别、数据库底座、接口能力、健康度进度条、状态徽标、负责人；可跳转清单页</td></tr>
+          <tr><td>5</td><td>白晚班交接态势</td><td>当前班次、距下次换班倒计时、未闭环事项、上次责任书状态、生成交接单</td></tr>
+          <tr><td>6</td><td>最新告警处置流水</td><td>时间线展示告警与处置状态，支持单条语音播报（Web Speech）</td></tr>
+          <tr><td>7</td><td>一键生成交接单</td><td>点击生成当日交接单并提示未闭环事项</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.2 -->
+      <h3 id="s32">3.2 子系统与数据库底座 <span class="pill blue">systems.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>待接入子系统清单</td><td>12 个样例：ERP、支付网关、结算、核心网络、堡垒机、IAM、TMS、ITSM、VMS、SCM、BI、WMS</td></tr>
+          <tr><td>2</td><td>统计条</td><td>总数、核心/外围、模式 A/B、在线、平均健康度</td></tr>
+          <tr><td>3</td><td>多维筛选</td><td>关键字搜索（名称/负责人）、类别（核心/外围）、状态（正常/告警/严重/离线）</td></tr>
+          <tr><td>4</td><td>采集模式标识</td><td>模式 A（接口订阅）/ 模式 B（数据库直连）双标识</td></tr>
+          <tr><td>5</td><td>导出清单</td><td>导出《待接入子系统清单》Excel（演示）</td></tr>
+          <tr><td>6</td><td>调研要点提示</td><td>对应问卷 1.1，引导确认子系统总数与完整清单</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.3 -->
+      <h3 id="s33">3.3 数据采集与调用日志 <span class="pill purple">ingest.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>采集 KPI（6 项）</td><td>调用总次数、成功率、平均耗时、异常次数、同步数据量、纳管子系统</td></tr>
+          <tr><td>2</td><td>各子系统对接情况总览</td><td>采集模式、今日调用、同步数据、平均耗时、成功率、最近调用、最近结果</td></tr>
+          <tr><td>3</td><td>调用日志明细</td><td>时间/子系统/模式/类型/端点或 SQL/状态码/耗时/返回条数/结果，可逐条查看</td></tr>
+          <tr><td>4</td><td>实时刷新</td><td>开关开启后每 4 秒模拟一次调度，追加新日志</td></tr>
+          <tr><td>5</td><td>多维筛选</td><td>关键字、子系统、结果（成功/无数据/慢/超时/鉴权/连接）、时间范围（1h/6h/今日/全部）</td></tr>
+          <tr><td>6</td><td>手动触发全量采集</td><td>立即模拟一次采集并刷新</td></tr>
+          <tr><td>7</td><td>调用日志详情</td><td>抽屉展示请求报文、响应报文、处置建议；支持手动重放该调用</td></tr>
+          <tr><td>8</td><td>异常分布 / 耗时 Top5</td><td>水平条形图：异常调用分布、响应耗时 Top5 子系统</td></tr>
+          <tr><td>9</td><td>降级与重试说明</td><td>连续 3 次失败自动降级为低频轮询并告警（演示口径）</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.4 -->
+      <h3 id="s34">3.4 存证与岗位交接 <span class="pill amber">evidence.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>现场存证上传</td><td>点击或拖拽上传 JPG/PNG/WEBP，支持多张</td></tr>
+          <tr><td>2</td><td>分辨率与大小提取</td><td>自动读取图片宽高与体积</td></tr>
+          <tr><td>3</td><td>哈希指纹与存证链</td><td>生成 SHA-256 指纹并登记水印时间、操作人，形成存证链</td></tr>
+          <tr><td>4</td><td>上传规范校验</td><td>单张 ≤5MB、单单据 ≤9 张、总量 ≤50MB、最低分辨率 ≥1280×720，超限实时拦截</td></tr>
+          <tr><td>5</td><td>清晰度不足告警</td><td>低于建议分辨率实时标记</td></tr>
+          <tr><td>6</td><td>示意截图生成</td><td>离线 SVG 生成两张示意截图（无需网络）</td></tr>
+          <tr><td>7</td><td>交接单据与责任书</td><td>单据编号、交接区间、附件、未闭环、特急、交接说明、真空期、责任书双签</td></tr>
+          <tr><td>8</td><td>责任书认领签章</td><td>未签章单据可一键认领签章，形成书面责任转移</td></tr>
+          <tr><td>9</td><td>新建交接单</td><td>支持创建新的交接单并等待对方签章</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.5 -->
+      <h3 id="s35">3.5 预警通知配置 <span class="pill red">alerts.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>预警通道说明</td><td>仅邮件（无短信），命中关键词升级为紧急邮件</td></tr>
+          <tr><td>2</td><td>紧急联系人管理</td><td>增删改、启用/停用、接收级别（仅特急/特急+重要/全部）</td></tr>
+          <tr><td>3</td><td>关键词库管理</td><td>包含/前缀/精确/正则/多词任一；等级、免打扰、命中计数</td></tr>
+          <tr><td>4</td><td>多对多绑定</td><td>关键词 × 子系统 × 紧急联系人，三者自由组合，笛卡尔积投递</td></tr>
+          <tr><td>5</td><td>命中试算与投递演练</td><td>输入异常描述，实时高亮命中关键词并列出将通知的收件人</td></tr>
+          <tr><td>6</td><td>邮件投递策略</td><td>Critical 单发 + 运营日报；分权分发，处室只收本处室</td></tr>
+          <tr><td>7</td><td>邮件通道运行概览</td><td>今日投递、最近投递、退信、紧急联系人覆盖</td></tr>
+          <tr><td>8</td><td>邮件内容预览</td><td>两套模板（特急单发 / 运营日报）切换预览</td></tr>
+          <tr><td>9</td><td>分权分处室隔离规则</td><td>子系统 × 责任处室 × 负责人 × 邮箱 × 订阅级别 × 语音 × 启用</td></tr>
+          <tr><td>10</td><td>语音告警策略</td><td>总开关、外接扬声器、音色（女/男声）、语速、音量、重复次数、播报文案模板</td></tr>
+          <tr><td>11</td><td>现场环境检查与建议</td><td>浏览器语音能力、中文语音包、音响连接、免打扰时段、部署建议</td></tr>
+          <tr><td>12</td><td>最近播报记录</td><td>保留最近 6 条语音播报记录</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.6 -->
+      <h3 id="s36">3.6 邮件内容展示 <span class="pill" style="background:#e2f3f9;color:#0b6a86">mail.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>通道说明</td><td>强调仅走邮件（无短信）</td></tr>
+          <tr><td>2</td><td>统计条</td><td>通道、邮件类型、今日投递、近两日投递、成功率、短信状态</td></tr>
+          <tr><td>3</td><td>两套邮件效果预览</td><td>Critical 特急单发邮件 / 白晚班运营日报，含主题、收件范围、正文</td></tr>
+          <tr><td>4</td><td>近期投递记录</td><td>时间、类型、主题、收件范围、触发来源、耗时、状态</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.7 -->
+      <h3 id="s37">3.7 用户与权限管理 <span class="pill" style="background:#e7eeff;color:#1d4ed8">users.html</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>RBAC 模型</td><td>用户 → 角色 → 权限 三层授权</td></tr>
+          <tr><td>2</td><td>顶部统计</td><td>用户总数、启用/停用、角色数、可授权权限点(48)、超级管理员、MFA</td></tr>
+          <tr><td>3</td><td>用户管理</td><td>新增/编辑/停用/删除/重置密码/多角色分配/数据范围/MFA</td></tr>
+          <tr><td>4</td><td>角色权限矩阵</td><td>8 模块 × 6 操作 = 48 权限点；授予/清空/复制/删除角色</td></tr>
+          <tr><td>5</td><td>数据范围控制</td><td>全部数据 / 本处室及下属 / 仅本人相关</td></tr>
+          <tr><td>6</td><td>操作日志</td><td>授权变更留痕（操作人/动作/对象/结果/IP/详情）；搜索与导出</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 3.8 -->
+      <h3 id="s38">3.8 公共能力 <span class="pill" style="background:#eef2f8;color:#5b6b7e">common.js / 引擎组件</span></h3>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>导航与顶栏</td><td>侧边导航、班次时钟、当前用户、语音总开关</td></tr>
+          <tr><td>2</td><td>全站语音引擎</td><td>Web Speech API，中英文语音包，可调音色/语速/音量/重复次数，可真实发声</td></tr>
+          <tr><td>3</td><td>轻量 SVG 图表</td><td>折线/柱状/环形/水平条形，零外部依赖，断网可用</td></tr>
+          <tr><td>4</td><td>通用弹窗</td><td>表单弹窗、确认弹窗，键盘 Esc 关闭</td></tr>
+          <tr><td>5</td><td>Toast 提示</td><td>操作反馈（成功/警告/危险/信息）</td></tr>
+          <tr><td>6</td><td>本地存储</td><td>演示数据存于 LocalStorage（键前缀 <span class="kbd">ohd_</span>），不影响生产</td></tr>
+          <tr><td>7</td><td>关键词命中引擎</td><td>纯逻辑：5 种匹配方式、命中高亮、解析收件人、绑定覆盖统计</td></tr>
+          <tr><td>8</td><td>邮件渲染组件</td><td>两套模板渲染，alerts 页与 mail 页共用</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 4. 待确认模块 -->
+    <section class="card confirm" id="s4">
+      <div class="c-head">
+        <span class="c-flag">★ 需跟客户确认</span>
+        <h2 style="margin:0">4. 需要跟客户确认的功能点</h2>
+      </div>
+      <p class="lead">以下为在正式立项 / 实施前需要客户拍板或澄清的事项。<strong>第 4.1 项（数据闭环）是本次调研的核心决策点</strong>，建议优先确认；其余为边界与范围类待澄清项。已与客户确认过的落地口径（不要短信、SMTP 写死、邮件写死、附件落到指定服务器、取消采集配置入口等）见第 5 节附录，不在本清单重复列为待确认。</p>
+
+      <!-- 4.1 数据闭环（重点） -->
+      <h3 id="s41">4.1 是否与对接系统形成「数据闭环」<span class="pill red">核心决策点</span></h3>
+      <div class="note red">
+        <strong>问题背景：</strong>本系统作为统一监控与岗位交接中心，会在发现问题时向各对接子系统（ERP、支付网关、VMS 等）的责任处室发出<strong>告警 / 警告</strong>。关键问题在于：告警发出之后，对方（子系统责任处室）的<strong>回复与处置反馈</strong>是否要回到本系统？
+      </div>
+
+      <div class="scn">
+        <div class="box a">
+          <h4>方案 A · 双向闭环（本系统内回复）</h4>
+          <ul>
+            <li>对方在<strong>本系统</strong>内直接<strong>回复、认领、填写处置结果</strong>；</li>
+            <li>本系统<strong>回写状态</strong>（待处置 → 处理中 → 已闭环），并<strong>留痕</strong>责任人与时间；</li>
+            <li>告警流水、交接单、KPI 直接与处置状态联动；</li>
+            <li>客户可在统一中心看到「谁、何时、怎么处置的」。</li>
+          </ul>
+          <div class="tag-line">需要对接系统<strong>开放「回复 / 认领 / 处置反馈」写接口</strong>，对接系统需配合改造。</div>
+        </div>
+        <div class="box b">
+          <h4>方案 B · 单向告警 + 原有系统处置（半闭环）</h4>
+          <ul>
+            <li>本系统<strong>只发告警 / 通知</strong>，不接收回复；</li>
+            <li>对方在<strong>其原有系统</strong>里查找、处置，并做交接回复；</li>
+            <li>本系统<strong>不接收回复</strong>，仅做告警记录与交接单/日报追踪；</li>
+            <li>「是否闭环」由本系统凭交接单或派单状态<strong>自行标记</strong>。</li>
+          </ul>
+          <div class="tag-line">对接系统<strong>无需开放写接口</strong>，实施成本低、周期短，但闭环完整性依赖人工核对。</div>
+        </div>
+      </div>
+
+      <div class="ask">
+        <div class="q">需要客户拍板 / 澄清的问题：</div>
+        <ul>
+          <li>告警发出后，对方是否需要在<strong>本系统</strong>内直接回复、认领并反馈处置结果（方案 A），还是可以接受在<strong>原有系统</strong>内查找、处置并做交接回复（方案 B）？</li>
+          <li>若选方案 A，需要对接系统开放哪些写接口？（回复内容、处置状态、责任人、处置时间、备注等）</li>
+          <li>「已闭环」的判定标准：以<strong>对方在本系统的回复</strong>为准，还是本系统<strong>自行标记</strong>即可？</li>
+          <li>是否要求<strong>状态双向同步</strong>？例如原系统处置完成后，本系统能否自动感知并回写状态？</li>
+          <li>若选方案 B，客户是否能接受「告警仅通知、闭环在原有系统完成、本系统凭交接单 / 日报做追踪」这一弱闭环模式？</li>
+        </ul>
+      </div>
+      <div class="note amber"><strong>影响评估：</strong>方案 A 的体验与数据完整性更好，但<strong>对接系统改造工作量、接口安全评估、实施周期</strong>显著更高；方案 B 落地最快、对既有系统零侵入。建议结合客户的对接系统开放程度与项目排期共同决定，必要时可采用「先 B 后 A」的渐进式路线。</div>
+
+      <!-- 4.2 其他待确认事项 -->
+      <h3 id="s42">4.2 其他待确认 / 澄清事项</h3>
+      <table>
+        <thead><tr><th style="width:34px">#</th><th style="width:170px">事项</th><th>待确认内容</th><th style="width:90px">优先级</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>语音告警落地要求</td><td>监控室大屏是否需要<strong>浏览器自动语音朗读</strong>预警？是否<strong>外接扬声器 / 音响</strong>？语速、音量是否对值班人员<strong>个性化可调</strong>？（对应问卷 5.2）</td><td><span class="pill amber">中</span></td></tr>
+          <tr><td>2</td><td>处室数据隔离粒度</td><td>处室负责人是否严格只能看<strong>本处室</strong>数据，管理层看<strong>全局合并视图</strong>？数据范围边界以什么维度划分（处室 / 子系统 / 业务线）？</td><td><span class="pill amber">中</span></td></tr>
+          <tr><td>3</td><td>遗留系统直连（模式 B）</td><td>TMS / WMS 等无接口系统是否允许开通<strong>只读账号 monitor_ro</strong> 直连？安全评估与 DBA 配合流程如何？连接池 / 超时阈值是否需按客户规范调整？</td><td><span class="pill amber">中</span></td></tr>
+          <tr><td>4</td><td>邮件模板与收件范围</td><td>两套模板的<strong>主题、收件范围、触发时机</strong>是否最终确认？是否需要按客户实际处室 / 职务体系重新映射？</td><td><span class="pill" style="background:#eef2f8;color:#5b6b7e">低</span></td></tr>
+          <tr><td>5</td><td>存证附件规范</td><td>格式（JPG/PNG/WEBP）、单张大小、张数、最低分辨率等上传规范是否按客户实际要求最终确认？</td><td><span class="pill" style="background:#eef2f8;color:#5b6b7e">低</span></td></tr>
+          <tr><td>6</td><td>调度频率与采集周期</td><td>各调度任务的 cron 周期（状态拉取、增量同步、健康度换算、交接研判、日报投递、冷归档）是否需按客户实际运维节奏调整？</td><td><span class="pill" style="background:#eef2f8;color:#5b6b7e">低</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note">说明：以上 2–6 项多源于演示站内的「调研要点 / 问卷章节」提示，部分已有初步口径；列为待确认是为确保实施前与客户的边界、范围、规范完全对齐，避免后期返工。</div>
+    </section>
+
+    <!-- 5. 附录 -->
+    <section class="card" id="s5">
+      <h2>5. 附录：已确认落地口径与实施参数</h2>
+      <p class="lead">以下口径已在 README 中按客户意见确认，实施阶段直接遵循，<strong>不在第 4 节重复列为待确认</strong>。</p>
+      <table>
+        <thead><tr><th style="width:34px">#</th><th style="width:200px">客户要求</th><th>落地实现</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>不要短信，只有邮件</td><td>全站已移除短信通道，仅邮件 / 邮件+语音；页面明示「短信通道：未启用」</td></tr>
+          <tr><td>2</td><td>SMTP 网关写死在代码</td><td>网关参数为后端实现细节，页面不展示、无输入框（<span class="kbd">SMTP_FIXED</span>）</td></tr>
+          <tr><td>3</td><td>邮件内容写死 + 展示页</td><td>模板由后端渲染；<span class="kbd">mail.html</span> / <span class="kbd">alerts.html</span> 仅展示收件人视角效果与投递记录</td></tr>
+          <tr><td>4</td><td>附件落到指定服务器</td><td>存证落到客户指定服务器，页面保留上传/校验/指纹/交接，不展示服务器地址（<span class="kbd">STORAGE_FIXED</span>）</td></tr>
+          <tr><td>5</td><td>采集与调度不给配置</td><td>页面取消配置入口，只保留对接总览 + 调用日志（按子系统/结果/时间筛选、实时追加、详情报文）</td></tr>
+          <tr><td>6</td><td>写死内容不在网页展示</td><td>全站清理「写死 / 硬编码 / 配置文件」类描述与面板</td></tr>
+        </tbody>
+      </table>
+      <h3>实施参数集中位置</h3>
+      <p class="small">页面不展示的实现参数集中在 <span class="kbd">assets/js/data.js</span>，供研发实施对齐口径：<span class="kbd">SMTP_FIXED</span>（邮件网关）、<span class="kbd">MAIL_TEMPLATES</span>（两套模板）、<span class="kbd">STORAGE_FIXED</span>（存储服务器）、<span class="kbd">LIMIT</span>（上传规范）、<span class="kbd">COLLECT_FIXED</span>（采集策略）、<span class="kbd">CRON_FIXED</span>（调度周期）、<span class="kbd">CALL_LOG_TPL</span>（调用日志样例）。</p>
+      <div class="note green">演示层开关（语音语速/音量/规则启用勾选）保存在浏览器 LocalStorage（键前缀 <span class="kbd">ohd_</span>），不影响任何真实生产系统。</div>
+    </section>
+
+  </div>
+</div>
+
+<footer>
+  文档由源码梳理生成 · 对应项目：ops-handover-demo（统一监控与岗位交接中心 演示站）· 全部单位、人名、邮箱、IP、子系统均为虚构样例。
+</footer>
+
+<script>
+  // 目录高亮与平滑滚动
+  const links = Array.from(document.querySelectorAll('#toc a'));
+  const map = {};
+  links.forEach(a => { const id = a.getAttribute('href').slice(1); const el = document.getElementById(id); if (el) map[id] = a; });
+  document.querySelectorAll('#toc a').forEach(a => a.addEventListener('click', e => {
+    const id = a.getAttribute('href').slice(1); const el = document.getElementById(id);
+    if (el) { e.preventDefault(); el.scrollIntoView({behavior:'smooth', block:'start'}); }
+  }));
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map[en.target.id]; if (a) a.classList.add('active');
+      }
+    });
+  }, {rootMargin:'-20% 0px -70% 0px'});
+  Object.keys(map).forEach(id => obs.observe(document.getElementById(id)));
+</script>
+</body>
+</html>

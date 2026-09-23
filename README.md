@@ -30,7 +30,9 @@
 | 存证与岗位交接 | `evidence.html` | **4.1** | 截图拖拽上传、自动提取分辨率与哈希指纹、超限实时拦截；交接单据与责任书认领签章 |
 | 预警通知配置 | `alerts.html` | **5.1 / 5.2** | 邮件投递策略、邮件通道运行概览、邮件内容预览、分权分处室分发规则、语音告警（女声/男声、语速、音量、重复次数，可真实发声） |
 | 邮件内容展示 | `mail.html` | **5.1** | 【演示页】两套邮件效果切换预览（主题、收件范围、正文）+ 近期投递记录 |
-| 用户与权限管理 | `users.html` | RBAC | 用户管理（新增/编辑/停用/删除/重置密码/多角色分配/数据范围）、角色权限矩阵（8 模块 × 6 操作 = 48 权限点）、操作日志留痕 |
+| 异常根因智能分析 | `analytics.html` | 高频告警统计 | 可配置字段聚合统计、按日/周/月分桶的趋势与 TOP 高频排行、相似告警自动聚类（区分批量连锁 / 偶发）与根因研判、图表展示与 Excel 导出、统计数据可被月报调用、按权限范围过滤 |
+| 自动月报 | `monthly.html` | 月度汇报 | 按月汇总告警总量 / TOP 高频异常 / 处置情况 / 根因聚类 / 子系统健康概览，支持章节配置、预览、手动触发生成、导出 PDF·Excel，受分级权限管控 |
+| 用户与权限管理 | `users.html` | RBAC | 用户管理（新增/编辑/停用/删除/重置密码/多角色分配/数据范围）、角色权限矩阵（10 模块 × 6 操作 = 60 权限点）、操作日志留痕 |
 
 ## 四、实施参数在哪里改
 
@@ -63,12 +65,13 @@ CALL_LOG_TPL    调用日志样例（组装函数 buildCallLogs）
 
 ```
 ops-handover-demo/
-├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html / users.html
+├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html / analytics.html / monthly.html / users.html
 ├── assets/
 │   ├── css/style.css          浅色主题样式
 │   └── js/
-│       ├── common.js          图标、导航、顶栏、Toast、SVG 图表
-│       ├── data.js            样例数据 + 实施参数（页面不展示）
+│       ├── common.js          图标、导航、顶栏、Toast、SVG 图表、演示身份切换、零依赖 Excel 导出
+│       ├── data.js            样例数据 + 实施参数（页面不展示）+ 10 个权限模块定义
+│       ├── analytics-core.js  告警数据引擎（确定性生成 / 聚类 / 分桶 / TOP 统计，analytics 与 monthly 共用）
 │       ├── mail-preview.js    邮件渲染（alerts / mail 两页共用）
 │       ├── page-index.js      总览页逻辑
 │       ├── page-systems.js    子系统与底座页逻辑
@@ -76,6 +79,8 @@ ops-handover-demo/
 │       ├── page-evidence.js   上传存证与交接逻辑
 │       ├── page-alerts.js     邮件通知与语音告警
 │       ├── page-mail.js       邮件内容展示页
+│       ├── page-analytics.js  异常根因智能分析页逻辑
+│       ├── page-monthly.js    自动月报页逻辑
 │       └── page-users.js      RBAC 用户 / 角色 / 权限 / 日志
 └── README.md
 ```

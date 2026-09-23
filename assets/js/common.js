@@ -45,6 +45,8 @@ const NAV = [
   { key: 'ingest', href: 'ingest.html', label: '数据采集与调度', icon: 'database' },
   { key: 'evidence', href: 'evidence.html', label: '存证与岗位交接', icon: 'image' },
   { key: 'alerts', href: 'alerts.html', label: '预警通知配置', icon: 'bell' },
+  { key: 'analytics', href: 'analytics.html', label: '异常根因分析', icon: 'activity' },
+  { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
   { key: 'mail', href: 'mail.html', label: '邮件内容展示', icon: 'mail' },
   { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
 ];
@@ -55,6 +57,8 @@ const PAGE_TITLES = {
   ingest: ['数据采集与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
   evidence: ['存证与岗位交接', '问卷 4.1 · 附件存证规范与交接责任书'],
   alerts: ['预警通知配置', '问卷 5.1 / 5.2 · 邮件通知 + 语音告警'],
+  analytics: ['异常根因智能分析', '高频告警统计 · 相似告警聚类 · 根因研判'],
+  monthly: ['自动月报', '按月汇总告警与事件 · 预览 / 导出 PDF·Excel'],
   mail: ['邮件内容展示', '问卷 5.1 · 演示实际投递到邮箱的效果'],
   users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕']
 };
@@ -92,16 +96,23 @@ function renderShell(page) {
       </button>
       <span class="shift-pill">${icon('clock', 16)} <span id="shiftName">白班</span> · <span id="shiftClock">--:--:--</span></span>
       <div class="who">
-        <div class="avatar">张</div>
-        <div>
-          <div class="who-name">张卫东</div>
-          <div class="who-role">值班班长 · 信息中心</div>
-        </div>
+        <label class="who-sel-label" for="whoSel">当前身份</label>
+        <select class="who-sel" id="whoSel" title="切换演示身份：用于演示分级权限下的数据范围与操作权限">
+          ${typeof USERS_SEED !== 'undefined' ? USERS_SEED.map(u => `<option value="${u.id}" ${u.id === CurrentUser.id ? 'selected' : ''}>${esc(u.name)} · ${esc(u.dept)}（${u.roles.map(rid => (ROLES_SEED.find(r => r.id === rid) || {}).name).filter(Boolean).join('/')}）</option>`).join('') : ''}
+        </select>
+        <div class="avatar">${esc((CurrentUser.get() ? CurrentUser.get().name : '张').slice(0, 1))}</div>
       </div>
     </div>`;
 
   const vb = document.getElementById('vBtn');
   if (vb) vb.onclick = () => Voice.toggle();
+
+  const ws = document.getElementById('whoSel');
+  if (ws) ws.onchange = () => {
+    CurrentUser.set(ws.value);
+    toast('已切换演示身份：' + (CurrentUser.get() ? CurrentUser.get().name : '') + '，数据范围按该角色权限刷新', 'success');
+    setTimeout(() => location.reload(), 360);
+  };
 
   startClock();
   if (Voice.supported()) {
@@ -135,6 +146,26 @@ const store = {
     catch (e) { return def; }
   },
   set(k, v) { try { localStorage.setItem('ohd_' + k, JSON.stringify(v)); } catch (e) { } }
+};
+
+/* ================= 当前登录身份（演示用，用于演示分级权限下的数据范围） =================
+   真实系统由登录会话决定；此处提供顶栏身份切换，便于演示「不同角色仅可见其权限范围内数据」。 */
+const CurrentUser = {
+  id: store.get('current_user', 'U01'),
+  set(id) { this.id = id; store.set('current_user', id); },
+  get() { return (typeof USERS_SEED !== 'undefined' && USERS_SEED.find(u => u.id === this.id)) || (typeof USERS_SEED !== 'undefined' ? USERS_SEED[0] : null); },
+  scope() { const u = this.get(); return u ? u.scope : '全部数据'; },
+  dept() { const u = this.get(); return u ? u.dept : ''; },
+  roles() { const u = this.get(); return u ? u.roles : ['R01']; },
+  roleNames() { return this.roles().map(rid => { const r = (typeof ROLES_SEED !== 'undefined' && ROLES_SEED.find(x => x.id === rid)) || {}; return r.name || rid; }); },
+  // 是否拥有某模块某操作权限（取所拥有角色的并集）
+  can(module, action) {
+    return this.roles().some(rid => {
+      const r = (typeof ROLES_SEED !== 'undefined' && ROLES_SEED.find(x => x.id === rid));
+      return r && (r.perms[module] || []).includes(action);
+    });
+  },
+  isAdmin() { return this.roles().includes('R01'); }
 };
 
 /* ---------------- Toast ---------------- */
@@ -287,6 +318,20 @@ const fmtDateCN = d => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()
 const weekCN = d => '星期' + '日一二三四五六'[d.getDay()];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fileSize = b => b < 1024 ? b + ' B' : b < 1024 * 1024 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(2) + ' MB';
+
+/* ---------------- 通用导出：Excel（.xls，零依赖，Excel 可直接打开） ---------------- */
+function exportExcel(filename, headers, rows) {
+  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1" cellspacing="0">';
+  html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
+  rows.forEach(r => { html += '<tr>' + r.map(c => `<td>${esc(c == null ? '' : c)}</td>`).join('') + '</tr>'; });
+  html += '</table></body></html>';
+  const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 120);
+}
 
 function statusInfo(s) {
   const map = {

@@ -7,6 +7,17 @@
   let audit = store.get('rbac_audit', null) || AUDIT_SEED.slice();
   let tab = store.get('rbac_tab', 'user');
 
+  // 兼容历史持久化：补齐新增权限模块（异常根因分析 / 自动月报），避免旧角色缺失这两列
+  (function normalizeRoles() {
+    let changed = false;
+    roles.forEach(r => {
+      PERM_MODULES.forEach(m => {
+        if (!r.perms[m.id]) { r.perms[m.id] = (r.id === 'R01') ? PERM_ACTIONS.map(a => a.id) : []; changed = true; }
+      });
+    });
+    if (changed) saveR();
+  })();
+
   let kw = '', fDept = 'all', fStatus = 'all', fRole = 'all', selRole = roles[0].id;
 
   const saveU = () => store.set('rbac_users', users);

@@ -612,3 +612,45 @@ table.table tbody tr:last-child td { border-bottom: none; }
   display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; color: var(--text-2);
 }
 .font-b { font-size: 15.5px; font-weight: 600; }
+
+/* ============ 顶栏身份切换（演示分级权限） ============ */
+.who { gap: 10px; }
+.who-sel-label { font-size: 13px; color: var(--text-3); white-space: nowrap; }
+.who-sel {
+  height: 38px; padding: 0 30px 0 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a95a5' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 9px center;
+  font-size: 14px; font-family: inherit; color: var(--text); cursor: pointer; max-width: 280px;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+}
+.who-sel:hover { border-color: #b7c3d3; background-color: var(--surface-2); }
+
+/* ============ 配置口径卡 / 范围徽标 ============ */
+.scope-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600;
+  padding: 6px 13px; border-radius: 999px; background: #eef4ff; border: 1px solid #cddcff; color: #1a3f9e; }
+.scope-badge.limited { background: #fff5e9; border-color: #f3d9a8; color: #8a520a; }
+.cfg-row { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; }
+.cfg-item { display: flex; flex-direction: column; gap: 6px; }
+.cfg-item > .field-label { margin-bottom: 0; }
+.cfg-note { font-size: 13.5px; color: var(--text-3); }
+
+/* ============ 月报 ============ */
+.report-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.report-title { font-size: 22px; font-weight: 700; }
+.report-meta { font-size: 14px; color: var(--text-3); }
+.print-area { background: #fff; }
+.print-area .card { border: 1px solid var(--border); box-shadow: none; }
+.print-area .card-head { background: #f7f9fc; }
+
+/* ============ 打印（另存为 PDF） ============ */
+@media print {
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .layout { display: block; }
+  .main { display: block; }
+  .content { padding: 0; max-width: none; }
+  body { background: #fff; }
+  .card { break-inside: avoid; box-shadow: none; }
+  .print-area { box-shadow: none; }
+}
+
+.mb12 { margin-bottom: 12px; }
+.gap16 { gap: 16px; }
