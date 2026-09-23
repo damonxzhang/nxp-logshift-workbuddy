@@ -2,7 +2,7 @@
 (function () {
   renderShell('evidence');
 
-  // 4.1 附件存证规范与存储目标：统一写入客户指定服务器，全部写死在代码中
+  // 4.1 附件存证规范与上传留痕
   const LIMIT = {
     sizeMB: 5, files: 9, totalMB: 50,
     width: 1280, height: 720, types: 'JPG / PNG / WEBP'
@@ -45,10 +45,10 @@
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
       ${icon('image', 19)}
-      <div><strong>落地说明（问卷 4.1）：</strong>值班人员上报异常、认领白晚班交接责任书时，可上传<strong>设备报错现场照片 / 系统报错截图</strong>作为存证附件。上传的附件<strong>统一写入客户指定的文件服务器</strong>，存储目标与容量规范<strong>均写死在代码中</strong>（<code>application-storage.yaml</code>），页面<strong>不提供方案切换与参数修改</strong>。</div>
+      <div><strong>功能说明（问卷 4.1）：</strong>值班人员上报异常、认领白晚班交接责任书时，可上传<strong>设备报错现场照片 / 系统报错截图</strong>作为存证附件。系统会自动提取分辨率、大小并生成哈希指纹，随单据一并归档留痕。</div>
     </div>
 
-    <div class="grid g-23 mt16">
+    <div class="mt16">
       <!-- 上传区 -->
       <section class="card">
         <div class="card-head">
@@ -60,7 +60,7 @@
           <div class="dropzone ${dragOver ? 'over' : ''}" id="dz">
             <div class="dz-icon">${icon('upload', 26)}</div>
             <div class="dz-title">点击选择文件，或将截图拖拽到此处</div>
-            <div class="dz-sub">支持 ${LIMIT.types} · 单张 ≤ ${LIMIT.sizeMB}MB · 单单据 ≤ ${LIMIT.files} 张 · 总量 ${LIMIT.totalMB}MB（规范写死）</div>
+            <div class="dz-sub">支持 ${LIMIT.types} · 单张 ≤ ${LIMIT.sizeMB}MB · 单单据 ≤ ${LIMIT.files} 张 · 总量 ${LIMIT.totalMB}MB</div>
             <input type="file" id="fileInput" accept="image/*" multiple hidden>
           </div>
 
@@ -68,7 +68,7 @@
             <div class="kpi" style="--accent:#1d4ed8;--accent-soft:#e7eeff">
               <div class="kpi-name">本单据已上传</div>
               <div class="kpi-value">${files.length}<span class="kpi-unit">张</span></div>
-              <div class="kpi-foot">上限 ${LIMIT.files} 张（写死）</div>
+              <div class="kpi-foot">上限 ${LIMIT.files} 张</div>
             </div>
             <div class="kpi" style="--accent:#0b6a86;--accent-soft:#e2f3f9">
               <div class="kpi-name">已占用容量</div>
@@ -80,13 +80,6 @@
               <div class="kpi-value">${files.filter(f => f.low).length}<span class="kpi-unit">张</span></div>
               <div class="kpi-foot">要求 ≥ ${LIMIT.width} × ${LIMIT.height}</div>
             </div>
-          </div>
-
-          <div class="fixed-kv mt16">
-            <div>单张大小上限</div><div>${LIMIT.sizeMB} MB（写死）</div>
-            <div>单单据最多张数</div><div>${LIMIT.files} 张（写死）</div>
-            <div>单据总容量上限</div><div>${LIMIT.totalMB} MB（写死）</div>
-            <div>建议最低分辨率</div><div>${LIMIT.width} × ${LIMIT.height}（写死）</div>
           </div>
 
           <div class="thumbs">
@@ -118,47 +111,6 @@
         </div>
       </section>
 
-      <!-- 存储方案（写死） -->
-      <section class="card" style="align-self:start">
-        <div class="card-head">
-          <div class="card-title">${icon('shield', 19)} 附件存储方案（写死）</div>
-          <span class="badge b-neutral">${icon('lock', 14)} 统一写入客户指定服务器</span>
-        </div>
-        <div class="card-body">
-          <div class="fixed-kv">
-            <div>落地服务器</div><div>${STORAGE_FIXED.server}</div>
-            <div>挂载协议</div><div>${STORAGE_FIXED.protocol}</div>
-            <div>挂载点</div><div class="log-meta">${STORAGE_FIXED.mount}</div>
-            <div>路径规则</div><div class="log-meta" style="word-break:break-all">${STORAGE_FIXED.pathRule}</div>
-            <div>容量与告警</div><div>${STORAGE_FIXED.quota}</div>
-            <div>保留策略</div><div>${STORAGE_FIXED.retain}</div>
-            <div>备份策略</div><div>${STORAGE_FIXED.backup}</div>
-            <div>衍生件</div><div>${STORAGE_FIXED.derived}</div>
-            <div>存证链</div><div>${STORAGE_FIXED.fingerprint}</div>
-            <div>访问管控</div><div>${STORAGE_FIXED.access}</div>
-          </div>
-
-          <div class="code-box mt16"># application-storage.yaml（后端写死，随版本发布，不支持在线切换）<br>
-storage:<br>
-&nbsp;&nbsp;type: nas&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 客户指定运维内网文件服务器<br>
-&nbsp;&nbsp;server: 10.20.40.12<br>
-&nbsp;&nbsp;mount: ${STORAGE_FIXED.mount}<br>
-&nbsp;&nbsp;path-rule: ${STORAGE_FIXED.pathRule}<br>
-&nbsp;&nbsp;max-file-size: ${LIMIT.sizeMB}MB<br>
-&nbsp;&nbsp;max-files-per-ticket: ${LIMIT.files}<br>
-&nbsp;&nbsp;max-ticket-size: ${LIMIT.totalMB}MB<br>
-&nbsp;&nbsp;retention-days: 180</div>
-
-          <div class="notice mt16" style="--nc:var(--success)">
-            ${icon('check', 17)}
-            <div class="small">存证附件<strong>统一落在客户指定的文件服务器</strong>，与代码分开放置；应用侧仅保存<strong>文件路径 + SHA-256 指纹</strong>，数据库不存二进制，避免表膨胀。</div>
-          </div>
-          <div class="notice mt8" style="--nc:var(--warn)">
-            ${icon('alert', 17)}
-            <div class="small">如需更换存储目标或调整配额，须修改 <code>application-storage.yaml</code> 并发版，运维侧同步挂载新目录，页面不提供在线修改入口。</div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <!-- 岗位交接 -->

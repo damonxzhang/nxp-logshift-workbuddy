@@ -1,30 +1,8 @@
 /* ==========================================================
    邮件内容展示（仅供演示）
-   邮件正文模板写死在后端 mail-templates/*.html.hbs，
-   此处仅按占位符渲染出「实际投递效果」，不提供任何在线编辑。
-   alerts.html 的「后台邮件内容展示页」与独立页 mail.html 共用本模块。
+   此处按真实占位符渲染出「实际投递到邮箱后看到的样子」，
+   alerts.html 的「邮件内容展示页」与独立页 mail.html 共用本模块。
    ========================================================== */
-
-const MAIL_SOURCE_TPL = {
-  critical: `# mail-templates/critical.html.hbs（后端写死模板，不支持在线编辑）
-&lt;h2&gt;【{{levelText}}告警】{{subsystem}} 发生 {{levelText}} 事件，请立即处置&lt;/h2&gt;
-&lt;p&gt;事件摘要：{{summary}}&lt;/p&gt;
-&lt;table&gt;
-  &lt;tr&gt;&lt;td&gt;事件编号&lt;/td&gt;&lt;td&gt;{{eventId}}&lt;/td&gt;&lt;/tr&gt;
-  &lt;tr&gt;&lt;td&gt;来源子系统&lt;/td&gt;&lt;td&gt;{{subsystem}}（{{dbType}} {{dbVersion}}）&lt;/td&gt;&lt;/tr&gt;
-  &lt;tr&gt;&lt;td&gt;异常等级&lt;/td&gt;&lt;td&gt;{{levelText}} / {{level}}&lt;/td&gt;&lt;/tr&gt;
-  &lt;tr&gt;&lt;td&gt;责任处室 / 负责人&lt;/td&gt;&lt;td&gt;{{dept}} · {{owner}}&lt;/td&gt;&lt;/tr&gt;
-  &lt;tr&gt;&lt;td&gt;SLA 剩余&lt;/td&gt;&lt;td&gt;{{slaRemain}}&lt;/td&gt;&lt;/tr&gt;
-&lt;/table&gt;`,
-  daily: `# mail-templates/daily-report.html.hbs（后端写死模板，不支持在线编辑）
-&lt;h2&gt;{{date}} 运维运营日报（{{shiftName}}）&lt;/h2&gt;
-&lt;p&gt;本班次共接入 {{totalSubsystems}} 个业务子系统，在线率 {{onlineRate}}，
-产生异常事件 {{todayEvents}} 起，已闭环 {{closed}} 起，待处置 {{pending}} 起。&lt;/p&gt;
-{{#each kpiCards}}
-  &lt;div class="kpi"&gt;&lt;div&gt;{{value}}&lt;/div&gt;&lt;div&gt;{{label}}&lt;/div&gt;&lt;/div&gt;
-{{/each}}
-&lt;table&gt; {{#each subsystems}} &lt;tr&gt;&lt;td&gt;{{name}}&lt;/td&gt;&lt;td&gt;{{health}}&lt;/td&gt;…&lt;/tr&gt; {{/each}} &lt;/table&gt;`
-};
 
 function mailHtml(kind) {
   if (kind === 'critical') return `
@@ -53,7 +31,7 @@ function mailHtml(kind) {
             <tr><td>责任处室 / 负责人</td><td>安保部 · 钱志强</td></tr>
             <tr><td>SLA 剩余</td><td><span class="num" style="color:#cc2f2a;font-weight:700">12 分 46 秒</span></td></tr>
             <tr><td>当前处置建议</td><td>① 现场确认机柜 PDU 供电 ② 检查 node-03 硬盘指示灯 ③ 15 分钟内未恢复请升级至厂商值班电话</td></tr>
-            <tr><td>现场存证</td><td>已关联 2 张现场照片（SHA-256 已登记，落盘至 ${STORAGE_FIXED.server}）</td></tr>
+            <tr><td>现场存证</td><td>已关联 2 张现场照片（哈希指纹已登记入存证链）</td></tr>
           </tbody>
         </table>
         <div class="mt16 small muted">本邮件 Critical 事件即时单发，不受免打扰时段限制；请勿直接回复。</div>
@@ -110,34 +88,25 @@ function mailHtml(kind) {
 /* 邮件内容展示卡片（alerts 页与 mail 页共用）
    cfg.mailTab：critical | daily */
 function mailCardHtml(cfg, extraClass = '') {
+  const t = MAIL_TEMPLATES[cfg.mailTab];
   return `
   <section class="card ${extraClass}">
     <div class="card-head">
-      <div class="card-title">${icon('mail', 19)} 后台邮件内容展示页
-        <span class="card-sub">模板由后端渲染，此处仅做效果预览（演示用）</span></div>
+      <div class="card-title">${icon('mail', 19)} 邮件内容预览
+        <span class="card-sub">展示收件人在邮箱中实际看到的样子（演示用）</span></div>
       <div class="toolbar">
-        ${Object.entries(MAIL_TEMPLATES).map(([k, t]) =>
-    `<button class="btn btn-sm ${cfg.mailTab === k ? 'btn-primary' : ''}" data-mail="${k}">${k === 'critical' ? 'Critical 特急单发' : t.name}</button>`).join('')}
+        ${Object.entries(MAIL_TEMPLATES).map(([k, v]) =>
+    `<button class="btn btn-sm ${cfg.mailTab === k ? 'btn-primary' : ''}" data-mail="${k}">${v.name}</button>`).join('')}
         <button class="btn btn-sm" id="btnMailSim">${icon('mail', 15)} 模拟投递该封</button>
       </div>
     </div>
     <div class="card-body">
-      <div class="fixed-kv" style="margin-bottom:14px">
-        <div>模板文件</div><div class="log-meta">mail-templates/${cfg.mailTab === 'critical' ? 'critical' : 'daily-report'}.html.hbs（写死）</div>
-        <div>邮件主题</div><div>${MAIL_TEMPLATES[cfg.mailTab].subject}</div>
-        <div>触发时机</div><div>${MAIL_TEMPLATES[cfg.mailTab].trigger}</div>
-        <div>收件范围</div><div>${MAIL_TEMPLATES[cfg.mailTab].receivers}</div>
+      <div class="mail-brief">
+        <div><span>邮件主题</span>${t.subject}</div>
+        <div><span>触发时机</span>${t.trigger}</div>
+        <div><span>收件范围</span>${t.receivers}</div>
       </div>
-      <div class="grid g-2 mt16" style="gap:18px">
-        <div>
-          <div class="small muted" style="margin-bottom:8px">① 模板源码（写死）</div>
-          <div class="code-box" style="white-space:pre-wrap;font-size:13px;max-height:300px;overflow:auto">${MAIL_SOURCE_TPL[cfg.mailTab]}</div>
-        </div>
-        <div>
-          <div class="small muted" style="margin-bottom:8px">② 渲染后的实际效果</div>
-          ${mailHtml(cfg.mailTab)}
-        </div>
-      </div>
+      ${mailHtml(cfg.mailTab)}
     </div>
   </section>`;
 }
@@ -149,7 +118,7 @@ function bindMailCard(cfg, rerender) {
   const b = document.getElementById('btnMailSim');
   b && b.addEventListener('click', () => {
     toast(cfg.mailTab === 'critical'
-      ? '已按写死模板即时投递至：安保部 钱志强、信息中心值班班长、分管领导'
-      : '已按写死模板投递本班次运营日报至：分管领导、信息中心管理层', 'success');
+      ? '已投递至：安保部 钱志强、信息中心值班班长、分管领导'
+      : '已投递本班次运营日报至：分管领导、信息中心管理层', 'success');
   });
 }

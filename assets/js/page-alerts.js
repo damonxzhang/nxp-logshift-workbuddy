@@ -1,4 +1,4 @@
-/* ============ 预警通知：邮件通道（SMTP 与正文均写死）+ 语音告警 ============ */
+/* ============ 预警通知：邮件通道 + 语音告警 ============ */
 (function () {
   renderShell('alerts');
 
@@ -50,48 +50,13 @@
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
       ${icon('mail', 19)}
-      <div><strong>预警通道说明：</strong>本系统预警<strong>仅通过邮件发送</strong>，不含短信通道。邮件网关参数与邮件正文模板<strong>均写死在后端配置与模板文件中</strong>，页面不提供在线编辑；下方「邮件内容展示页」<strong>仅用于向客户演示实际投递效果</strong>。</div>
+      <div><strong>预警通道说明：</strong>本系统预警<strong>仅通过邮件发送</strong>，不含短信通道。下方「邮件内容预览」可切换查看<strong>特急单发邮件</strong>与<strong>换班运营日报邮件</strong>在收件邮箱中的实际效果。</div>
     </div>
 
     <div class="grid g-2 mt16">
       <section class="card">
         <div class="card-head">
-          <div class="card-title">${icon('settings', 19)} 邮件 SMTP 网关配置（写死）</div>
-          <span class="badge b-neutral">${icon('lock', 14)} 仅在此展示，修改需发版</span>
-        </div>
-        <div class="card-body">
-          <div class="fixed-kv">
-            <div>网关类型</div><div>${SMTP_FIXED.type}</div>
-            <div>SMTP 主机</div><div class="log-meta">${SMTP_FIXED.host}</div>
-            <div>端口 / 加密</div><div>${SMTP_FIXED.port} · ${SMTP_FIXED.ssl}</div>
-            <div>认证方式</div><div>${SMTP_FIXED.auth}</div>
-            <div>发件人</div><div>${SMTP_FIXED.fromName} &lt;${SMTP_FIXED.from}&gt;</div>
-            <div>域名加白</div><div>${SMTP_FIXED.whitelist}</div>
-            <div>发送限额</div><div>${SMTP_FIXED.limit}</div>
-            <div>超时与重试</div><div>${SMTP_FIXED.timeout}</div>
-            <div>退信处理</div><div>${SMTP_FIXED.bounce}</div>
-            <div>短信通道</div><div><span class="badge b-neutral">未启用</span> 本期不集成短信网关</div>
-          </div>
-          <div class="code-box mt16"># application-mail.yaml（后端写死，随版本发布）<br>
-mail:<br>
-&nbsp;&nbsp;enabled: true<br>
-&nbsp;&nbsp;host: ${SMTP_FIXED.host}<br>
-&nbsp;&nbsp;port: ${SMTP_FIXED.port}<br>
-&nbsp;&nbsp;starttls: true&nbsp;&nbsp;# 强制开启<br>
-&nbsp;&nbsp;username: ops-monitor<br>
-&nbsp;&nbsp;from: ${SMTP_FIXED.from}<br>
-&nbsp;&nbsp;from-name: ${SMTP_FIXED.fromName}<br>
-&nbsp;&nbsp;daily-limit: 500<br>
-&nbsp;&nbsp;retry: 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 30s / 120s / 300s<br>
-sms:<br>
-&nbsp;&nbsp;enabled: false&nbsp;&nbsp;&nbsp;# 本期不使用短信通道</div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('file', 19)} 邮件投递策略（写死）</div>
-          <span class="badge b-neutral">${icon('lock', 14)} 三选一策略已在代码中固定</span>
+          <div class="card-title">${icon('file', 19)} 邮件投递策略</div>
         </div>
         <div class="card-body">
           ${Object.entries(MAIL_TEMPLATES).map(([k, t]) => `
@@ -109,6 +74,44 @@ sms:<br>
           <div class="notice mt8" style="--nc:var(--warn)">
             ${icon('alert', 17)}
             <div class="small">特急邮件不受 23:00 - 06:30 免打扰时段限制，其余等级邮件在该时段合并，次日 08:00 随日报补发。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="align-self:start">
+        <div class="card-head">
+          <div class="card-title">${icon('activity', 19)} 邮件通道运行概览</div>
+          <span class="badge b-success">${icon('check', 14)} 投递正常</span>
+        </div>
+        <div class="card-body">
+          <div class="rowline">
+            <div><div class="rl-title">通知通道</div>
+              <div class="rl-desc">仅邮件发送，本期不集成短信网关</div></div>
+            <span class="badge b-primary">邮件</span>
+          </div>
+          <div class="rowline">
+            <div><div class="rl-title">今日已投递</div>
+              <div class="rl-desc">特急单发 2 封 · 换班日报 1 封</div></div>
+            <span class="badge b-info">3 封</span>
+          </div>
+          <div class="rowline">
+            <div><div class="rl-title">最近一次投递</div>
+              <div class="rl-desc">今天 14:52 · 视频监控 VMS 特急事件 → 安保部 钱志强</div></div>
+            <span class="badge b-success">已送达</span>
+          </div>
+          <div class="rowline">
+            <div><div class="rl-title">订阅覆盖</div>
+              <div class="rl-desc">${cfg.rules.length} 个处室、${new Set(cfg.rules.map(r => r.mail)).size} 个负责人邮箱</div></div>
+            <span class="badge b-neutral">${cfg.rules.length} 条规则</span>
+          </div>
+          <div class="rowline">
+            <div><div class="rl-title">退信情况</div>
+              <div class="rl-desc">连续退信 3 次自动停用收件人并产生告警</div></div>
+            <span class="badge b-success">0 封</span>
+          </div>
+          <div class="notice mt16" style="--nc:var(--success)">
+            ${icon('mail', 17)}
+            <div class="small">邮件 SSL 加密传输，不携带敏感金额信息；涉及报价、回调地址等内容改为系统内跳转链接。</div>
           </div>
         </div>
       </section>
@@ -188,7 +191,7 @@ sms:<br>
           </div>
 
           <div class="field">
-            <label class="field-label">告警播报文案模板（写死，占位符自动替换）</label>
+            <label class="field-label">告警播报文案模板（占位符自动替换）</label>
             <textarea class="textarea" id="tpl">${esc(cfg.tpl)}</textarea>
             <div class="field-hint">可用占位符：{等级} {系统} {事件} {负责人}</div>
           </div>
@@ -209,7 +212,7 @@ sms:<br>
         <div class="card-body">
           <div class="rowline">
             <div><div class="rl-title">通知通道</div>
-              <div class="rl-desc">仅邮件（SMTP 写死），无短信网关</div></div>
+              <div class="rl-desc">仅邮件发送，本期不集成短信网关</div></div>
             <span class="badge b-primary">邮件</span>
           </div>
           <div class="rowline">

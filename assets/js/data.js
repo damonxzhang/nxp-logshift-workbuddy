@@ -59,11 +59,12 @@ const DEPT_STATS = [
 ];
 
 /* ==========================================================
-   以下为「代码中写死（后端配置文件 / 常量）」的参数
-   页面仅做展示，不提供修改入口
+   实施参数（SMTP / 模板 / 存储 / 采集 / 调度）
+   这些值代表后端实际落地时的配置，页面不做展示，
+   仅供研发在实施阶段对齐口径使用。
    ========================================================== */
 
-// 5.1 邮件网关：写死在企业自建私有邮件服务器
+// 5.1 邮件网关实施参数（企业自建私有邮件服务器）
 const SMTP_FIXED = {
   type: '企业自建私有邮件服务器（Postfix + Dovecot，内网部署）',
   host: 'mail.corp.example.com',
@@ -78,7 +79,7 @@ const SMTP_FIXED = {
   bounce: '退信统一回收至 ops-bounce@corp.example.com，连续 3 次退信自动停用该收件人并告警'
 };
 
-// 邮件正文模板：由后端模板引擎渲染，代码内置
+// 邮件正文模板：由后端模板引擎渲染
 const MAIL_TEMPLATES = {
   critical: {
     name: 'Critical 特急事件单发邮件',
@@ -88,13 +89,13 @@ const MAIL_TEMPLATES = {
   },
   daily: {
     name: '白晚班换班运营日报邮件',
-    trigger: '触发条件：后端定时任务 cron = 0 8,20 * * *，白晚班换班节点自动投递',
+    trigger: '触发条件：白晚班换班节点（08:00 / 20:00）自动投递当日汇总运营日报',
     receivers: '分管领导 + 信息中心管理层（可选：按处室分别分发）',
     subject: '{日期} 运维运营日报（{班次}）· 在线率 {在线率} · 待处置 {待处置} 项'
   }
 };
 
-// 4.1 附件存储：统一写入客户指定服务器
+// 4.1 附件存储：统一写入客户指定服务器（页面不展示）
 const STORAGE_FIXED = {
   server: 'file-mgt-01（10.20.40.12）· 运维内网区',
   protocol: 'NFS v4.1 只读无关写入挂载（备选 SMB 3.0）',
@@ -108,7 +109,7 @@ const STORAGE_FIXED = {
   access: '仅经堡垒机代理访问，禁止公网直连；取图走后端鉴权临时 URL（30 分钟有效）'
 };
 
-// 2.1 采集模式与端点：后端 collector.yaml 固定配置
+// 2.1 采集模式与端点（实施时对接口径）
 const COLLECT_FIXED = {
   strategy: '以模式 A 为主、模式 B 兜底：具备标准接口的系统走网关订阅推送，遗留系统走只读库定时轮询',
   gateway: '统一日志网关 https://log-gw.corp.internal:9443/api/v1（ELK + Prometheus Alertmanager 双通道）',
@@ -118,7 +119,7 @@ const COLLECT_FIXED = {
   fallback: '连续 3 次采集失败自动降级为低频轮询并推送运维群，恢复后自动切回'
 };
 
-// 3.1 调度周期：全局硬编码，变更需发版重启
+// 3.1 调度周期（实施时对接口径）
 const CRON_FIXED = [
   { job: 'collect-subsystem-status', alias: '子系统状态拉取', cron: '*/1 * * * *', note: '每分钟调用各子系统 /health 网关接口' },
   { job: 'pull-alert-log', alias: '异常日志增量同步', cron: '*/1 * * * *', note: '按事件水位拉取增量，不做全量扫描' },

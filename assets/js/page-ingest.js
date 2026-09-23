@@ -1,4 +1,4 @@
-/* ============ 数据采集与调度：配置为代码写死，页面提供调用日志 ============ */
+/* ============ 数据采集与调度：页面提供各子系统对接调用日志 ============ */
 (function () {
   renderShell('ingest');
 
@@ -119,8 +119,8 @@ ${l.mode === 'A'
 
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
-      ${icon('lock', 19)}
-      <div><strong>说明：</strong>本模块的采集模式、端点参数与调度周期<strong>全部写死在后端配置文件中</strong>（<code>collector.yaml</code> / <code>scheduler.yaml</code>），页面<strong>不提供任何在线修改入口</strong>，变更需走版本发布流程。本页仅用于查看<strong>各子系统的数据对接调用日志</strong>，便于快速定位哪一环没打通。</div>
+      ${icon('activity', 19)}
+      <div><strong>页面说明：</strong>本页用于查看<strong>各子系统的数据对接调用日志</strong>，实时反映每一次采集调用了谁、花了多久、返回多少条、是否成功，便于快速定位哪一环没打通。</div>
     </div>
 
     <div class="grid g-6 mt16">
@@ -130,7 +130,7 @@ ${l.mode === 'A'
         { n: '平均响应耗时', v: st.avg, u: 'ms', f: '慢调用阈值 1500ms（模式 A）/ 2000ms（模式 B）', c: '#0b6a86', s: '#e2f3f9', i: 'clock' },
         { n: '异常调用次数', v: st.fail + st.slow, u: '次', f: `失败 ${st.fail} · 慢响应 ${st.slow}`, c: '#cc2f2a', s: '#fdecea', i: 'alert' },
         { n: '本日同步数据量', v: st.rows, u: '条', f: '按事件水位增量提取，不重复入库', c: '#8b5cf6', s: '#f1ebfe', i: 'database' },
-        { n: '调度任务', v: CRON_FIXED.length, u: '个', f: '全部硬编码，页面不可修改', c: '#a8620b', s: '#fdf1e0', i: 'settings' }
+        { n: '纳管子系统', v: SUBSYSTEMS.length, u: '个', f: `其中 ${ov.filter(o => o.mode === 'B').length} 个为无接口遗留系统`, c: '#a8620b', s: '#fdf1e0', i: 'layers' }
       ].map(k => `<div class="kpi" style="--accent:${k.c};--accent-soft:${k.s}">
         <div class="kpi-top"><span class="kpi-name">${k.n}</span><span class="kpi-icon">${icon(k.i, 20)}</span></div>
         <div class="kpi-value">${k.v}<span class="kpi-unit">${k.u}</span></div>
@@ -142,7 +142,7 @@ ${l.mode === 'A'
       <div class="card-head">
         <div class="card-title">${icon('layers', 19)} 各子系统数据对接情况总览
           <span class="card-sub">按今日调用日志实时汇总</span></div>
-        <span class="badge b-neutral">${icon('lock', 14)} 端点写死在 collector.yaml</span>
+        <span class="badge b-info">${icon('database', 14)} 含 API 网关与只读库两类对接方式</span>
       </div>
       <div class="card-body" style="padding:0">
         <div style="overflow-x:auto">
@@ -258,59 +258,6 @@ ${l.mode === 'A'
         <div class="card-body"><div id="slowBars"></div>
           ${slowTop.length ? '' : '<div class="muted small">全部子系统响应均在阈值内</div>'}</div>
       </section>
-    </div>
-
-    <!-- 写死配置展示 -->
-    <div class="grid g-2 mt24">
-      <section class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('database', 19)} 采集模式配置（写死）</div>
-          <span class="badge b-neutral">${icon('lock', 14)} 页面不可修改</span>
-        </div>
-        <div class="card-body">
-          <div class="fixed-kv">
-            <div>总体策略</div><div>${COLLECT_FIXED.strategy}</div>
-            <div>统一日志网关</div><div class="log-meta">${COLLECT_FIXED.gateway}</div>
-            <div>认证方式</div><div>${COLLECT_FIXED.auth}</div>
-            <div>推送/拉取</div><div>${COLLECT_FIXED.pushMode}</div>
-            <div>模式 B 范围</div><div>${COLLECT_FIXED.dbMode}</div>
-            <div>失败降级</div><div>${COLLECT_FIXED.fallback}</div>
-          </div>
-          <div class="code-box mt16"># collector.yaml（后端写死，随版本发布，不支持在线热改）<br>
-collector:<br>
-&nbsp;&nbsp;mode-a:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;gateway: "https://log-gw.corp.internal:9443/api/v1"<br>
-&nbsp;&nbsp;&nbsp;&nbsp;auth: oauth2-client-credentials<br>
-&nbsp;&nbsp;&nbsp;&nbsp;subscribe: webhook&nbsp;&nbsp;# webhook | poll | grpc-stream<br>
-&nbsp;&nbsp;&nbsp;&nbsp;timeout-ms: 3000<br>
-&nbsp;&nbsp;&nbsp;&nbsp;retry: 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 30s / 120s / 300s<br>
-&nbsp;&nbsp;mode-b:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;targets: [TMS, WMS]<br>
-&nbsp;&nbsp;&nbsp;&nbsp;username: monitor_ro&nbsp;&nbsp;# 仅 SELECT 权限<br>
-&nbsp;&nbsp;&nbsp;&nbsp;pool-size: 8<br>
-&nbsp;&nbsp;&nbsp;&nbsp;sql-timeout-ms: 2000<br>
-&nbsp;&nbsp;&nbsp;&nbsp;readonly: true</div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('settings', 19)} 定时调度周期（写死）</div>
-          <span class="badge b-neutral">${icon('lock', 14)} 全局统一，变更后需重启</span>
-        </div>
-        <div class="card-body" style="padding:0">
-          <table class="table">
-            <thead><tr><th>任务</th><th>Cron 表达式</th><th>说明</th></tr></thead>
-            <tbody>
-              ${CRON_FIXED.map(c => `<tr>
-                <td><div class="tname" style="font-size:14.5px">${c.alias}</div><div class="tsub">${c.job}</div></td>
-                <td><span class="code-box" style="padding:4px 8px;font-size:13.5px">${c.cron}</span></td>
-                <td class="small">${c.note}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="card-foot">调度周期由 <code>scheduler.yaml</code> 硬编码管理，页面不提供图形化修改入口；如需调整周期，请联系运维侧发版。</div>
-      </section>
     </div>`;
 
     hBars(document.getElementById('failBars'), failDist, ' 次');
@@ -374,7 +321,7 @@ collector:<br>
       </div>
       <div class="modal-body">${detailHtml(l)}</div>
       <div class="card-foot" style="border-radius:0 0 var(--radius) var(--radius);display:flex;justify-content:space-between;align-items:center">
-        <span class="small muted">配置为后端写死，此处仅支持查看与日志回放</span>
+        <span class="small muted">支持查看报文详情与手动重放</span>
         <button class="btn btn-primary btn-sm" id="mReplay">${icon('refresh', 15)} 手动重放该调用</button>
       </div>
     </div>`;
