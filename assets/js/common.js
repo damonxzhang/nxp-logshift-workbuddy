@@ -47,6 +47,7 @@ const NAV = [
   { key: 'alerts', href: 'alerts.html', label: '预警通知配置', icon: 'bell' },
   { key: 'analytics', href: 'analytics.html', label: '异常根因分析', icon: 'activity' },
   { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
+  { key: 'archive', href: 'archive.html', label: '历史日志归档', icon: 'database' },
   { key: 'mail', href: 'mail.html', label: '邮件内容展示', icon: 'mail' },
   { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
 ];
@@ -59,6 +60,7 @@ const PAGE_TITLES = {
   alerts: ['预警通知配置', '问卷 5.1 / 5.2 · 邮件通知 + 语音告警'],
   analytics: ['异常根因智能分析', '高频告警统计 · 相似告警聚类 · 根因研判'],
   monthly: ['自动月报', '按月汇总告警与事件 · 预览 / 导出 PDF·Excel'],
+  archive: ['历史日志归档', '过期日志自动归档 · 检索查询与审计追溯'],
   mail: ['邮件内容展示', '问卷 5.1 · 演示实际投递到邮箱的效果'],
   users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕']
 };

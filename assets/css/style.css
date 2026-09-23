@@ -654,3 +654,17 @@ table.table tbody tr:last-child td { border-bottom: none; }
 
 .mb12 { margin-bottom: 12px; }
 .gap16 { gap: 16px; }
+
+/* ============ 历史日志归档 ============ */
+.hl { background: #fff2cc; color: #8a520a; padding: 0 2px; border-radius: 3px; font-weight: 600; }
+.filterbar { display: flex; flex-wrap: wrap; gap: 14px 16px; align-items: flex-end; }
+.filterbar .fb { display: flex; flex-direction: column; gap: 6px; }
+.filterbar .fb > .field-label { margin-bottom: 0; }
+.arc-jobs { max-height: 360px; overflow-y: auto; }
+.arc-job { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px dashed var(--border); }
+.arc-job:last-child { border-bottom: none; }
+.arc-job .aj-time { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; flex: 0 0 152px; }
+.arc-job .aj-main { flex: 1; min-width: 0; }
+.arc-job .aj-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.arc-job .aj-desc { font-size: 13.5px; color: var(--text-2); margin-top: 2px; }
+.arc-job .aj-stat { text-align: right; font-size: 14px; flex: 0 0 auto; }

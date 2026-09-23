@@ -32,7 +32,8 @@
 | 邮件内容展示 | `mail.html` | **5.1** | 【演示页】两套邮件效果切换预览（主题、收件范围、正文）+ 近期投递记录 |
 | 异常根因智能分析 | `analytics.html` | 高频告警统计 | 可配置字段聚合统计、按日/周/月分桶的趋势与 TOP 高频排行、相似告警自动聚类（区分批量连锁 / 偶发）与根因研判、图表展示与 Excel 导出、统计数据可被月报调用、按权限范围过滤 |
 | 自动月报 | `monthly.html` | 月度汇报 | 按月汇总告警总量 / TOP 高频异常 / 处置情况 / 根因聚类 / 子系统健康概览，支持章节配置、预览、手动触发生成、导出 PDF·Excel，受分级权限管控 |
-| 用户与权限管理 | `users.html` | RBAC | 用户管理（新增/编辑/停用/删除/重置密码/多角色分配/数据范围）、角色权限矩阵（10 模块 × 6 操作 = 60 权限点）、操作日志留痕 |
+| 历史日志归档 | `archive.html` | 归档审计 | 按可配置规则自动归档过期日志（减少主库数据量、保障性能），归档概览 KPI、主库在线 vs 已归档趋势、等级分布、各系统归档量与释放空间趋势、归档任务历史；归档日志支持关键词/等级/系统/操作人/时间范围检索查询与 Excel 导出，归档时长/触发规则/存储方式均为预留配置入口，受分级权限管控 |
+| 用户与权限管理 | `users.html` | RBAC | 用户管理（新增/编辑/停用/删除/重置密码/多角色分配/数据范围）、角色权限矩阵（11 模块 × 6 操作 = 66 权限点）、操作日志留痕 |
 
 ## 四、实施参数在哪里改
 
@@ -65,13 +66,14 @@ CALL_LOG_TPL    调用日志样例（组装函数 buildCallLogs）
 
 ```
 ops-handover-demo/
-├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html / analytics.html / monthly.html / users.html
+├── index.html / systems.html / ingest.html / evidence.html / alerts.html / mail.html / analytics.html / monthly.html / archive.html / users.html
 ├── assets/
 │   ├── css/style.css          浅色主题样式
 │   └── js/
 │       ├── common.js          图标、导航、顶栏、Toast、SVG 图表、演示身份切换、零依赖 Excel 导出
-│       ├── data.js            样例数据 + 实施参数（页面不展示）+ 10 个权限模块定义
+│       ├── data.js            样例数据 + 实施参数（页面不展示）+ 11 个权限模块定义
 │       ├── analytics-core.js  告警数据引擎（确定性生成 / 聚类 / 分桶 / TOP 统计，analytics 与 monthly 共用）
+│       ├── archive-core.js    日志归档引擎（确定性生成 420 天日志 / 归档规则 / 检索过滤 / 分级范围过滤）
 │       ├── mail-preview.js    邮件渲染（alerts / mail 两页共用）
 │       ├── page-index.js      总览页逻辑
 │       ├── page-systems.js    子系统与底座页逻辑
@@ -81,6 +83,7 @@ ops-handover-demo/
 │       ├── page-mail.js       邮件内容展示页
 │       ├── page-analytics.js  异常根因智能分析页逻辑
 │       ├── page-monthly.js    自动月报页逻辑
+│       ├── page-archive.js    历史日志归档页逻辑
 │       └── page-users.js      RBAC 用户 / 角色 / 权限 / 日志
 └── README.md
 ```

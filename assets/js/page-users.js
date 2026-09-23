@@ -7,7 +7,7 @@
   let audit = store.get('rbac_audit', null) || AUDIT_SEED.slice();
   let tab = store.get('rbac_tab', 'user');
 
-  // 兼容历史持久化：补齐新增权限模块（异常根因分析 / 自动月报），避免旧角色缺失这两列
+  // 兼容历史持久化：补齐新增权限模块（异常根因分析 / 自动月报 / 历史日志归档），避免旧角色缺失对应列
   (function normalizeRoles() {
     let changed = false;
     roles.forEach(r => {
