@@ -45,7 +45,21 @@
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
       ${icon('image', 19)}
-      <div><strong>功能说明（问卷 4.1）：</strong>值班人员上报异常、认领白晚班交接责任书时，可上传<strong>设备报错现场照片 / 系统报错截图</strong>作为存证附件。系统会自动提取分辨率、大小并生成哈希指纹，随单据一并归档留痕。</div>
+      <div><strong>P1 专属大屏 · 生产交易日志看板：</strong>对应客户原始需求表第 1 项，在现有交接日志系统基础上升级——支持上传<strong>现场照片 / 报错截图</strong>存证、<strong>关键词检索</strong>、<strong>导出并发送邮件</strong>；本屏自带<strong>预警组件</strong>（阈值/周期/系数可配，触发后屏幕变红 + 强制弹窗 + 语音播报）与<strong>邮件组件</strong>，均为各屏复用能力。<br>
+      系统自动提取分辨率、大小并生成哈希指纹，随单据一并归档留痕。<strong>FLT 批次、紧急批字段的取值规则待 09-29 与客户确认。</strong></div>
+    </div>
+
+    <div class="card mt16">
+      <div class="card-head">
+        <div class="card-title">${icon('layers', 19)} 本屏标配能力
+          <span class="card-sub">每块专属大屏均自带，作为统一组件复用</span></div>
+      </div>
+      <div class="card-body flex gap16" style="flex-wrap:wrap">
+        <a class="chip" href="alerts.html">${icon('bell', 16)} 预警组件 · 阈值 / 强制弹窗 / 语音</a>
+        <a class="chip" href="mail.html">${icon('mail', 16)} 邮件组件 · 告警邮件与导出发送</a>
+        <a class="chip" href="wall.html">${icon('layers', 16)} 加入监控室轮播</a>
+        <span class="chip">${icon('clock', 16)} 数据刷新：手动 + 可配置周期</span>
+      </div>
     </div>
 
     <div class="mt16">

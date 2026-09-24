@@ -122,6 +122,8 @@ const PERM_MODULES = [
   { id: 'analysis', name: '异常根因分析', desc: '高频告警统计、根因聚类、相似告警研判' },
   { id: 'report', name: '自动月报', desc: '月度报表生成、预览与导出' },
   { id: 'archive', name: '历史日志归档', desc: '过期日志自动归档、检索查询与审计追溯' },
+  { id: 'pit', name: '凹库·微水调库看板', desc: '各站凹库量统计、在库时长与调库趋势（P2 屏）' },
+  { id: 'wall', name: '监控室轮播', desc: '多屏轮播、轮播顺序与间隔配置（监控室）' },
   { id: 'user', name: '用户与权限', desc: '用户、角色、权限矩阵管理' },
   { id: 'system', name: '系统设置', desc: '基础参数、字典、备份与升级' }
 ];
@@ -130,32 +132,32 @@ const ROLES_SEED = [
   {
     id: 'R01', name: '系统管理员', builtin: true, level: '系统级', users: 2, color: '#1d4ed8',
     desc: '拥有全部功能的全部权限，可创建角色并授权他人',
-    perms: { overview: ['view', 'create', 'edit', 'delete', 'export', 'approve'], systems: ['view', 'create', 'edit', 'delete', 'export', 'approve'], ingest: ['view', 'create', 'edit', 'delete', 'export', 'approve'], evidence: ['view', 'create', 'edit', 'delete', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'delete', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'delete', 'export', 'approve'], analysis: ['view', 'create', 'edit', 'delete', 'export', 'approve'], report: ['view', 'create', 'edit', 'delete', 'export', 'approve'], archive: ['view', 'create', 'edit', 'delete', 'export', 'approve'], user: ['view', 'create', 'edit', 'delete', 'export', 'approve'], system: ['view', 'create', 'edit', 'delete', 'export', 'approve'] }
+    perms: { overview: ['view', 'create', 'edit', 'delete', 'export', 'approve'], systems: ['view', 'create', 'edit', 'delete', 'export', 'approve'], ingest: ['view', 'create', 'edit', 'delete', 'export', 'approve'], evidence: ['view', 'create', 'edit', 'delete', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'delete', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'delete', 'export', 'approve'], analysis: ['view', 'create', 'edit', 'delete', 'export', 'approve'], report: ['view', 'create', 'edit', 'delete', 'export', 'approve'], archive: ['view', 'create', 'edit', 'delete', 'export', 'approve'], pit: ['view', 'create', 'edit', 'delete', 'export', 'approve'], wall: ['view', 'create', 'edit', 'delete', 'export', 'approve'], user: ['view', 'create', 'edit', 'delete', 'export', 'approve'], system: ['view', 'create', 'edit', 'delete', 'export', 'approve'] }
   },
   {
     id: 'R02', name: '信息中心主任', builtin: false, level: '管理级', users: 1, color: '#0b6a86',
     desc: '全局查看与审批，可管理本部门用户，不可修改系统参数',
-    perms: { overview: ['view', 'export'], systems: ['view', 'edit', 'export'], ingest: ['view', 'export'], evidence: ['view', 'create', 'edit', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'export', 'approve'], analysis: ['view', 'export'], report: ['view', 'create', 'edit', 'export', 'approve'], archive: ['view', 'create', 'edit', 'export', 'approve'], user: ['view', 'create', 'edit'], system: ['view'] }
+    perms: { overview: ['view', 'export'], systems: ['view', 'edit', 'export'], ingest: ['view', 'export'], evidence: ['view', 'create', 'edit', 'export', 'approve'], alerts: ['view', 'create', 'edit', 'export', 'approve'], keyword: ['view', 'create', 'edit', 'export', 'approve'], analysis: ['view', 'export'], report: ['view', 'create', 'edit', 'export', 'approve'], archive: ['view', 'create', 'edit', 'export', 'approve'], pit: ['view', 'export'], wall: ['view'], user: ['view', 'create', 'edit'], system: ['view'] }
   },
   {
     id: 'R03', name: '值班班长', builtin: false, level: '执行级', users: 2, color: '#12805a',
     desc: '负责日常值守、异常处置与白晚班交接，可上传存证、认领责任书',
-    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit', 'export'], alerts: ['view', 'create', 'edit'], keyword: ['view'], analysis: ['view'], report: ['view', 'create', 'edit', 'export'], archive: ['view', 'create', 'export'], user: ['view'], system: [] }
+    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit', 'export'], alerts: ['view', 'create', 'edit'], keyword: ['view'], analysis: ['view'], report: ['view', 'create', 'edit', 'export'], archive: ['view', 'create', 'export'], pit: ['view', 'create', 'export'], wall: ['view'], user: ['view'], system: [] }
   },
   {
     id: 'R04', name: '处室负责人', builtin: false, level: '执行级', users: 4, color: '#a8620b',
     desc: '仅可见本处室相关数据，负责本处室异常签收与处置反馈',
-    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit'], alerts: ['view', 'edit'], keyword: ['view'], analysis: ['view'], report: ['view', 'edit'], archive: ['view'], user: ['view'], system: [] }
+    perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit'], alerts: ['view', 'edit'], keyword: ['view'], analysis: ['view'], report: ['view', 'edit'], archive: ['view'], pit: ['view'], wall: ['view'], user: ['view'], system: [] }
   },
   {
     id: 'R05', name: '安全审计员', builtin: false, level: '审计级', users: 1, color: '#8b5cf6',
     desc: '只读 + 导出，用于合规审计与追溯，不可做任何写操作',
-    perms: { overview: ['view', 'export'], systems: ['view', 'export'], ingest: ['view', 'export'], evidence: ['view', 'export'], alerts: ['view', 'export'], keyword: ['view', 'export'], analysis: ['view', 'export'], report: ['view', 'export'], archive: ['view', 'export'], user: ['view', 'export'], system: ['view'] }
+    perms: { overview: ['view', 'export'], systems: ['view', 'export'], ingest: ['view', 'export'], evidence: ['view', 'export'], alerts: ['view', 'export'], keyword: ['view', 'export'], analysis: ['view', 'export'], report: ['view', 'export'], archive: ['view', 'export'], pit: ['view', 'export'], wall: ['view'], user: ['view', 'export'], system: ['view'] }
   },
   {
     id: 'R06', name: '只读访客', builtin: false, level: '访客级', users: 1, color: '#8a95a5',
     desc: '演示或参观用，仅可查看监控总览，不含任何导出能力',
-    perms: { overview: ['view'], systems: [], ingest: [], evidence: [], alerts: [], keyword: [], analysis: ['view'], report: [], archive: ['view'], user: [], system: [] }
+    perms: { overview: ['view'], systems: [], ingest: [], evidence: [], alerts: [], keyword: [], analysis: ['view'], report: [], archive: ['view'], pit: ['view'], wall: ['view'], user: [], system: [] }
   }
 ];
 

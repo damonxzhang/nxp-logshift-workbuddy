@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生产监控 Dashboard · 需求对齐清单（09-24 会议后）</title>
+<style>
+  :root{
+    --bg:#f2f5fa; --surface:#ffffff; --surface-2:#f7f9fc; --surface-3:#eef2f8;
+    --border:#e1e7f0; --text:#1d2836; --text-2:#566375; --text-3:#8a95a5;
+    --primary:#1d4ed8; --primary-soft:#e7eeff;
+    --success:#12805a; --warn:#a8620b; --danger:#cc2f2a; --info:#0b6a86; --purple:#8b5cf6;
+    --radius:14px; --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;font-size:15px}
+  a{color:var(--primary);text-decoration:none}
+  .topbar-g{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#1d2836,#26323f);
+    color:#fff;padding:16px 28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .topbar-g .logo{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center}
+  .topbar-g h1{font-size:19px;margin:0;font-weight:700}
+  .topbar-g .sub{font-size:13px;color:#aeb9c8;margin-top:2px}
+  .topbar-g .tag{margin-left:auto;font-size:12.5px;background:rgba(255,255,255,.12);
+    padding:5px 12px;border-radius:999px;color:#dbe3ee}
+  .wrap{display:flex;gap:26px;max-width:var(--maxw);margin:0 auto;padding:26px 20px 60px}
+  .toc{position:sticky;top:84px;align-self:flex-start;width:240px;flex:0 0 240px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 12px;max-height:calc(100vh - 110px);overflow:auto}
+  .toc .t-title{font-size:12px;color:var(--text-3);letter-spacing:.5px;padding:6px 10px;font-weight:700}
+  .toc a{display:block;padding:8px 10px;border-radius:9px;color:var(--text-2);font-size:14px;margin:2px 0}
+  .toc a:hover{background:var(--surface-3);color:var(--text)}
+  .main{flex:1;min-width:0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:22px;box-shadow:0 1px 2px rgba(20,40,80,.03)}
+  .card h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .card h3{font-size:16.5px;margin:22px 0 10px}
+  .card .lead{color:var(--text-2);margin:0 0 14px;font-size:14.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 11px;
+    border-radius:999px;font-weight:600;background:var(--surface-3);color:var(--text-2);white-space:nowrap}
+  .pill.blue{background:var(--primary-soft);color:var(--primary)}
+  .pill.green{background:#e3f6ee;color:var(--success)}
+  .pill.amber{background:#fdf1e0;color:var(--warn)}
+  .pill.red{background:#fdecea;color:var(--danger)}
+  .pill.purple{background:#f1ebfe;color:var(--purple)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--surface-2);font-weight:600;color:var(--text-2);font-size:13.5px}
+  tbody tr:hover{background:var(--surface-2)}
+  .num{font-variant-numeric:tabular-nums}
+  .muted{color:var(--text-3)}
+  .small{font-size:13px}
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .kpi{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--surface-2)}
+  .kpi .k{font-size:12.5px;color:var(--text-3)}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:2px}
+  .note{border-left:4px solid var(--info);background:var(--surface-2);padding:12px 16px;
+    border-radius:0 10px 10px 0;margin:14px 0;font-size:14px;color:var(--text-2)}
+  .note.red{border-color:var(--danger);background:#fdf3f2}
+  .note.amber{border-color:var(--warn);background:#fef6ec}
+  .note.green{border-color:var(--success);background:#eef9f4}
+  .ask{background:#fff8ef;border:1px dashed #e0b878;border-radius:12px;padding:14px 18px;margin:14px 0}
+  .ask .q{font-weight:700;color:#8a4b03;margin-bottom:6px}
+  .ask ul{margin:6px 0;padding-left:20px}
+  .ask li{margin:5px 0;font-size:14px}
+  .confirm{background:linear-gradient(180deg,#fff,#fffdf8);border:1.5px solid #f3d9a8}
+  .confirm h2{color:#8a4b03}
+  footer{max-width:var(--maxw);margin:0 auto;padding:0 20px 40px;color:var(--text-3);font-size:12.5px}
+  @media (max-width:900px){
+    .wrap{flex-direction:column}.toc{position:static;width:100%;flex:none;max-height:none}
+    .g3,.g2{grid-template-columns:1fr}
+  }
+  @media print{
+    .topbar-g{background:#1d2836 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .toc{display:none}.wrap{display:block;padding:0}
+    .card,.confirm{break-inside:avoid;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar-g">
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+  </div>
+  <div>
+    <h1>生产监控 Dashboard · 需求对齐清单</h1>
+    <div class="sub">依据：客户原始需求表（10 项） + 09-24「生产监控 Dashboard 需求及开发计划」会议纪要 ｜ 产品形态已按客户澄清更正</div>
+  </div>
+  <div class="tag">整理日期 2026-09-24</div>
+</div>
+
+<div class="wrap">
+  <nav class="toc">
+    <div class="t-title">目录</div>
+    <a href="#s1">1. 会议要点速览</a>
+    <a href="#sform">2. 产品形态（已更正）</a>
+    <a href="#s2">3. 优先级与排期</a>
+    <a href="#s3">4. 需求全量对照表</a>
+    <a href="#s4">5. 两份材料的口径差异</a>
+    <a href="#s5">6. ★ 周二会议待确认清单</a>
+    <a href="#s6">7. 下一步行动</a>
+  </nav>
+
+  <main class="main">
+
+    <section class="card" id="s1">
+      <h2>1. 会议要点速览</h2>
+      <p class="lead">来源：钉钉 AI 听记《纪要_09-24 生产监控Dashboard需求及开发计划》，会议时长约 20 分钟，共 4 个议题。</p>
+      <div class="grid g3">
+        <div class="kpi"><div class="k">核心痛点</div><div class="v" style="font-size:15px">多系统查询繁琐</div>
+          <div class="small muted">需进不同网页、手动选时间、输密码</div></div>
+        <div class="kpi"><div class="k">建设目标</div><div class="v" style="font-size:15px">一个界面看全部 KPI</div>
+          <div class="small muted">定位为「监控室」式汇总展示</div></div>
+        <div class="kpi"><div class="k">目标用户</div><div class="v" style="font-size:15px">管理层 + 现场带班</div>
+          <div class="small muted">被视为「管理者角色」</div></div>
+      </div>
+
+      <h3>1.1 已确认的决策</h3>
+      <table>
+        <thead><tr><th style="width:170px">议题</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td>项目定位</td><td>Dashboard 定位为 <b>KPI 集中监控平台</b>，解决多系统分散查询痛点，采用<b>分优先级迭代</b>方式推进，初期由技术团队介入评估。</td></tr>
+          <tr><td>报警方式</td><td>采用 <b>屏幕变色（红）+ 强制弹窗 + 语音播报</b> 组合方式，支持后台自定义触发条件（阈值、周期、系数），系统自动计算、满足条件即强制提醒，<b>减少人为判断</b>。</td></tr>
+          <tr><td>首批开发范围</td><td><b>Priority 1：生产交易日志升级</b>；<b>Priority 2：微水调库（各站凹库）统计看板</b>。二者因日常高频使用、需求相对明确而优先。</td></tr>
+          <tr><td>推进策略</td><td>小步快跑：先上线两个核心高频模块，其余按老板要求逐个追加，避免一次性铺开导致资源分散。</td></tr>
+          <tr><td>需求对接时间</td><td>下周二（09-29）赵刚与张鑫通过 Teams 会议过审，当场梳理详细需求清单；接口数据格式（含原始数据格式统一、Broker 系统数据接口一致）同场敲定。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>1.2 明确待定 / 未决事项</h3>
+      <div class="note amber">
+        <b>① 交易记录的「导出邮件发送」功能</b> —— 业务方诉求是方便工程师获取信息；技术方判断为「锦上添花」，<b>若开发难度大，可直接拷贝数据单独发送</b>，不强制集成进系统。<span class="muted">最终是否开发取决于开发难度评估。</span><br>
+        <b>② 自动刷新频率</b> —— 系统肯定会有手动更新按钮；自动刷新是「每天 7:30 定时」还是「每 2 小时一次」<b>待业务方给出最终诉求</b>。
+      </div>
+
+      <h3>1.3 展示形态与终端</h3>
+      <ul class="small">
+        <li>除网页外，未来可能通过<b>平板（Surface Go / Surface Pro）</b>展示。</li>
+        <li>构想是在带班桌部署 <b>8 块大屏</b>，分别展示 Cell Time、EO、OTD 等不同 KPI，形成「监控室」效果；多系统看板可整合为一个统一看板或分屏展示。</li>
+        <li>滚动频率可设置（如 1 分钟 / 半分钟一次），也支持手动滚动，具体后续再定。</li>
+        <li>数据现状：<b>部分数据已有系统，部分仅有原始数据</b>，需技术团队加工或对接接口。</li>
+      </ul>
+    </section>
+
+    <section class="card" id="sform" style="border:1.5px solid #bcd4f6">
+      <h2>2. 产品形态（已按客户澄清更正）</h2>
+      <p class="lead">此前的理解偏「一个统一平台 + 若干功能模块」；<b>实际形态是：每对接完成一个子系统，就产出一个该系统的专属 Dashboard 监控大屏，每块屏自带预警与邮件能力</b>，多块屏共同构成「监控室」。</p>
+
+      <div class="grid g2">
+        <div class="kpi">
+          <div class="k">更正前（作废）</div>
+          <div class="v" style="font-size:15px;color:var(--text-3)">一个大屏装下所有 KPI</div>
+          <div class="small muted">把 10 项需求当作同一套系统里的并列模块，统一入口、统一视图。</div>
+        </div>
+        <div class="kpi" style="background:#eef4ff;border-color:#bcd4f6">
+          <div class="k">更正后（当前口径）</div>
+          <div class="v" style="font-size:15px;color:var(--primary)">一个子系统 = 一块专属大屏</div>
+          <div class="small muted">逐系统对接、逐个产出看板；每个看板自带<b>预警</b>与<b>邮件</b>，屏与屏之间互不干扰。</div>
+        </div>
+      </div>
+
+      <h3>2.1 三层结构</h3>
+      <table>
+        <thead><tr><th style="width:130px">层级</th><th style="width:230px">内容</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>专属大屏层</b></td>
+            <td>每子系统一块看板</td>
+            <td>对接一个系统 → 长出一块屏，展示该系统自己的 KPI、明细与时效状态。当前已明确的两块：<b>生产交易日志看板（P1）</b>、<b>各站凹库 / 微水调库看板（P2）</b>；其余（MTBA、WIP、产量、设备 Monitor、原材料等）随对接进度逐个追加。</td>
+          </tr>
+          <tr>
+            <td><b>屏内标配能力</b></td>
+            <td>预警 + 邮件</td>
+            <td>每块屏都必须具备：① 预警（阈值/周期/系数可配，触发后屏幕变色、强制弹窗、语音播报）；② 邮件（告警邮件 + 手工导出邮件发送）。<b>建议做成统一组件，各屏复用</b>，否则每加一块屏都要重写一遍。</td>
+          </tr>
+          <tr>
+            <td><b>平台底座</b></td>
+            <td>数据对接、权限、报警引擎、邮件通道</td>
+            <td>所有看板共用一套底座：子系统接入与采集调度、用户与权限（含大屏免登录展示）、报警规则引擎、邮件网关与投递记录。看板只负责取数与呈现，不重复建设底座。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 这个理解带来的三点调整</h3>
+      <div class="note">
+        <b>① 需求表要「按屏」重新归位。</b>原表 10 项并不是一个系统的 10 个功能，而是分属若干块屏的指标：交接日志（屏 1）、MTBA / WIP / 产量（产量类屏）、OTD 与铜线、原材料、PMC 120H（时效类屏）、Monitor 三项（设备屏）。<b>先定屏清单，再定每屏内容</b>，比逐条讨论功能更快收敛。
+      </div>
+      <div class="note">
+        <b>② 预警与邮件是「每屏标配」，不是某一项需求。</b>会议要求的屏幕变红 + 强制弹窗 + 语音、以及后台自定义阈值，应统一实现为屏内组件 + 平台级规则引擎；否则后续每接一个系统都要重新做一遍报警。
+      </div>
+      <div class="note amber">
+        <b>③ 排期变成「按屏排期」。</b>P1 / P2 实质是<b>前两块屏</b>；后续排期以「一个子系统一块屏」为交付单位，正好契合会议确定的小步快跑策略——每块屏可独立上线、独立验收，不阻塞其他屏。
+      </div>
+
+      <h3>2.3 会前需要先明确的三件事</h3>
+      <div class="ask">
+        <div class="q">要在周二确认，否则排期无法细化</div>
+        <ul>
+          <li><b>屏清单</b>：目前规划的专属大屏一共几块、分别对应哪个子系统？是否就是带班桌的 8 块屏？</li>
+          <li><b>部署方式</b>：8 块屏是 8 台设备各开一个地址常驻显示，还是一台机器循环轮播？这直接决定权限（是否免登录）与刷新机制设计。</li>
+          <li><b>配置归属</b>：每块屏的预警阈值与邮件收件范围<b>各自独立配置</b>，还是由平台统一配置下发？是否需要按站段 / 料号分别设阈值？</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card" id="s2">
+      <h2>3. 优先级与排期</h2>
+      <p class="lead">会议已明确「先开发、后迭代」。按更正后的形态，下列优先级以<b>「一块屏」为交付单位</b>排列。</p>
+      <table>
+        <thead><tr><th style="width:90px">优先级</th><th style="width:230px">模块</th><th>说明与依据</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="pill red">P1 首批</span></td>
+            <td>第 1 块屏：生产交易日志看板</td>
+            <td>对应原需求表第 1 项。基于现有 One BE 交易记录系统 / 2024 年开发的交接日志网站升级：新增上传照片、关键词搜索、导出邮件发送。<b>该屏需自带预警与邮件能力</b>。团队日常高频使用，需求相对明确。</td>
+          </tr>
+          <tr>
+            <td><span class="pill red">P2 首批</span></td>
+            <td>第 2 块屏：微水调库 / 各站凹库统计看板</td>
+            <td>会议新增模块，<b>原需求表中没有对应条目</b>。选为首批的理由同样是高频使用 + 需求相对明确。<span class="muted">术语与统计口径需在周二确认。</span></td>
+          </tr>
+          <tr>
+            <td><span class="pill amber">暂缓</span></td>
+            <td>MTBA / MTV、各站产量统计、原材料需求量</td>
+            <td>会议明确「暂不排期」。对应原需求表第 2 项（MTBA）、第 7 项（各站各机台产量统计）、第 4 项（原材料库存与领用量）。</td>
+          </tr>
+          <tr>
+            <td><span class="pill">待排期</span></td>
+            <td>其余交接类需求</td>
+            <td>OTD 与铜线时间短物料（第 3 项）、原材料过期倒计时（第 4 项）、PMC 出炉 120H 倒计时（第 5 项）、Weekly Output 与 BE/FE WIP（第 6 项）。</td>
+          </tr>
+          <tr>
+            <td><span class="pill">待排期</span></td>
+            <td>Monitor 板块（3 项）</td>
+            <td>设备程序展板、机器运行状态（PKG / 批号）、设备模具信息。会议未讨论，原表描述也最简。</td>
+          </tr>
+          <tr>
+            <td><span class="pill purple">每屏标配</span></td>
+            <td>预警组件 + 邮件组件 + 大屏轮播</td>
+            <td>屏幕变红 / 强制弹窗 / 语音播报、后台自定义阈值与周期系数、8 屏滚动展示。<b>这三项不是某块屏的专属功能，而是每块屏都必须具备的能力</b>，必须在第一块屏（P1）时就沉淀为统一组件，否则后续每接一个系统都要重做一遍。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="s3">
+      <h2>4. 需求全量对照表</h2>
+      <p class="lead">左侧为客户原始需求表中的 10 项，末尾为会议新增项；「现状」列指现有演示原型的可复用程度。</p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px">#</th><th style="width:190px">需求项</th>
+            <th style="width:200px">客户描述要点</th><th style="width:96px">站段</th>
+            <th style="width:96px">优先级</th><th>现状 / 缺口</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">1</td><td><b>生产交接日志</b></td>
+            <td>班级交接信息、设备异常、紧急批、FLT 批次信息；可上传照片；记录可搜索关键词；可直接导出邮件并发送</td>
+            <td>LD / NLD / PLT</td><td><span class="pill red">P1</span></td>
+            <td>演示原型中「存证与岗位交接」「邮件内容展示」已覆盖照片上传、指纹留痕、交接单据与邮件预览；<b>缺口：关键词搜索强化、FLT / 紧急批字段、导出邮件与发送链路的落地方式</b></td>
+          </tr>
+          <tr>
+            <td class="num">2</td><td>MTBA 实时刷新的 data</td>
+            <td>—（会议中称 MTV，疑同一指标）</td>
+            <td>LD / NLD / PLT</td><td><span class="pill amber">暂缓</span></td>
+            <td>需确认 MTBA 数据来源与刷新方式；采集调用日志页可复用为对接监控</td>
+          </tr>
+          <tr>
+            <td class="num">3</td><td>一键统计 OTD &amp; 铜线时间短物料<br><span class="small muted">过期报警</span></td>
+            <td>当站 C/T 时间 &gt; 24H，铜线时间倒计时 &lt; 24H</td>
+            <td>LD / NLD</td><td><span class="pill">待排期</span></td>
+            <td><b>需新建时效倒计时引擎</b>：双阈值（已超期 C/T&gt;24H + 即将到期 铜线&lt;24H）同时呈现</td>
+          </tr>
+          <tr>
+            <td class="num">4</td><td>原材料库存与领用量、过期倒计时<br><span class="small muted">过期报警</span></td>
+            <td>显示原材料的库存与需求量，预警中的 COMPOUND 信息</td>
+            <td>LD / NLD</td><td><span class="pill amber">暂缓</span></td>
+            <td>与需求 3/5 同属倒计时报警族，建议共用一套预警引擎与阈值配置</td>
+          </tr>
+          <tr>
+            <td class="num">5</td><td>PMC 出炉后 120H 倒计时<br><span class="small muted">过期报警</span></td>
+            <td>PMC 出炉后 120H 倒计时</td>
+            <td>NLD</td><td><span class="pill">待排期</span></td>
+            <td>单点规则，实现简单；需确认是否所有料号统一 120H、是否允许按料号配置</td>
+          </tr>
+          <tr>
+            <td class="num">6</td><td>Weekly Output / 各站（BE&amp;FE）WIP 实时刷新</td>
+            <td>见附页，各部门统一格式</td>
+            <td>LD / NLD / PLT</td><td><span class="pill">待排期</span></td>
+            <td><b>附页格式尚未取得</b>；「各部门统一格式」需要先定模板</td>
+          </tr>
+          <tr>
+            <td class="num">7</td><td>各站各机台产量统计</td>
+            <td>—</td>
+            <td>LD / NLD / PLT</td><td><span class="pill amber">暂缓</span></td>
+            <td>可参考原型中的异常根因分析页（聚合统计 + 趋势 + 导出）复用统计与导出能力</td>
+          </tr>
+          <tr>
+            <td class="num">M1</td><td>各工序机台可生产物料程序</td>
+            <td>各工序设备程序展板：工序 - 机台 - 显示生产程序</td>
+            <td>—</td><td><span class="pill">待排期</span></td>
+            <td>新增查询型看板，需设备程序主数据来源</td>
+          </tr>
+          <tr>
+            <td class="num">M2</td><td>各工序机器运行状态</td>
+            <td>显示机器是否已开机，并可查询机器当前生产的 PKG、批号</td>
+            <td>LD / NLD / PLT</td><td><span class="pill">待排期</span></td>
+            <td>依赖设备联网/直采或 MES 状态接口，实时性要求最高</td>
+          </tr>
+          <tr>
+            <td class="num">M3</td><td>期望的设备模具信息</td>
+            <td><span class="muted">描述为空</span></td>
+            <td>—</td><td><span class="pill">待排期</span></td>
+            <td><b>需求不完整</b>，需客户补充字段清单（模具号 / 寿命 / 保养状态等）</td>
+          </tr>
+          <tr style="background:#fdf8ff">
+            <td class="num">N1</td><td><b>多级报警能力</b> <span class="pill purple">会议新增</span></td>
+            <td>屏幕变红 + 强制弹窗 + 语音播报；示例：备件过期（YP-002 冷却循环泵超期 43 天）、库存价差异常弹出预期值 vs 实际值对比</td>
+            <td>全局</td><td><span class="pill purple">每屏标配</span></td>
+            <td>演示原型已有邮件 + 语音告警通道；<b>缺口：屏幕变色 / 强制弹窗 / 预期值-实际值对比弹窗</b></td>
+          </tr>
+          <tr style="background:#fdf8ff">
+            <td class="num">N2</td><td><b>后台自定义报警阈值</b> <span class="pill purple">会议新增</span></td>
+            <td>用户可自行设置阈值（如位库过高、铜线时间过短），系统按设定周期与系数自动计算并触发</td>
+            <td>全局</td><td><span class="pill purple">每屏标配</span></td>
+            <td>原型中预警规则配置页（阈值 / 通道 / 分发）可扩展为含周期与系数</td>
+          </tr>
+          <tr style="background:#fdf8ff">
+            <td class="num">N3</td><td><b>多屏滚动展示</b> <span class="pill purple">会议新增</span></td>
+            <td>带班桌 8 块大屏分别展示 Cell Time / EO / OTD 等 KPI；滚动 1 分钟或半分钟一次，支持手动滚动</td>
+            <td>全局</td><td><span class="pill purple">每屏标配</span></td>
+            <td>需新增「大屏轮播模式」（含自动滚动 + 手动切换 + 大字号适配）</td>
+          </tr>
+          <tr style="background:#fdf8ff">
+            <td class="num">N4</td><td><b>敏感词汇设置 / Audit 版本修改流程</b> <span class="pill purple">现有系统已有</span></td>
+            <td>现有交接日志网站（2024 年开发）后台已含敏感词汇设置与 Audit 版本修改流程，在此基础上升级</td>
+            <td>全局</td><td><span class="pill">沿袭</span></td>
+            <td>需确认：是直接沿用现有后台，还是在新 Dashboard 中重建</td>
+          </tr>
+          <tr style="background:#fdf8ff">
+            <td class="num">N5</td><td><b>平板端展示</b> <span class="pill purple">会议新增</span></td>
+            <td>展示形式不限于网页，未来可能通过 Surface Go / Surface Pro 展示</td>
+            <td>全局</td><td><span class="pill">待排期</span></td>
+            <td>原型已是响应式布局，平板适配成本低</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="s4">
+      <h2>5. 两份材料的口径差异（重点）</h2>
+      <p class="lead">客户原始需求表与 09-24 会议纪要存在若干不一致，直接按任一份开工都可能返工，建议周二先对齐下表。</p>
+      <table>
+        <thead><tr><th style="width:150px">议题</th><th style="width:250px">原始需求表口径</th><th>09-24 会议口径</th><th style="width:230px">建议</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>产品形态</b></td>
+            <td>按「交接 7 项 + Monitor 3 项」并列列出，未区分载体</td>
+            <td>每个子系统对接完成后产出专属 Dashboard 大屏，多屏构成监控室；会议亦提到「每个子系统对应独立看板或统一看板」两种展示逻辑</td>
+            <td><b>以「一个子系统一块屏」为准</b>；若某些系统需合并到统一看板，需逐屏确认</td>
+          </tr>
+          <tr>
+            <td>开发顺序</td>
+            <td>按交接 7 项 + Monitor 3 项列出，未标优先级</td>
+            <td>P1 生产交易日志升级、P2 微水调库（各站凹库）统计，其余暂不排期</td>
+            <td>以会议口径为准；需求表补充优先级列</td>
+          </tr>
+          <tr>
+            <td>微水调库 / 各站凹库</td>
+            <td><b>表中无此项</b></td>
+            <td>列为 P2 首批开发</td>
+            <td>请客户补充：数据定义、统计维度、与需求 6/7 的关系</td>
+          </tr>
+          <tr>
+            <td>邮件发送</td>
+            <td>需求 1 明确「可直接导出邮件并发送」</td>
+            <td>视为锦上添花，难度大时可用「拷贝数据单独发送」替代</td>
+            <td>周二明确取舍；若保留，需确认发送通道与收件范围</td>
+          </tr>
+          <tr>
+            <td>刷新机制</td>
+            <td>需求 2/6 要求「实时刷新」</td>
+            <td>手动更新按钮 + 自动刷新频率待定（每天 7:30 vs 每 2 小时）</td>
+            <td>先按「手动 + 可配置周期」设计，避免实时性承诺过高</td>
+          </tr>
+          <tr>
+            <td>报警范围</td>
+            <td>仅 3 处「过期报警」：铜线/OTD、原材料、PMC 120H</td>
+            <td>扩展至备件过期、库存价差、位库过高；且要求屏幕变色 + 弹窗 + 语音</td>
+            <td>报警做成统一引擎 + 可配置阈值，勿按单点开发</td>
+          </tr>
+          <tr>
+            <td>指标名称</td>
+            <td>MTBA</td>
+            <td>MTV（听记）</td>
+            <td>疑为同一指标，需确认正式名称与计算口径</td>
+          </tr>
+          <tr>
+            <td>数据来源</td>
+            <td>未说明</td>
+            <td>部分数据已有系统、部分只有原始数据；需统一原始数据格式、确保 Broker 系统数据接口一致</td>
+            <td>周二必须拿到：逐项数据源 + 接口清单 + 提供方</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note red">
+        <b>术语与听记核对提示：</b>纪要为 AI 听记自动生成，以下词汇疑为识别偏差，建议在周二向客户核对正式名称后再落文档：<b>微水调库 / 各站凹库 / 位库</b>、<b>MTV</b>、<b>OPPO 原始数据</b>、<b>Broker 系统</b>、<b>One BE 交易记录系统</b>、<b>FLT 批次</b>、<b>PMC 出炉</b>。
+      </div>
+    </section>
+
+    <section class="card confirm" id="s5">
+      <h2>6. ★ 周二（09-29）会议待确认清单</h2>
+      <p class="lead">建议按此顺序过会，前两组不确认，后两组问了也没法开工。</p>
+
+      <div class="ask">
+        <div class="q">A. 范围与口径（先定「屏清单」，再定每屏内容）</div>
+        <ul>
+          <li><b>专属看板清单</b>：目前一共规划几块屏、分别对应哪个子系统？是否即带班桌的 8 块屏？请让客户按「一个子系统一块屏」列出屏清单及先后顺序。</li>
+          <li><b>P1 生产交易日志看板</b>：现有系统（One BE / 2024 年交接日志网站）的具体形态、数据库结构、后台敏感词与 Audit 流程能否直接复用？本次是「升级」还是「重建」？这块屏上要展示哪些指标、预警哪些条件？</li>
+          <li>P1 需要新增/保留的字段清单：班级交接信息、设备异常、紧急批、FLT 批次的取值规则分别是什么？<b>FLT 全称与判定口径</b>？</li>
+          <li><b>P2 各站凹库（微水调库）看板</b>的准确名称、统计对象、统计维度（按站 / 按机台 / 按班次 / 按时间窗口）？该屏要展示哪几个指标？</li>
+          <li>P2 与需求表中第 6 项「Weekly Output / BE&amp;FE 各站 WIP」是否为同一件事的不同说法？</li>
+        </ul>
+      </div>
+
+      <div class="ask">
+        <div class="q">B. 数据来源与接口</div>
+        <ul>
+          <li>P1、P2 的数据来自哪里：现有系统接口、数据库直连、还是手工 Excel？<b>提供方与责任人是谁</b>？</li>
+          <li>会议提到「统一原始数据格式、确保 Broker 系统数据接口一致」——原始数据当前是什么格式，目标格式由谁定义？</li>
+          <li>接口可用性：是否有测试环境与账号？联调时间窗口？生产环境是否需要白名单 / 内网访问？</li>
+          <li>数据量级与刷新频率上限（每 2 小时 vs 每天 7:30 会直接影响接口设计）。</li>
+        </ul>
+      </div>
+
+      <div class="ask">
+        <div class="q">C. 报警与展示策略</div>
+        <ul>
+          <li>报警优先级如何分级？哪些走「屏幕变红 + 强制弹窗 + 语音」，哪些只写日志 / 发邮件？（避免弹窗泛滥导致系统被弃用）</li>
+          <li><b>每块屏的预警阈值与邮件收件范围是各自独立配置，还是由平台统一配置下发？</b>谁有权限改？是否需要按站段 / 料号分别设阈值？</li>
+          <li>邮件有几种用途需覆盖：预警自动邮件、手工「导出邮件发送」、周期性汇总邮件？收件人是固定名单还是按屏 / 按站段分发？<b>「导出邮件发送」保留还是用「拷贝数据单独发送」替代</b>（会议尚未拍板）。</li>
+          <li>报警确认与闭环：是否需要「已知悉 / 已处理」留痕与升级提醒？</li>
+          <li>多屏方案：8 块屏是 8 台设备各开一个地址常驻，还是单机轮播？滚动 1 分钟还是半分钟？是否需大屏免登录展示（涉及权限设计）。</li>
+          <li>「导出邮件发送」保留还是用「拷贝数据发送」替代？</li>
+        </ul>
+      </div>
+
+      <div class="ask">
+        <div class="q">D. 权限与审计</div>
+        <ul>
+          <li>用户范围与角色划分：管理层（全部看）vs 带班（本站段看）的数据权限如何切分？</li>
+          <li>是否需要与公司统一账号（域账号 / SSO）打通，还是系统内自建账号？</li>
+          <li>日志与审计保留期限、是否需要归档与月报。</li>
+        </ul>
+      </div>
+
+      <div class="ask">
+        <div class="q">E. 需求表遗留缺口（需客户补充资料）</div>
+        <ul>
+          <li>需求 6 提到的<b>附页</b>（Weekly Output「各部门统一格式」）尚未提供，需索取。</li>
+          <li>Monitor 第 3 项<b>「期望的设备模具信息」描述为空</b>，需补字段清单。</li>
+          <li>各时效规则的例外情况：C/T &gt; 24H 与铜线 &lt; 24H 是「同时满足」还是「任一满足」即报警？PMC 120H 是否所有料号统一？</li>
+          <li>站段范围确认：LD / NLD / PLT 的正式全称与包含的工序。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card" id="s6">
+      <h2>7. 下一步行动</h2>
+      <table>
+        <thead><tr><th style="width:150px">事项</th><th style="width:130px">责任人</th><th style="width:130px">时间</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>内部先梳理需求与原始数据</td><td>团队内部</td><td>本周内</td><td>针对「需求不明确、资源齐全像百宝箱」的现状，先内部碰头梳理，避免盲目对接。</td></tr>
+          <tr><td>与赵刚对接、确定 P1/P2 具体需求</td><td>张鑫</td><td>下周初（周二前）</td><td>准备原始数据 + 具体需求后一并发出，提升沟通效率。</td></tr>
+          <tr><td>Teams 会议过审详细需求与接口格式</td><td>赵刚 × 张鑫</td><td>下周二 09-29</td><td>当场产出 P1 / P2 详细需求清单，敲定数据格式与接口口径。</td></tr>
+          <tr><td>启动 P1 / P2 开发</td><td>开发团队</td><td>需求确认后</td><td>先上线两个高频模块，其余需求逐个追加迭代。</td></tr>
+        </tbody>
+      </table>
+      <div class="note green">
+        <b>提示：</b>本清单中的「现状 / 缺口」列基于现有演示原型（<a href="功能清单与待确认项.html">功能清单与待确认项</a>）评估——存证交接、邮件通道、权限、对接日志、归档与月报已具备，可作为 P1 的起点；时效倒计时引擎、多级视觉报警、大屏轮播、产量与 WIP 看板为新增建设内容。
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  依据材料：① 客户原始需求表（交接 7 项 + Monitor 3 项）；② 《纪要_09-24 生产监控Dashboard需求及开发计划》（钉钉 AI 听记，2026-09-24 14:58–15:19）。<br>
+  本清单为需求整理稿，涉及术语与口径的条目以客户确认为准。
+</footer>
+
+</body>
+</html>

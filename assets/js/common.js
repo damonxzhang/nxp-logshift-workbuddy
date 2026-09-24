@@ -30,7 +30,8 @@ const ICONS = {
   lock: '<rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   speaker: '<rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><path d="M12 8.5h.01"/>',
   close: '<path d="M18 6L6 18M6 6l12 12"/>',
-  zap: '<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13z"/>'
+  zap: '<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13z"/>',
+  monitor: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'
 };
 
 function icon(name, size = 19, sw = 1.7) {
@@ -38,52 +39,137 @@ function icon(name, size = 19, sw = 1.7) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 }
 
-/* ---------------- 侧边导航 ---------------- */
-const NAV = [
-  { key: 'index', href: 'index.html', label: '监控总览', icon: 'grid' },
-  { key: 'systems', href: 'systems.html', label: '子系统与数据库底座', icon: 'server' },
-  { key: 'ingest', href: 'ingest.html', label: '数据采集与调度', icon: 'database' },
-  { key: 'evidence', href: 'evidence.html', label: '存证与岗位交接', icon: 'image' },
-  { key: 'alerts', href: 'alerts.html', label: '预警通知配置', icon: 'bell' },
-  { key: 'analytics', href: 'analytics.html', label: '异常根因分析', icon: 'activity' },
-  { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
-  { key: 'archive', href: 'archive.html', label: '历史日志归档', icon: 'database' },
-  { key: 'mail', href: 'mail.html', label: '邮件内容展示', icon: 'mail' },
-  { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
+/* ---------------- 侧边导航 ----------------
+   信息架构依据《需求对齐清单-0924》「一个子系统 = 一块专属大屏」三层结构：
+     ① 监控室（多屏轮播入口）
+     ② 专属大屏层（一个子系统一块屏，按屏排期）
+     ③ 屏内标配能力（预警 / 邮件，各屏复用，非某一屏专属）
+     ④ 平台底座（数据接入 / 采集调度 / 权限，各屏共用）
+     ⑤ 分析与归档
+   其中 tag 为交付状态，与需求文档的优先级一一对应。 */
+const NAV_GROUPS = [
+  {
+    label: '监控室',
+    items: [
+      { key: 'index', href: 'index.html', label: '监控总览', icon: 'grid' },
+      { key: 'wall', href: 'wall.html', label: '监控室 · 多屏轮播', icon: 'layers', tag: '标配', tagCls: 't-purple' }
+    ]
+  },
+  {
+    label: '专属大屏 · 一系统一屏',
+    items: [
+      { key: 'evidence', href: 'evidence.html', label: '生产交易日志看板', icon: 'image', tag: 'P1', tagCls: 't-red' },
+      { key: 'pit', href: 'pit.html', label: '凹库 · 微水调库看板', icon: 'database', tag: 'P2', tagCls: 't-red' },
+      { key: 'countdown', href: '', label: 'OTD·铜线时效屏', icon: 'clock', tag: '待排期', tagCls: 't-plain' },
+      { key: 'output', href: '', label: '产量 · WIP 看板', icon: 'activity', tag: '暂缓', tagCls: 't-plain' },
+      { key: 'monitor', href: '', label: '设备程序·状态屏', icon: 'zap', tag: '待排期', tagCls: 't-plain' }
+    ]
+  },
+  {
+    label: '屏内标配能力 · 各屏复用',
+    items: [
+      { key: 'alerts', href: 'alerts.html', label: '预警组件 · 多级报警', icon: 'bell', tag: '标配', tagCls: 't-purple' },
+      { key: 'mail', href: 'mail.html', label: '邮件组件 · 投递效果', icon: 'mail', tag: '标配', tagCls: 't-purple' }
+    ]
+  },
+  {
+    label: '平台底座 · 各屏共用',
+    items: [
+      { key: 'systems', href: 'systems.html', label: '子系统接入与底座', icon: 'server' },
+      { key: 'ingest', href: 'ingest.html', label: '采集调度与调用日志', icon: 'refresh' },
+      { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
+    ]
+  },
+  {
+    label: '分析与归档',
+    items: [
+      { key: 'analytics', href: 'analytics.html', label: '异常根因智能分析', icon: 'search' },
+      { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
+      { key: 'archive', href: 'archive.html', label: '历史日志归档', icon: 'download' }
+    ]
+  }
 ];
+
+// 扁平索引：便于按 key 反查
+const NAV = NAV_GROUPS.reduce((a, g) => a.concat(g.items), []);
 
 const PAGE_TITLES = {
   index: ['监控总览', '全厂子系统健康度 · 异常处置 · 交接态势'],
-  systems: ['子系统清单', '问卷 1.1 · 待接入子系统规模'],
-  ingest: ['数据采集与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
-  evidence: ['存证与岗位交接', '问卷 4.1 · 附件存证规范与交接责任书'],
-  alerts: ['预警通知配置', '问卷 5.1 / 5.2 · 邮件通知 + 语音告警'],
+  wall: ['监控室 · 多屏轮播', '带班桌多块大屏自动轮播 · 可配间隔 / 手动切换 / 大字号'],
+  evidence: ['生产交易日志看板', 'P1 首批 · 班级交接 · 设备异常 · 紧急批 · FLT 批次'],
+  pit: ['各站凹库 · 微水调库看板', 'P2 首批 · 按站 / 机台 / 班次统计凹库量与调库趋势'],
+  systems: ['子系统接入与底座', '问卷 1.1 · 待接入子系统规模与接入方式'],
+  ingest: ['采集调度与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
+  alerts: ['预警组件 · 多级报警', '每屏标配 · 阈值/周期/系数可配 · 屏幕变色 + 强制弹窗 + 语音'],
   analytics: ['异常根因智能分析', '高频告警统计 · 相似告警聚类 · 根因研判'],
   monthly: ['自动月报', '按月汇总告警与事件 · 预览 / 导出 PDF·Excel'],
   archive: ['历史日志归档', '过期日志自动归档 · 检索查询与审计追溯'],
-  mail: ['邮件内容展示', '问卷 5.1 · 演示实际投递到邮箱的效果'],
+  mail: ['邮件组件 · 投递效果', '每屏标配 · 演示实际投递到邮箱的效果'],
   users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕']
 };
 
+// 把 .sidebar 包进 .nav-shell 占位层：使侧边栏悬停浮出时不再挤压内容区
+function wrapSidebar() {
+  const sb = document.getElementById('sidebar');
+  if (!sb || sb.parentElement.classList.contains('nav-shell')) return;
+  const shell = document.createElement('div');
+  shell.className = 'nav-shell';
+  sb.parentNode.insertBefore(shell, sb);
+  shell.appendChild(sb);
+}
+
 function renderShell(page) {
   const title = PAGE_TITLES[page] || ['演示', ''];
+  wrapSidebar();
+
+  const navItem = n => {
+    const cls = ['nav-item'];
+    if (n.key === page) cls.push('active');
+    if (!n.href) cls.push('off');
+    const tag = n.tag ? `<span class="nav-tag ${n.tagCls || 't-plain'}">${n.tag}</span>` : '';
+    const inner = `<span class="nav-icon">${icon(n.icon, 20)}</span><span class="nav-text">${n.label}</span>${tag}`;
+    return n.href
+      ? `<a href="${n.href}" class="${cls.join(' ')}" title="${n.label}">${inner}</a>`
+      : `<span class="${cls.join(' ')}" role="button" tabindex="0"
+           title="${n.label}（${n.tag}）· 待 09-29 与客户确认后开工"
+           onclick="toast('「${n.label}」为${n.tag}看板，需求与数据源待 09-29 会议确认后开工','warn')">${inner}</span>`;
+  };
+
   document.getElementById('sidebar').innerHTML = `
     <div class="brand">
       <div class="brand-logo">${icon('shield', 24, 1.9)}</div>
-      <div>
+      <div class="brand-text">
         <div class="brand-title">统一监控与交接中心</div>
         <div class="brand-sub">OpsMonitor · DEMO</div>
       </div>
     </div>
     <nav class="nav">
-      <div class="nav-label">功能导航</div>
-      ${NAV.map(n => `<a href="${n.href}" class="${n.key === page ? 'active' : ''}">
-        <span class="nav-icon">${icon(n.icon, 20)}</span><span>${n.label}</span></a>`).join('')}
+      ${NAV_GROUPS.map(g => `
+        <div class="nav-group">
+          <div class="nav-label">${g.label}</div>
+          ${g.items.map(navItem).join('')}
+        </div>`).join('')}
     </nav>
     <div class="sidebar-foot">
-      <div class="env"><span class="dot dot-success"></span> 演示环境 v1.0.0</div>
-      <div class="env" style="color:var(--text-3)">数据均为样例，可自由修改</div>
+      <div class="env-text">
+        <div class="env"><span class="dot dot-success"></span> 演示环境 v1.1.0</div>
+        <div class="env" style="color:var(--text-3)">数据均为样例，可自由修改</div>
+      </div>
+      <button class="pin-btn" id="pinBtn" aria-label="固定或收起侧边栏">${icon('lock', 17, 1.8)}</button>
     </div>`;
+
+  const pb = document.getElementById('pinBtn');
+  if (pb) pb.onclick = () => {
+    Sidebar.togglePin();
+    toast(Sidebar.pinned ? '侧边栏已固定常驻' : '侧边栏已收起 · 鼠标移到左侧自动浮出', 'success');
+  };
+  Sidebar.apply();
+
+  // 首次进入时给一次轻提示，避免不知道侧边栏可以展开
+  if (Sidebar.mini && !store.get('nav_hint', false)) {
+    store.set('nav_hint', true);
+    setTimeout(() => toast('左侧目录已收起：鼠标移到最左侧即可自动浮出，点图钉可固定常驻', 'primary'), 700);
+  }
 
   document.getElementById('topbar').innerHTML = `
     <div class="topbar-left">
@@ -148,6 +234,34 @@ const store = {
     catch (e) { return def; }
   },
   set(k, v) { try { localStorage.setItem('ohd_' + k, JSON.stringify(v)); } catch (e) { } }
+};
+
+/* ---------------- 侧边栏：可自动隐藏（收起为图标条 + 悬停浮出 + 图钉固定） ----------------
+   注意：必须定义在 store 之后（对象字面量初始化时会立即读取本地存储）。 */
+const Sidebar = {
+  // true = 收起为图标条（悬停浮出）；false = 常驻展开
+  mini: store.get('nav_mini', true),
+  pinned: store.get('nav_pinned', false),
+
+  apply() {
+    const b = document.body;
+    b.classList.toggle('nav-mini', this.mini);
+    b.classList.toggle('nav-pinned', this.pinned);
+    const pin = document.getElementById('pinBtn');
+    if (pin) {
+      // 常驻展开 = 已固定，或显式展开（非收起）
+      const fixed = this.pinned || !this.mini;
+      pin.classList.toggle('on', fixed);
+      pin.title = fixed ? '已固定常驻 · 点击收起为图标条' : '已收起 · 点击固定常驻展开';
+    }
+  },
+  save() { store.set('nav_mini', this.mini); store.set('nav_pinned', this.pinned); },
+  // 图钉：在「常驻展开」与「自动隐藏」之间切换
+  togglePin() {
+    if (this.pinned) { this.pinned = false; this.mini = true; }
+    else { this.pinned = true; this.mini = false; }
+    this.save(); this.apply();
+  }
 };
 
 /* ================= 当前登录身份（演示用，用于演示分级权限下的数据范围） =================
