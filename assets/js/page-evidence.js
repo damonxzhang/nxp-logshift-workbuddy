@@ -16,7 +16,7 @@
     }));
 
     const prioOver = docs.filter(d => !d.sign).map(d => ({
-      title: `${d.id} 未完成认领签章`, meta: `${d.from} → ${d.to} · ${d.gap} · 逾期未签即形成责任悬空`, badge: '逾期', badgeCls: 'b-danger', hot: true
+      title: `${d.id} 未完成认领签章`, meta: `${d.from} → ${d.to} · 逾期未签即形成责任悬空`, badge: '逾期', badgeCls: 'b-danger', hot: true
     }));
 
     const kwTotal = KEYWORDS_SEED.filter(k => k.enabled).reduce((a, k) => a + (k.hits || 0), 0);
@@ -28,7 +28,7 @@
     const PRIO = prioBand([
       { key: 'pending', cls: 'p-attend', icon: 'file', label: '待处理', count: prioPending.length, unit: ' 项', sub: '交接单未闭环事项', items: prioPending },
       { key: 'abn', cls: 'p-abn', icon: 'zap', label: '异常', count: prioAbn.length, unit: ' 项', sub: '特急事项需优先处置', items: prioAbn },
-      { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, unit: ' 单', sub: '未签章交接单 · 已产生真空期', items: prioOver },
+      { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, unit: ' 单', sub: '未签章交接单 · 责任悬空风险', items: prioOver },
       { key: 'kw', cls: 'p-kw', icon: 'search', label: '关键词命中', count: kwTotal, unit: ' 条', sub: '今日命中告警关键词库的生产日志', items: prioKw }
     ]);
 

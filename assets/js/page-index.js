@@ -63,7 +63,7 @@
   const prioOver = [
     { title: '2 项待办超 30 分钟未响应', meta: '超过处置时限 · 已触发升级提醒', badge: '超时', badgeCls: 'b-danger', hot: true }
   ];
-  if (gapDoc) prioOver.push({ title: `${gapDoc.id} 未完成签章`, meta: `${gapDoc.from} → ${gapDoc.to} · ${gapDoc.gap}`, badge: '真空期', badgeCls: 'b-warn' });
+  if (gapDoc) prioOver.push({ title: `${gapDoc.id} 未完成签章`, meta: `${gapDoc.from} → ${gapDoc.to}` });
 
   const kwHits = [];
   KEYWORDS_SEED.filter(k => k.enabled).forEach(k => {
@@ -82,7 +82,7 @@
   const PRIO = prioBand([
     { key: 'pending', cls: 'p-attend', icon: 'file', label: '待处理', count: openAlerts.length + handoverPending, sub: '告警流水与交接未闭环 · 需跟进处理', items: prioPending },
     { key: 'abn', cls: 'p-abn', icon: 'zap', label: '异常', count: prioAbn.length, sub: '特急告警与健康度异常子系统', items: prioAbn },
-    { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, sub: '超时未响应与交接真空期', items: prioOver },
+    { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, sub: '超时未响应与未签章交接单', items: prioOver },
     { key: 'kw', cls: 'p-kw', icon: 'search', label: '关键词命中', count: kwHits.length, unit: ' 条', sub: '命中告警关键词库（K01–K10）', items: kwHits }
   ]);
 
