@@ -888,3 +888,25 @@ body.wall-alarm .content::before {
 @media (max-width: 1280px) { .prio-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 720px)  { .prio-grid { grid-template-columns: 1fr; } }
 @media print { .prio-band { display: none !important; } }
+
+/* ================= 归档页 · 子系统分类卡片 ================= */
+.sys-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.sys-cat {
+  --sc: var(--primary);
+  text-align: left; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 4px solid var(--sc);
+  border-radius: 10px; padding: 12px 14px;
+  transition: box-shadow .15s, transform .15s;
+}
+.sys-cat:hover { box-shadow: 0 3px 10px rgba(16,24,40,.10); transform: translateY(-1px); }
+.sys-cat.on { border-color: var(--sc); background: color-mix(in srgb, var(--sc) 6%, var(--surface)); }
+.sc-head { display: flex; align-items: center; gap: 7px; }
+.sc-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--sc); flex: 0 0 9px; }
+.sc-name { font-size: 14.5px; font-weight: 700; line-height: 1.35; }
+.sc-meta { font-size: 12px; color: var(--text-3); margin: 4px 0 8px; }
+.sc-count { font-size: 21px; font-weight: 800; color: var(--sc); line-height: 1; font-variant-numeric: tabular-nums; }
+.sc-count small { font-size: 12px; font-weight: 600; color: var(--text-3); margin-left: 2px; }
+.sc-mb { float: right; font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 6px; }
+@media (max-width: 1280px) { .sys-cat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px)  { .sys-cat-grid { grid-template-columns: 1fr; } }
