@@ -41,8 +41,55 @@
   const minsToShift = Math.round((nextShiftStart - now) / 60000);
   const gapText = minsToShift > 60 ? `${Math.floor(minsToShift / 60)} 小时 ${minsToShift % 60} 分` : `${minsToShift} 分钟`;
 
+  /* —— 重点关注事项（置顶集中展示：待处理 / 异常 / 逾期 / 关键词命中） —— */
+  const openAlerts = ALERT_FEED.filter(a => a.handler !== '已闭环');
+  const handoverPending = HANDOVER_DOCS.reduce((a, d) => a + (d.pending || 0), 0);
+  const prioPending = openAlerts.map(a => ({
+    title: a.title, meta: `${a.time} · ${a.sys} · ${a.handler}`,
+    badge: a.handler.includes('待处理') ? '待处理' : a.handler.includes('升级') ? '升级中' : a.handler.includes('挂起') ? '已挂起' : '处理中',
+    badgeCls: 'b-warn', hot: a.level === 'critical'
+  }));
+  prioPending.push({ title: `白晚班交接未闭环事项 ${handoverPending} 项`, meta: 'HO-20260923-01 / HO-20260922-01 · 需换班前闭环或书面顺延', badge: '交接', badgeCls: 'b-warn' });
+
+  const prioAbn = ALERT_FEED.filter(a => a.level === 'critical').map(a => ({
+    title: a.title, meta: `${a.time} · ${a.sys} · ${a.handler}`, badge: '特急', badgeCls: 'b-danger', hot: true
+  }));
+  SUBSYSTEMS.filter(s => s.status === 'warn' || s.status === 'critical').forEach(s => {
+    const st2 = statusInfo(s.status);
+    prioAbn.push({ title: `${s.name} 健康度异常`, meta: `健康度 ${s.health} 分 · 负责人 ${s.owner}`, badge: st2.label, badgeCls: st2.cls, hot: s.status === 'critical' });
+  });
+
+  const gapDoc = HANDOVER_DOCS.find(d => !d.sign || d.gap !== '无真空期');
+  const prioOver = [
+    { title: '2 项待办超 30 分钟未响应', meta: '超过处置时限 · 已触发升级提醒', badge: '超时', badgeCls: 'b-danger', hot: true }
+  ];
+  if (gapDoc) prioOver.push({ title: `${gapDoc.id} 未完成签章`, meta: `${gapDoc.from} → ${gapDoc.to} · ${gapDoc.gap}`, badge: '真空期', badgeCls: 'b-warn' });
+
+  const kwHits = [];
+  KEYWORDS_SEED.filter(k => k.enabled).forEach(k => {
+    ALERT_FEED.forEach(a => {
+      let hit = false;
+      if (k.match === '包含') hit = a.title.includes(k.word);
+      else if (k.match === '多词任一') hit = k.word.split('|').some(w => a.title.includes(w));
+      else { try { hit = new RegExp(k.word).test(a.title); } catch (e) { } }
+      if (hit) kwHits.push({
+        title: a.title, meta: `${a.time} · ${a.sys} · 命中词「${k.word.split('|')[0].replace(/^\s*\^?\\?s?\*?\\??/, '')}」· ${k.note}`,
+        badge: k.level, badgeCls: k.level === '特急' ? 'b-danger' : 'b-warn', hot: k.level === '特急'
+      });
+    });
+  });
+
+  const PRIO = prioBand([
+    { key: 'pending', cls: 'p-attend', icon: 'file', label: '待处理', count: openAlerts.length + handoverPending, sub: '告警流水与交接未闭环 · 需跟进处理', items: prioPending },
+    { key: 'abn', cls: 'p-abn', icon: 'zap', label: '异常', count: prioAbn.length, sub: '特急告警与健康度异常子系统', items: prioAbn },
+    { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, sub: '超时未响应与交接真空期', items: prioOver },
+    { key: 'kw', cls: 'p-kw', icon: 'search', label: '关键词命中', count: kwHits.length, unit: ' 条', sub: '命中告警关键词库（K01–K10）', items: kwHits }
+  ]);
+
   document.getElementById('content').innerHTML = `
-  <div class="grid g-6">
+  ${PRIO}
+
+  <div class="grid g-6 mt16">
     ${KPIS.map(k => `
       <div class="kpi" style="--accent:${k.color};--accent-soft:${k.soft}">
         <div class="kpi-top">

@@ -426,6 +426,59 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeDialog(); }
 });
 
+/* ---------------- 重点事项置顶区（待处理 / 异常 / 逾期 / 关键词命中） ----------------
+   各看板页统一复用：置于页面最上方，突出色块 + 徽标 + 呼吸圆点，确保一眼识别紧急程度。
+   groups: [{ key, cls: 'p-attend|p-abn|p-over|p-kw', icon, label, count, unit, sub,
+              items: [{ title, meta, badge, badgeCls, hot }] }] */
+function prioBand(groups) {
+  const itemHtml = it => `
+      <li class="prio-item ${it.hot ? 'hot' : ''}">
+        <i class="prio-dot"></i>
+        <div class="pi-body">
+          <div class="pi-title">${it.title}${it.badge ? ` <span class="badge ${it.badgeCls || 'b-danger'}">${it.badge}</span>` : ''}</div>
+          ${it.meta ? `<div class="pi-meta">${it.meta}</div>` : ''}
+        </div>
+      </li>`;
+  return `
+  <div class="prio-band no-print">
+    <div class="prio-head">
+      <span class="prio-flag">${icon('alert', 19)}</span>
+      <span class="prio-headtitle">重点关注事项</span>
+      <span class="prio-headsub">待处理 · 异常 · 逾期 · 关键词命中（置顶集中展示，处置完成后自动移出）</span>
+    </div>
+    <div class="prio-grid">
+      ${groups.map(g => {
+    const list = g.items || [];
+    const vis = list.slice(0, 3), extra = list.slice(3);
+    return `
+        <div class="prio-card ${g.cls}" id="prio_${esc(g.key)}">
+          <div class="prio-card-head">
+            <span class="prio-ic">${icon(g.icon, 20)}</span>
+            <span class="prio-name">${g.label}</span>
+            <span class="prio-count">${g.count}<small>${g.unit || ' 项'}</small></span>
+          </div>
+          <div class="prio-cap">${g.sub || ''}</div>
+          ${list.length ? `
+          <ul class="prio-items">
+            ${vis.map(itemHtml).join('')}
+            ${extra.map(it => itemHtml(it).replace('class="prio-item', 'class="prio-item prio-extra')).join('')}
+          </ul>
+          ${extra.length ? `<button class="prio-more" data-n="${list.length}">展开全部 ${list.length} 项 ▾</button>` : ''}`
+        : `<div class="prio-empty">${icon('check', 15)} 暂无需关注事项</div>`}
+        </div>`;
+  }).join('')}
+    </div>
+  </div>`;
+}
+/* 「展开全部」折叠切换（事件委托，一次绑定全站生效） */
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.prio-more');
+  if (!b) return;
+  const card = b.closest('.prio-card');
+  const open = card.classList.toggle('open');
+  b.innerHTML = open ? '收起 ▴' : `展开全部 ${b.dataset.n} 项 ▾`;
+});
+
 /* ---------------- 工具函数 ---------------- */
 const pad = n => String(n).padStart(2, '0');
 const fmtTime = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;

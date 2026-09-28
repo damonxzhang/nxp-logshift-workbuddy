@@ -51,8 +51,42 @@
       ? PIT_TRANSFERS.slice(0, 20)
       : PIT_TRANSFERS.filter(t => t.dept === CurrentUser.dept()).slice(0, 20);
 
+    /* —— 重点关注事项（置顶：待处理 / 异常 / 逾期 / 关键词命中） —— */
+    const critRecs = recs.filter(r => pitStatus(r.hours, cfg) === 'critical').sort((a, b) => b.hours - a.hours);
+    const warnRecs = recs.filter(r => pitStatus(r.hours, cfg) === 'warn').sort((a, b) => b.hours - a.hours);
+    const recMeta = r => `${esc(r.lot)} · ${esc(r.stationName)} · ${esc(r.machine)} · 在库 ${r.hours}H`;
+    const prioAttend = critRecs.concat(warnRecs).slice(0, 8).map(r => ({
+      title: recMeta(r).split(' · ').slice(0, 3).join(' · '),
+      meta: `在库 ${r.hours}H · ${r.qty} 片 · ${r.inTimeStr} 入库`,
+      badge: pitStatus(r.hours, cfg) === 'critical' ? '需立即调库' : '待调库',
+      badgeCls: pitStatus(r.hours, cfg) === 'critical' ? 'b-danger' : 'b-warn',
+      hot: pitStatus(r.hours, cfg) === 'critical'
+    }));
+    const prioCrit = critRecs.slice(0, 6).map(r => ({
+      title: `${esc(r.lot)} · ${esc(r.stationName)} · ${esc(r.machine)}`,
+      meta: `在库 ${r.hours}H（阈值 ${cfg.criticalH}H）· ${r.qty} 片`, badge: '超期', badgeCls: 'b-danger', hot: true
+    }));
+    const prioWarn = warnRecs.slice(0, 6).map(r => ({
+      title: `${esc(r.lot)} · ${esc(r.stationName)} · ${esc(r.machine)}`,
+      meta: `在库 ${r.hours}H（阈值 ${cfg.thresholdH}H）· ${r.qty} 片`, badge: '预警', badgeCls: 'b-warn'
+    }));
+    const kwRecs = recs.filter(r => r.hours > st.avgHours * 2).sort((a, b) => b.hours - a.hours);
+    const prioKw = kwRecs.slice(0, 6).map(r => ({
+      title: `${esc(r.lot)} · ${esc(r.stationName)} · ${esc(r.pkg)}`,
+      meta: `在库 ${r.hours}H ≈ 平均 ${st.avgHours}H 的 ${(r.hours / st.avgHours).toFixed(1)} 倍 · 疑似滞留`, badge: '滞留?', badgeCls: 'b-warn'
+    }));
+
+    const PRIO = prioBand([
+      { key: 'attend', cls: 'p-attend', icon: 'file', label: '待处理', count: critRecs.length + warnRecs.length, unit: ' 批', sub: '超阈值需调库 / 处置的批次', items: prioAttend },
+      { key: 'abn', cls: 'p-abn', icon: 'zap', label: '异常 · 已超期', count: critRecs.length, unit: ' 批', sub: `在库超过 ${cfg.criticalH}H`, items: prioCrit },
+      { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期 · 超阈值', count: warnRecs.length, unit: ' 批', sub: `在库超过 ${cfg.thresholdH}H 未超期`, items: prioWarn },
+      { key: 'kw', cls: 'p-kw', icon: 'search', label: '关键词命中', count: kwRecs.length, unit: ' 批', sub: '监控词「滞留」· 演示规则：在库 > 平均 2 倍（口径待客户确认）', items: prioKw }
+    ]);
+
     document.getElementById('content').innerHTML = `
-    <div class="notice" style="--nc:var(--primary)">
+    ${PRIO}
+
+    <div class="notice mt16" style="--nc:var(--primary)">
       ${icon('database', 19)}
       <div><strong>P2 专属大屏 · 各站凹库 / 微水调库统计看板：</strong>按站段、机台、班次等维度统计各站在库（凹库）批次量与在库时长，输出 <strong>超期预警</strong> 与 <strong>TOP 排行</strong>，并展示微水调库流水。
       <strong>术语（凹库 / 微水调库）、统计维度与判定阈值待 09-29 与客户确认</strong>，故全部做成配置入口，页面不写死口径。本屏遵循分级权限，仅可见权限范围内数据。</div>

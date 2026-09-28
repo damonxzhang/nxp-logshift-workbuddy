@@ -42,8 +42,41 @@
 
   function render() {
     const usedMB = (totalBytes() / 1048576);
+
+    /* —— 重点关注事项（置顶：待处理 / 异常 / 逾期 / 关键词命中） —— */
+    const prioPending = docs.filter(d => d.pending > 0).map(d => ({
+      title: `${d.id} 存在未闭环事项 ${d.pending} 项`,
+      meta: `${d.from} → ${d.to} · ${d.note}`, badge: '未闭环', badgeCls: 'b-warn', hot: d.critical > 0
+    }));
+    if (!files.length) prioPending.unshift({ title: '当前单据尚未上传存证', meta: '现场上报建议至少 2 张：报错全景 + 软件报错详情（含时间戳）', badge: '待上传', badgeCls: 'b-warn' });
+
+    const prioAbn = docs.filter(d => d.critical > 0).map(d => ({
+      title: `${d.id} 含特急未闭环 ${d.critical} 项`, meta: d.note, badge: '特急', badgeCls: 'b-danger', hot: true
+    }));
+    const lowRes = files.filter(f => f.low).length;
+    if (lowRes) prioAbn.push({ title: `${lowRes} 张存证截图分辨率不足`, meta: `要求 ≥ ${LIMIT.width} × ${LIMIT.height}，建议重新抓图`, badge: '不合格', badgeCls: 'b-warn' });
+
+    const prioOver = docs.filter(d => !d.sign).map(d => ({
+      title: `${d.id} 未完成认领签章`, meta: `${d.from} → ${d.to} · ${d.gap} · 逾期未签即形成责任悬空`, badge: '逾期', badgeCls: 'b-danger', hot: true
+    }));
+
+    const kwTotal = KEYWORDS_SEED.filter(k => k.enabled).reduce((a, k) => a + (k.hits || 0), 0);
+    const prioKw = KEYWORDS_SEED.filter(k => k.enabled && k.hits > 0).sort((a, b) => b.hits - a.hits).slice(0, 5).map(k => ({
+      title: `「${k.word.includes('|') ? k.word.split('|')[0] + ' 等多词' : k.word}」今日命中 ${k.hits} 条生产日志`,
+      meta: `${k.note} · 匹配方式：${k.match}`, badge: k.level, badgeCls: k.level === '特急' ? 'b-danger' : 'b-warn', hot: k.level === '特急'
+    }));
+
+    const PRIO = prioBand([
+      { key: 'pending', cls: 'p-attend', icon: 'file', label: '待处理', count: prioPending.length, unit: ' 项', sub: '交接未闭环与待上传存证', items: prioPending },
+      { key: 'abn', cls: 'p-abn', icon: 'zap', label: '异常', count: prioAbn.length, unit: ' 项', sub: '特急事项与不合格存证', items: prioAbn },
+      { key: 'over', cls: 'p-over', icon: 'clock', label: '逾期', count: prioOver.length, unit: ' 单', sub: '未签章交接单 · 已产生真空期', items: prioOver },
+      { key: 'kw', cls: 'p-kw', icon: 'search', label: '关键词命中', count: kwTotal, unit: ' 条', sub: '今日命中告警关键词库的生产日志', items: prioKw }
+    ]);
+
     document.getElementById('content').innerHTML = `
-    <div class="notice" style="--nc:var(--primary)">
+    ${PRIO}
+
+    <div class="notice mt16" style="--nc:var(--primary)">
       ${icon('image', 19)}
       <div><strong>P1 专属大屏 · 生产交易日志看板：</strong>对应客户原始需求表第 1 项，在现有交接日志系统基础上升级——支持上传<strong>现场照片 / 报错截图</strong>存证、<strong>关键词检索</strong>、<strong>导出并发送邮件</strong>；本屏自带<strong>预警组件</strong>（阈值/周期/系数可配，触发后屏幕变红 + 强制弹窗 + 语音播报）与<strong>邮件组件</strong>，均为各屏复用能力。<br>
       系统自动提取分辨率、大小并生成哈希指纹，随单据一并归档留痕。<strong>FLT 批次、紧急批字段的取值规则待 09-29 与客户确认。</strong></div>

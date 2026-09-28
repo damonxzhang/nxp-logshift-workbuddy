@@ -822,3 +822,69 @@ body.wall-alarm .content::before {
 .arc-job .aj-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .arc-job .aj-desc { font-size: 13.5px; color: var(--text-2); margin-top: 2px; }
 .arc-job .aj-stat { text-align: right; font-size: 14px; flex: 0 0 auto; }
+
+/* ================= 重点事项置顶区（各看板页共用） ================= */
+.prio-band { margin-bottom: 6px; }
+.prio-head { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; }
+.prio-flag { display: inline-flex; color: var(--danger); }
+.prio-headtitle { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: .5px; }
+.prio-headsub { font-size: 12.5px; color: var(--text-3); font-weight: 400; }
+.prio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+.prio-card {
+  --pc: var(--danger); --pc-soft: #fdecea;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--pc);
+  border-radius: 12px;
+  padding: 13px 15px 11px;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, .07);
+  display: flex; flex-direction: column;
+}
+.prio-card.p-attend { --pc: #e0912a; --pc-soft: #fdf1e0; }
+.prio-card.p-abn    { --pc: #cc2f2a; --pc-soft: #fdecea; }
+.prio-card.p-over   { --pc: #b3261e; --pc-soft: #fbe9e8; }
+.prio-card.p-kw     { --pc: #6d28d9; --pc-soft: #f1ebfe; }
+
+.prio-card-head { display: flex; align-items: center; gap: 8px; }
+.prio-ic { display: inline-flex; color: var(--pc); }
+.prio-name { font-size: 15.5px; font-weight: 700; color: var(--text); }
+.prio-count {
+  margin-left: auto; font-size: 26px; font-weight: 800; line-height: 1;
+  color: var(--pc); font-variant-numeric: tabular-nums;
+}
+.prio-count small { font-size: 12px; font-weight: 600; color: var(--text-3); margin-left: 2px; }
+.prio-cap { font-size: 12.5px; color: var(--text-3); margin: 5px 0 8px; }
+
+.prio-items { list-style: none; margin: 0; padding: 0; }
+.prio-item {
+  display: flex; gap: 8px; padding: 7px 9px; margin-bottom: 5px;
+  background: var(--pc-soft); border-radius: 8px;
+}
+.prio-item.prio-extra { display: none; }
+.prio-card.open .prio-item.prio-extra { display: flex; }
+.prio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); margin-top: 6px; flex: 0 0 8px; }
+.prio-item.hot .prio-dot { animation: prioPulse 1.3s ease-out infinite; }
+@keyframes prioPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(204, 47, 42, .45); }
+  70%  { box-shadow: 0 0 0 7px rgba(204, 47, 42, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(204, 47, 42, 0); }
+}
+.pi-body { min-width: 0; }
+.pi-title { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.45; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pi-title .badge { flex: 0 0 auto; }
+.pi-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; line-height: 1.5; }
+.prio-more {
+  margin-top: 2px; width: 100%; border: none; background: transparent;
+  color: var(--pc); font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 5px 0 2px; text-align: center;
+}
+.prio-more:hover { text-decoration: underline; }
+.prio-empty {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--success);
+  background: var(--success-soft); border-radius: 8px; padding: 10px;
+}
+@media (max-width: 1280px) { .prio-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px)  { .prio-grid { grid-template-columns: 1fr; } }
+@media print { .prio-band { display: none !important; } }
