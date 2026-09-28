@@ -17,9 +17,6 @@
     return prefix + String(i).padStart(2, '0');
   };
 
-  /* ---------------- 邮件效果预览配置 ---------------- */
-  const cfg = { mailTab: 'critical' };
-
   const sysName = id => id === 'ALL' ? '全部子系统' : (SUBSYSTEMS.find(s => s.id === id) || { name: id }).name;
   const kwWord = id => (K.keywords.find(k => k.id === id) || { word: id }).word;
   const ctName = id => (K.contacts.find(c => c.id === id) || { name: id, dept: '—' }).name;
@@ -147,9 +144,7 @@
         </div>
       </div>
       <div class="card-foot">${icon('activity', 15)} 一条绑定即一个笛卡尔积：任一关键词在该子系统上被命中，就向列表内全部紧急联系人发出紧急邮件。</div>
-    </section>
-
-    ${mailCardHtml(cfg, 'mt24')}`;
+    </section>`;
 
     bind();
   }
@@ -297,8 +292,6 @@
 
   /* ================= 事件绑定 ================= */
   function bind() {
-    bindMailCard(cfg, render);
-
     /* --- 关键词联动 --- */
     const $ = id => document.getElementById(id);
     $('btnNewContact') && ($('btnNewContact').onclick = () => openContactDlg(-1));
