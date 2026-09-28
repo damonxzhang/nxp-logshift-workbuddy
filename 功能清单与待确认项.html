@@ -164,8 +164,8 @@
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--primary)">01</span>监控总览</div><div class="mc-meta">index.html</div><div class="mc-desc">KPI、健康度趋势、异常分布、子系统状态、交接态势、告警流水</div></div>
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#0b6a86">02</span>子系统与底座</div><div class="mc-meta">systems.html</div><div class="mc-desc">待接入子系统清单、类别/状态筛选、模式 A/B、导出</div></div>
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--purple)">03</span>数据采集与日志</div><div class="mc-meta">ingest.html</div><div class="mc-desc">对接总览、调用日志、实时刷新、详情报文、手动重放</div></div>
-        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--warn)">04</span>存证与交接</div><div class="mc-meta">evidence.html</div><div class="mc-desc">截图上传存证、哈希指纹、交接单与责任书认领</div></div>
-        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--danger)">05</span>预警通知配置</div><div class="mc-meta">alerts.html</div><div class="mc-desc">关键词联动、邮件通道、语音告警、命中试算</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--warn)">04</span>存证与交接</div><div class="mc-meta">evidence.html</div><div class="mc-desc">交接单据、未闭环/真空期研判、责任书认领签章</div></div>
+        <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--danger)">05</span>预警通知配置</div><div class="mc-meta">alerts.html</div><div class="mc-desc">关键词联动、紧急邮件分发、邮件效果预览</div></div>
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:var(--info)">06</span>邮件内容展示</div><div class="mc-meta">mail.html</div><div class="mc-desc">收件人视角的邮件效果、近期投递记录</div></div>
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#1d6fb8">07</span>用户与权限</div><div class="mc-meta">users.html</div><div class="mc-desc">RBAC、权限矩阵（48 点）、操作审计日志</div></div>
         <div class="map-card"><div class="mc-top"><span class="mc-ico" style="background:#5b6b7e">08</span>公共能力</div><div class="mc-meta">common.js 等</div><div class="mc-desc">导航/顶栏、语音引擎、SVG 图表、弹窗、本地存储</div></div>
@@ -228,15 +228,10 @@
       <table>
         <thead><tr><th style="width:40px">#</th><th>功能点</th><th style="width:200px">说明 / 演示要点</th></tr></thead>
         <tbody>
-          <tr><td>1</td><td>现场存证上传</td><td>点击或拖拽上传 JPG/PNG/WEBP，支持多张</td></tr>
-          <tr><td>2</td><td>分辨率与大小提取</td><td>自动读取图片宽高与体积</td></tr>
-          <tr><td>3</td><td>哈希指纹与存证链</td><td>生成 SHA-256 指纹并登记水印时间、操作人，形成存证链</td></tr>
-          <tr><td>4</td><td>上传规范校验</td><td>单张 ≤5MB、单单据 ≤9 张、总量 ≤50MB、最低分辨率 ≥1280×720，超限实时拦截</td></tr>
-          <tr><td>5</td><td>清晰度不足告警</td><td>低于建议分辨率实时标记</td></tr>
-          <tr><td>6</td><td>示意截图生成</td><td>离线 SVG 生成两张示意截图（无需网络）</td></tr>
-          <tr><td>7</td><td>交接单据与责任书</td><td>单据编号、交接区间、附件、未闭环、特急、交接说明、真空期、责任书双签</td></tr>
-          <tr><td>8</td><td>责任书认领签章</td><td>未签章单据可一键认领签章，形成书面责任转移</td></tr>
-          <tr><td>9</td><td>新建交接单</td><td>支持创建新的交接单并等待对方签章</td></tr>
+          <tr><td>1</td><td>重点事项置顶区</td><td>待处理 / 异常 / 逾期 / 关键词命中四类事项置顶展示</td></tr>
+          <tr><td>2</td><td>交接单据与责任书</td><td>单据编号、交接区间、附件、未闭环、特急、交接说明、真空期、责任书双签</td></tr>
+          <tr><td>3</td><td>责任书认领签章</td><td>未签章单据可一键认领签章，形成书面责任转移</td></tr>
+          <tr><td>4</td><td>新建交接单</td><td>支持创建新的交接单并等待对方签章</td></tr>
         </tbody>
       </table>
 
@@ -249,14 +244,7 @@
           <tr><td>2</td><td>紧急联系人管理</td><td>增删改、启用/停用、接收级别（仅特急/特急+重要/全部）</td></tr>
           <tr><td>3</td><td>关键词库管理</td><td>包含/前缀/精确/正则/多词任一；等级、免打扰、命中计数</td></tr>
           <tr><td>4</td><td>多对多绑定</td><td>关键词 × 子系统 × 紧急联系人，三者自由组合，笛卡尔积投递</td></tr>
-          <tr><td>5</td><td>命中试算与投递演练</td><td>输入异常描述，实时高亮命中关键词并列出将通知的收件人</td></tr>
-          <tr><td>6</td><td>邮件投递策略</td><td>Critical 单发 + 运营日报；分权分发，处室只收本处室</td></tr>
-          <tr><td>7</td><td>邮件通道运行概览</td><td>今日投递、最近投递、退信、紧急联系人覆盖</td></tr>
-          <tr><td>8</td><td>邮件内容预览</td><td>两套模板（特急单发 / 运营日报）切换预览</td></tr>
-          <tr><td>9</td><td>分权分处室隔离规则</td><td>子系统 × 责任处室 × 负责人 × 邮箱 × 订阅级别 × 语音 × 启用</td></tr>
-          <tr><td>10</td><td>语音告警策略</td><td>总开关、外接扬声器、音色（女/男声）、语速、音量、重复次数、播报文案模板</td></tr>
-          <tr><td>11</td><td>现场环境检查与建议</td><td>浏览器语音能力、中文语音包、音响连接、免打扰时段、部署建议</td></tr>
-          <tr><td>12</td><td>最近播报记录</td><td>保留最近 6 条语音播报记录</td></tr>
+          <tr><td>5</td><td>邮件内容预览</td><td>两套模板（特急单发 / 运营日报）切换预览</td></tr>
         </tbody>
       </table>
 

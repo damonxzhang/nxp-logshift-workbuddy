@@ -117,7 +117,7 @@ const PERM_MODULES = [
   { id: 'systems', name: '子系统管理', desc: '接入子系统清单与底座信息' },
   { id: 'ingest', name: '数据采集与日志', desc: '对接情况与调用日志' },
   { id: 'evidence', name: '存证与岗位交接', desc: '附件存证、交接单与责任书' },
-  { id: 'alerts', name: '预警通知', desc: '邮件策略、语音播报、分发规则' },
+  { id: 'alerts', name: '预警通知', desc: '关键词联动、紧急邮件分发' },
   { id: 'keyword', name: '关键词与紧急联系人', desc: '关键词命中规则与绑定关系' },
   { id: 'analysis', name: '异常根因分析', desc: '高频告警统计、根因聚类、相似告警研判' },
   { id: 'report', name: '自动月报', desc: '月度报表生成、预览与导出' },
@@ -141,7 +141,7 @@ const ROLES_SEED = [
   },
   {
     id: 'R03', name: '值班班长', builtin: false, level: '执行级', users: 2, color: '#12805a',
-    desc: '负责日常值守、异常处置与白晚班交接，可上传存证、认领责任书',
+    desc: '负责日常值守、异常处置与白晚班交接，认领责任书',
     perms: { overview: ['view'], systems: ['view'], ingest: ['view'], evidence: ['view', 'create', 'edit', 'export'], alerts: ['view', 'create', 'edit'], keyword: ['view'], analysis: ['view'], report: ['view', 'create', 'edit', 'export'], archive: ['view', 'create', 'export'], pit: ['view', 'create', 'export'], wall: ['view'], user: ['view'], system: [] }
   },
   {
