@@ -31,7 +31,9 @@ const ICONS = {
   speaker: '<rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><path d="M12 8.5h.01"/>',
   close: '<path d="M18 6L6 18M6 6l12 12"/>',
   zap: '<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13z"/>',
-  monitor: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'
+  monitor: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+  filter: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>'
 };
 
 function icon(name, size = 19, sw = 1.7) {
@@ -60,8 +62,9 @@ const NAV_GROUPS = [
     items: [
       { key: 'evidence', href: 'evidence.html', label: '生产交易日志看板', icon: 'image', tag: 'P1', tagCls: 't-red' },
       { key: 'pit', href: 'pit.html', label: '凹库 · 微水调库看板', icon: 'database', tag: 'P2', tagCls: 't-red' },
+      { key: 'op', href: 'output.html', label: 'Output（OP）大屏', icon: 'activity', tag: 'P2', tagCls: 't-red' },
       { key: 'countdown', href: '', label: 'OTD·铜线时效屏', icon: 'clock', tag: '待排期', tagCls: 't-plain' },
-      { key: 'output', href: '', label: '产量 · WIP 看板', icon: 'activity', tag: '暂缓', tagCls: 't-plain' },
+      { key: 'output', href: '', label: '产量 · WIP 看板', icon: 'layers', tag: '暂缓', tagCls: 't-plain' },
       { key: 'monitor', href: '', label: '设备程序·状态屏', icon: 'zap', tag: '待排期', tagCls: 't-plain' }
     ]
   },
@@ -98,6 +101,7 @@ const PAGE_TITLES = {
   wall: ['监控室 · 多屏轮播', '带班桌多块大屏自动轮播 · 可配间隔 / 手动切换 / 大字号'],
   evidence: ['生产交易日志看板', 'P1 首批 · 班级交接 · 设备异常 · 紧急批 · FLT 批次'],
   pit: ['各站凹库 · 微水调库看板', 'P2 首批 · 按站 / 机台 / 班次统计凹库量与调库趋势'],
+  op: ['Output（OP）大屏', '每日产出 Go/Total/Earning · 工序机台明细 · 差额/复合报警'],
   systems: ['子系统接入与底座', '问卷 1.1 · 待接入子系统规模与接入方式'],
   ingest: ['采集调度与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
   alerts: ['预警组件 · 多级报警', '每屏标配 · 阈值/周期/系数可配 · 屏幕变色 + 强制弹窗 + 语音'],
