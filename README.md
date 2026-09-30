@@ -9,6 +9,8 @@
 
 > 建议用 Chrome / Edge 打开，语音告警（Web Speech API）在 Chromium 内核下效果最佳。
 
+> 📊 **图表口径与联动关系**：全站所有可视化的数据来源、计算口径、绘制基元与相互联动，见 **[`图表逻辑关系说明.md`](图表逻辑关系说明.md)**。改动任一图表口径时请同步更新该文档。
+
 ## 二、已确认的落地口径（按客户意见）
 
 | # | 客户要求 | 落地实现 |
@@ -101,6 +103,7 @@ ops-handover-demo/
 ├── analytics.html / monthly.html / archive.html     分析与归档
 ├── 需求对齐清单-0924.html                            09-24 会议后的需求对齐清单（独立文档）
 ├── 功能清单与待确认项.html                            功能清单与待客户确认项（独立文档）
+├── 图表逻辑关系说明.md                                全站可视化的数据来源 / 计算口径 / 绘制基元 / 联动关系（交接与评审用）
 ├── .render.js      开发用无头渲染校验脚本（CDP，不随页面发布）
 ├── .extract-op.py  开发用数据抽取脚本：把客户《BE1 Output Report V5.xls》抽取为 assets/js/op-real-data.js（需 Python + xlrd；客户更新报表后重跑即可刷新大屏真实数据）
 ├── .extract-wip.py 开发用数据抽取脚本：把客户《BE1 WIP Report-V26.xls》抽取为 assets/js/wip-real-data.js（客户更新 WIP 报表后重跑即可刷新看板）
