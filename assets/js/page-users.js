@@ -7,7 +7,14 @@
   let audit = store.get('rbac_audit', null) || AUDIT_SEED.slice();
   let tab = store.get('rbac_tab', 'user');
 
+  let kw = '', fDept = 'all', fStatus = 'all', fRole = 'all', selRole = roles[0].id;
+
+  const saveU = () => store.set('rbac_users', users);
+  const saveR = () => store.set('rbac_roles', roles);
+  const saveA = () => store.set('rbac_audit', audit);
+
   // 兼容历史持久化：补齐新增权限模块（异常根因分析 / 自动月报 / 历史日志归档），避免旧角色缺失对应列
+  // 注：必须放在 saveR 定义之后，否则触发 const 暂时性死区（TDZ）异常
   (function normalizeRoles() {
     let changed = false;
     roles.forEach(r => {
@@ -17,12 +24,6 @@
     });
     if (changed) saveR();
   })();
-
-  let kw = '', fDept = 'all', fStatus = 'all', fRole = 'all', selRole = roles[0].id;
-
-  const saveU = () => store.set('rbac_users', users);
-  const saveR = () => store.set('rbac_roles', roles);
-  const saveA = () => store.set('rbac_audit', audit);
 
   const roleOf = id => roles.find(r => r.id === id);
   const usersIn = rid => users.filter(u => u.roles.includes(rid)).length;

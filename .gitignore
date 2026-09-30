@@ -1,0 +1,23 @@
+# ---- 无头浏览器校验产物 ----
+shot-*.png
+*.png.tmp
+.cdp-profile/
+.chrome-debug/
+
+# ---- 临时/导出文件 ----
+*.tmp
+*.log
+~$*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 编辑器 ----
+.vscode/
+.idea/
+*.swp
+
+# ---- 客户原始资料（不含在演示工程内，防误传）----
+原始资料/
+*.xls
+*.xlsx

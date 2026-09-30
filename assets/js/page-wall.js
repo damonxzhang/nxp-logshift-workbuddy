@@ -9,9 +9,8 @@
      客户规划的 8 块屏（Cell Time / EO / OTD 等）清单待确认，此处以现有屏占位。 */
   const WALL_SCREENS = [
     { key: 'index', href: 'index.html', name: '监控总览', kpi: '全厂健康度 · 告警流水', icon: 'grid', tag: '已上线' },
-    { key: 'evidence', href: 'evidence.html', name: '生产交易日志看板', kpi: '交接 · 设备异常 · FLT', icon: 'image', tag: 'P1' },
-    { key: 'pit', href: 'pit.html', name: '各站凹库看板', kpi: '凹库量 · 在库时长', icon: 'database', tag: 'P2' },
     { key: 'op', href: 'output.html', name: 'Output（OP）大屏', kpi: 'Go/Total/Earning · 工序机台', icon: 'activity', tag: 'P2' },
+    { key: 'wip', href: 'wip.html', name: 'WIP 在制品看板', kpi: '工序 × 品类 · Hold/OTD 预警', icon: 'layers', tag: 'P2' },
     { key: 'alerts', href: 'alerts.html', name: '预警组件', kpi: '阈值 · 强制弹窗 · 语音', icon: 'bell', tag: '标配' },
     { key: 'mail', href: 'mail.html', name: '邮件组件', kpi: '告警邮件投递', icon: 'mail', tag: '标配' },
     { key: 'analytics', href: 'analytics.html', name: '异常根因分析', kpi: '高频告警 · 根因聚类', icon: 'search', tag: '已上线' },

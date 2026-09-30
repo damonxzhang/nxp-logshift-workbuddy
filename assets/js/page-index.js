@@ -198,7 +198,6 @@
           </div>
           <div class="flex gap8 mt16">
             <button class="btn btn-primary" id="btnGenHandover">${icon('download', 17)} 生成交接单</button>
-            <a class="btn" href="evidence.html">上传现场存证</a>
           </div>
         </div>
       </section>

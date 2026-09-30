@@ -1,5 +1,6 @@
 /* 无头截图工具（开发用）
-   node .shot.js <url> <out.png> [hoverX] [hoverY]   —— 可模拟鼠标悬停验证侧边栏浮出 */
+   node .shot.js <url> <out.png> [hoverX] [hoverY] [scrollY] [clickX] [clickY]
+   —— 可模拟鼠标悬停 / 滚动 / 点击后截图 */
 const fs = require('fs');
 const url = process.argv[2];
 const out = process.argv[3];
@@ -22,9 +23,20 @@ const PORT = 9333;
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url });
   await new Promise(r2 => setTimeout(r2, 2600));
+  if (process.argv[6]) {
+    await send('Runtime.evaluate', { expression: `window.scrollTo(0, ${Number(process.argv[6])})` });
+    await new Promise(r2 => setTimeout(r2, 400));
+  }
   if (hx !== null) {
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hx, y: hy, buttons: 0 });
     await new Promise(r2 => setTimeout(r2, 700));
+  }
+  if (process.argv[7] && process.argv[8]) {
+    const cx = Number(process.argv[7]), cy = Number(process.argv[8]);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, buttons: 0 });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, buttons: 1, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, buttons: 0, button: 'left', clickCount: 1 });
+    await new Promise(r2 => setTimeout(r2, 1100));
   }
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(out, Buffer.from(shot.data, 'base64'));

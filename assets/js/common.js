@@ -7,6 +7,7 @@ const ICONS = {
   image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="2"/><path d="M21 16l-5-5-9 9"/>',
   bell: '<path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 15V3"/><path d="M7.5 7.5L12 3l4.5 4.5"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>',
@@ -60,12 +61,10 @@ const NAV_GROUPS = [
   {
     label: '专属大屏 · 一系统一屏',
     items: [
-      { key: 'evidence', href: 'evidence.html', label: '生产交易日志看板', icon: 'image', tag: 'P1', tagCls: 't-red' },
-      { key: 'pit', href: 'pit.html', label: '凹库 · 微水调库看板', icon: 'database', tag: 'P2', tagCls: 't-red' },
       { key: 'op', href: 'output.html', label: 'Output（OP）大屏', icon: 'activity', tag: 'P2', tagCls: 't-red' },
-      { key: 'countdown', href: '', label: 'OTD·铜线时效屏', icon: 'clock', tag: '待排期', tagCls: 't-plain' },
-      { key: 'output', href: '', label: '产量 · WIP 看板', icon: 'layers', tag: '暂缓', tagCls: 't-plain' },
-      { key: 'monitor', href: '', label: '设备程序·状态屏', icon: 'zap', tag: '待排期', tagCls: 't-plain' }
+      { key: 'optable', href: 'op-table.html', label: '周维度累计表', icon: 'layers', tag: 'P2', tagCls: 't-red' },
+      { key: 'opcfg', href: 'op-config.html', label: 'OP 目标与权限配置', icon: 'settings', tag: '配置', tagCls: 't-purple' },
+      { key: 'wip', href: 'wip.html', label: 'WIP 在制品看板', icon: 'layers', tag: 'P2', tagCls: 't-red' }
     ]
   },
   {
@@ -99,10 +98,11 @@ const NAV = NAV_GROUPS.reduce((a, g) => a.concat(g.items), []);
 const PAGE_TITLES = {
   index: ['监控总览', '全厂子系统健康度 · 异常处置 · 交接态势'],
   wall: ['监控室 · 多屏轮播', '带班桌多块大屏自动轮播 · 可配间隔 / 手动切换 / 大字号'],
-  evidence: ['生产交易日志看板', 'P1 首批 · 班级交接 · 设备异常 · 紧急批 · FLT 批次'],
-  pit: ['各站凹库 · 微水调库看板', 'P2 首批 · 按站 / 机台 / 班次统计凹库量与调库趋势'],
-  op: ['Output（OP）大屏', '每日产出 Go/Total/Earning · 工序机台明细 · 差额/复合报警'],
-  systems: ['子系统接入与底座', '问卷 1.1 · 待接入子系统规模与接入方式'],
+  op: ['Output（OP）大屏', '周维度追踪 · 累计曲线对比 · 达标/临界/超标预警'],
+  optable: ['周维度累计表', '各 PKG Type 逐日累计目标/实际 · 达标/临界/超标着色 · Excel 导出'],
+  opcfg: ['OP 目标与权限配置', 'PKG Type 维护 · 每周目标数量 · 部门可见范围 · 报警/刷新/夏令时'],
+  wip: ['WIP 在制品看板', '按 PKG Type × 工序呈现在制（数量 / Earn 口径）· 二级钻取筛选 · 指标报警配置'],
+  systems: ['子系统接入与底座', '问卷 1.1 · 接入范围（Output / WIP）与接入方式'],
   ingest: ['采集调度与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
   alerts: ['预警组件 · 多级报警', '每屏标配 · 阈值/周期/系数可配 · 屏幕变色 + 强制弹窗 + 语音'],
   analytics: ['异常根因智能分析', '高频告警统计 · 相似告警聚类 · 根因研判'],
@@ -518,9 +518,19 @@ function statusInfo(s) {
 
 /* ---------------- 轻量 SVG 图表（无外部依赖） ---------------- */
 function lineChart(el, opts) {
-  const { series, labels, height = 240, min = 0, max = 100, yUnit = '' } = opts;
-  const W = 1000, H = height, pl = 46, pr = 16, pt = 16, pb = 30;
+  /* series[].data 允许含 null（未来日期无实际值）：跳过该点，折线在已知区间内绘制。
+     marks: [{ i 下标, v 值, color, text }] —— 用于超标红灯等异常点的红柱背景 + 脉冲红环 + 标注。
+     vw: viewBox 宽度（默认 1000）。SVG 以 width:100% + height:auto 铺满容器，
+         故视图单位到像素的缩放比 ≈ 容器宽 / vw；传更小的 vw 可让图内文字「相对更大」。
+         内部以 k = 1000 / vw 同步放大字号与边距，保证任意 vw 下文字与图形比例一致。
+     hover: 开启鼠标悬停浮层（竖线 + 放大圆点 + 数据明细浮层）。
+     tipUnit / tipTitle(i) / tipExtra(i)：浮层数值单位、标题、附加行（如差额）。 */
+  const { series, labels, height = 240, min = 0, max = 100, yUnit = '', marks = [], endAt = -1, endUnit = '',
+    vw = 1000, hover = false, tipUnit = '', tipTitle = null, tipExtra = null } = opts;
+  const W = vw, H = height, k = 1000 / vw;
+  const pl = Math.round(46 * k), pr = Math.round(18 * k), pt = Math.round(16 * k), pb = Math.round(30 * k);
   const iw = W - pl - pr, ih = H - pt - pb;
+  const F = n => (n * k).toFixed(1);                        // 字号 / 线宽等视图单位补偿
   const step = iw / (labels.length - 1);
   const X = i => pl + i * step;
   const Y = v => pt + ih - (v - min) / (max - min) * ih;
@@ -528,23 +538,113 @@ function lineChart(el, opts) {
   for (let i = 0; i <= 4; i++) {
     const v = min + (max - min) * i / 4, y = Y(v);
     grid += `<line x1="${pl}" y1="${y}" x2="${W - pr}" y2="${y}" stroke="#e6ebf3" stroke-width="1"/>`;
-    ticks += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" font-size="12" fill="#8a95a5">${Math.round(v)}${yUnit}</text>`;
+    ticks += `<text x="${(pl - 10 * k).toFixed(1)}" y="${(y + 4 * k).toFixed(1)}" text-anchor="end" font-size="${F(12)}" fill="#8a95a5">${Math.round(v)}${yUnit}</text>`;
   }
   let xt = '';
   labels.forEach((l, i) => {
+    if (i === endAt) return;                                  // 基准日刻度由下方高亮标注，避免重影
     if (i % 3 === 0 || i === labels.length - 1) {
-      xt += `<text x="${X(i)}" y="${H - 8}" text-anchor="middle" font-size="12" fill="#8a95a5">${l}</text>`;
+      xt += `<text x="${X(i)}" y="${(H - 8 * k).toFixed(1)}" text-anchor="middle" font-size="${F(12)}" fill="#8a95a5">${l}</text>`;
     }
   });
+  const seg = s => {
+    let d = '', first = -1, last = -1;
+    s.data.forEach((v, i) => {
+      if (v == null || !isFinite(v)) return;      // 未来日期：跳过
+      if (first < 0) first = i;
+      last = i;
+      d += `${first === i ? 'M' : 'L'}${X(i).toFixed(1)},${Y(v).toFixed(1)} `;
+    });
+    return { d: d.trim(), first, last };
+  };
   const paths = series.map(s => {
-    const d = s.data.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-    const area = s.fill
-      ? `<path d="${d} L${X(s.data.length - 1)},${pt + ih} L${pl},${pt + ih} Z" fill="${s.color}" opacity=".10"/>`
+    const g = seg(s);
+    if (!g.d) return '';
+    const area = (s.fill && g.last > g.first)
+      ? `<path d="${g.d} L${X(g.last).toFixed(1)},${pt + ih} L${X(g.first).toFixed(1)},${pt + ih} Z" fill="${s.color}" opacity=".10"/>`
       : '';
-    return area + `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const dash = s.dash ? ` stroke-dasharray="${String(s.dash === true ? '7 5' : s.dash).split(' ').map(n => (Number(n) * k).toFixed(1)).join(' ')}"` : '';
+    return area + `<path d="${g.d}" fill="none" stroke="${s.color}" stroke-width="${F(s.width || 2.4)}"${dash} stroke-linejoin="round" stroke-linecap="round"/>`;
   }).join('');
-  const dots = series.map(s => s.data.map((v, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`).join('')).join('');
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="overflow:visible">${grid}${xt}${ticks}${paths}${dots}</svg>`;
+  const dots = series.map(s => s.data.map((v, i) =>
+    (v == null || !isFinite(v)) ? ''
+      : `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="${F(s.dash ? 2.6 : 3.4)}" fill="${s.dash ? '#fff' : s.color}" stroke="${s.color}" stroke-width="${F(2)}"/>`
+  ).join('')).join('');
+  // 异常标记：红柱背景 + 脉冲红环 + 文字标注（超标红灯）
+  let mk = '';
+  (marks || []).forEach(m => {
+    if (m.v == null || !isFinite(m.v)) return;
+    const x = X(m.i), y = Y(m.v), c = m.color || '#cc2f2a';
+    mk += `<rect x="${(x - step / 2).toFixed(1)}" y="${pt}" width="${step.toFixed(1)}" height="${ih}" fill="${c}" opacity=".10"/>`;
+    mk += `<circle class="op-pulse-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${F(6)}" fill="none" stroke="${c}" stroke-width="${F(2.2)}"/>`;
+    if (m.text) mk += `<text x="${x.toFixed(1)}" y="${(y - 13 * k).toFixed(1)}" text-anchor="middle" font-size="${F(12.5)}" font-weight="800" fill="${c}">${m.text}</text>`;
+  });
+  // 截至基准日：竖直参考线 + 两条线各自的取值标注（让「两条线差多少」有确切数字）
+  let ends = '';
+  if (endAt >= 0 && endAt < labels.length) {
+    ends += `<line x1="${X(endAt).toFixed(1)}" y1="${pt}" x2="${X(endAt).toFixed(1)}" y2="${pt + ih}" stroke="#c9d2e0" stroke-width="1" stroke-dasharray="${F(4)} ${F(4)}"/>`;
+    ends += `<text x="${X(endAt).toFixed(1)}" y="${(H - 8 * k).toFixed(1)}" text-anchor="middle" font-size="${F(12)}" font-weight="700" fill="#5b6577">${labels[endAt]}</text>`;
+    series.forEach((s, si) => {
+      const v = s.data[endAt];
+      if (v == null || !isFinite(v)) return;
+      const x = X(endAt), y = Y(v);
+      const dy = si === 0 ? -11 * k : 17 * k;              // 目标线标注在上，实际线标注在下，互不遮挡
+      ends += `<text x="${(x + 15 * k).toFixed(1)}" y="${(y + dy).toFixed(1)}" font-size="${F(12.5)}" font-weight="800" fill="${s.color}">${Math.round(v).toLocaleString('en-US')}${endUnit}</text>`;
+    });
+  }
+
+  // 悬停浮层：竖线 + 放大圆点 + 数据明细（hover 模式）
+  const hlGroup = hover ? '<g class="lc-hl" style="display:none"></g>' : '';
+  el.innerHTML = `<div class="lc-wrap">
+    <svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${grid}${xt}${ticks}${paths}${mk}${ends}${dots}${hlGroup}</svg>
+    ${hover ? '<div class="lc-tip" style="display:none"></div>' : ''}
+  </div>`;
+
+  if (!hover) return;
+  const svg = el.querySelector('svg'), hl = el.querySelector('.lc-hl'), tipEl = el.querySelector('.lc-tip');
+  if (!svg || !hl || !tipEl) return;
+  const fmtTip = v => {
+    if (v == null || !isFinite(v)) return '—';
+    const n = Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 100) / 100;
+    return n.toLocaleString('en-US') + tipUnit;
+  };
+  const show = (clientX, clientY) => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const vx = (clientX - r.left) / r.width * W;
+    let i = Math.round((vx - pl) / step);
+    i = Math.max(0, Math.min(labels.length - 1, i));
+    let h = `<line x1="${X(i).toFixed(1)}" y1="${pt}" x2="${X(i).toFixed(1)}" y2="${pt + ih}" stroke="#8d9bb0" stroke-width="${F(1.2)}" stroke-dasharray="${F(4)} ${F(4)}"/>`;
+    series.forEach(s => {
+      const v = s.data[i];
+      if (v == null || !isFinite(v)) return;
+      h += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="${F(6)}" fill="#fff" stroke="${s.color}" stroke-width="${F(2.6)}"/>`;
+    });
+    hl.innerHTML = h; hl.style.display = '';
+    const rows = series.map(s => {
+      const sw = s.dash ? `<i class="lc-dash" style="border-color:${s.color}"></i>` : `<i style="background:${s.color}"></i>`;
+      return `<div class="lc-trow"><span class="lc-tname">${sw}${s.name}</span><span class="lc-tval" style="color:${s.color}">${fmtTip(s.data[i])}</span></div>`;
+    }).join('');
+    tipEl.innerHTML = `<div class="lc-ttitle">${tipTitle ? tipTitle(i) : labels[i]}</div>${rows}${tipExtra ? tipExtra(i) : ''}`;
+    tipEl.style.display = 'block';
+    const ratio = r.width / W;
+    const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    let left = X(i) * ratio + 18;
+    if (left + tw > r.width - 4) left = X(i) * ratio - tw - 18;   // 右边界：翻到左侧
+    if (left < 4) left = 4;
+    const vy = (clientY - r.top) / r.height * H * ratio;
+    let top = vy - th / 2;
+    if (top < 4) top = 4;
+    if (top + th > r.height - 4) top = r.height - th - 4;
+    tipEl.style.left = left.toFixed(1) + 'px';
+    tipEl.style.top = top.toFixed(1) + 'px';
+  };
+  const hide = () => { tipEl.style.display = 'none'; hl.style.display = 'none'; };
+  svg.addEventListener('mousemove', e => show(e.clientX, e.clientY));
+  svg.addEventListener('mouseleave', hide);
+  svg.addEventListener('touchstart', e => { const t = e.touches[0]; if (t) show(t.clientX, t.clientY); }, { passive: true });
+  svg.addEventListener('touchmove', e => { const t = e.touches[0]; if (t) show(t.clientX, t.clientY); }, { passive: true });
+  svg.addEventListener('touchend', hide);
 }
 
 function barGroup(el, opts) {
