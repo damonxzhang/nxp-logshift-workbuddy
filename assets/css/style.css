@@ -936,6 +936,29 @@ table.wk .row-goal td.lbl strong { font-size: 15px; }
 /* 今日列高亮 */
 table.wk th.is-today { background: #e8eefc; color: var(--primary-dark); }
 table.wk td.is-today { background: rgba(29, 78, 216, .06); }
+/* 来自 OP 大屏浮窗点击的「定位日」列高亮（比 is-today 更醒目一档） */
+table.wk th.is-focus { background: #dfe9ff; color: var(--primary-dark); box-shadow: inset 0 -3px 0 var(--primary, #1d4ed8); }
+table.wk td.is-focus { background: rgba(29, 78, 216, .10); box-shadow: inset 2px 0 0 rgba(29, 78, 216, .35), inset -2px 0 0 rgba(29, 78, 216, .35); }
+
+/* ================= 日志管理 · 生产日志（静态展示页） ================= */
+/* 顶部工具按钮：对齐客户截图的绿色系（上一个交班班 / 回到当前班） */
+.btn-green { background: #4e9a51; border-color: #4e9a51; color: #fff; }
+.btn-green:hover:not(:disabled) { background: #448a47; border-color: #448a47; color: #fff; }
+.btn-green:disabled { opacity: .45; cursor: not-allowed; }
+/* From：夜班 - A班 - 孙志彬 / Date：…… 对齐截图的橙色文字 */
+.logs-meta { margin-left: auto; }
+.log-from { font-size: 13.5px; font-weight: 700; color: #d97a1f; white-space: nowrap; }
+/* 「生产日志」标题：绿色竖条强调 */
+.logs-title {
+  font-size: 20px; font-weight: 800; line-height: 1.25;
+  padding-left: 11px; border-left: 4px solid #4e9a51;
+}
+/* 日志表：ID 列居中、整行斑马纹，贴合截图的浅色隔行效果 */
+.logs-table th { font-size: 14px; color: var(--text-2); background: #f4f6fa; }
+.logs-table td.num { text-align: center; color: var(--text-2); }
+.logs-table tbody tr:nth-child(even) { background: #fafbfd; }
+.logs-table td { font-size: 14.5px; }
+
 .tod { font-size: 10px; background: var(--primary); color: #fff; border-radius: 4px; padding: 0 4px; margin-left: 3px; vertical-align: middle; }
 
 /* 达标 / 临界 / 超标 单元格着色 + 脉冲动画 */
@@ -1076,6 +1099,14 @@ table.table input.input.num.t-th.input-bad {
 .op-chart-stack .op-chart-card .legend { margin: 0; flex: 0 0 auto; white-space: nowrap; }
 .op-chart-stack .op-chart-card .card-body { padding-top: 10px; padding-bottom: 10px; }
 
+/* 2×2 双部门视图（10-08）：卡片宽度减半 → 标题不再保留 420px 最小宽度，
+   改为与图例上下堆叠，避免半宽卡片内标题溢出；图形高度仍由 page-output.js 按视口余量自适应 */
+.op-chart-grid .op-chart-card .card-head { padding: 10px 16px 8px; flex-wrap: wrap; row-gap: 2px; }
+.op-chart-grid .op-chart-card .card-title { flex: 1 1 100%; min-width: 0; font-size: 16.5px; flex-wrap: wrap; row-gap: 3px; }
+.op-chart-grid .op-chart-card .card-sub { flex: 1 1 100%; font-size: 13px; }
+.op-chart-grid .op-chart-card .legend { flex: 1 1 100%; white-space: normal; margin-top: 2px; }
+.op-chart-grid .op-chart-card .card-body { padding-top: 8px; padding-bottom: 8px; }
+
 .lc-wrap { position: relative; }
 .lc-wrap svg { touch-action: pan-y; }
 
@@ -1094,6 +1125,9 @@ table.table input.input.num.t-th.input-bad {
 }
 .lc-trow { display: flex; align-items: center; justify-content: space-between; gap: 18px; white-space: nowrap; }
 .lc-trow + .lc-trow { margin-top: 4px; }
+
+/* 图表直接可点（OP 大屏 → 周维度累计表）：下钻动作挂在 SVG 上，浮窗保持 pointer-events:none
+   （原「浮窗底部 CTA 链接行」方案已于 2026-10-08 按客户要求下线） */
 .lc-tname { display: inline-flex; align-items: center; color: var(--text-2); }
 .lc-tname i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 7px; flex: none; }
 .lc-tname i.lc-dash { width: 14px; height: 0; border-top: 2.5px dashed; border-radius: 0; background: none; }
@@ -1268,122 +1302,3 @@ table.wdt td .ct-badge.r1 { background: #fff3e0; color: var(--warn); }
 .wd-page button { border: 1px solid var(--border); background: var(--surface); border-radius: 7px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
 .wd-page button:disabled { opacity: .45; cursor: default; }
 .wd-page button.on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
-
-/* ================= WIP 动态可视化 · 5 个备选方案 ================= */
-.wip-viz .vz-seg { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.wip-viz .vz-seg button {
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
-  border-radius: 9px; padding: 6px 11px; font-size: 13px; transition: .2s;
-}
-.wip-viz .vz-seg button:hover { border-color: var(--border-strong); color: var(--text); }
-.wip-viz .vz-seg button.on { background: var(--primary-soft); border-color: #c3d4ff; color: var(--primary); font-weight: 700; }
-.vz-host { min-height: 120px; }
-.vz-block { animation: wipFadeUp .5s cubic-bezier(.2,.7,.3,1) both; }
-.vz-block + .vz-block { margin-top: 26px; padding-top: 20px; border-top: 1px dashed var(--border-strong); }
-.vz-title { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 800; }
-.vz-desc { font-size: 12.8px; color: var(--text-3); margin: 4px 0 14px; line-height: 1.75; }
-.vz-info {
-  margin-top: 14px; padding: 10px 13px; border-radius: 10px;
-  background: var(--surface-2); border: 1px dashed var(--border-strong);
-  font-size: 13.2px; color: var(--text-2); min-height: 42px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
-}
-.vz-info b { color: var(--text); }
-.vz-legend {
-  display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; padding-top: 11px;
-  border-top: 1px solid var(--border); font-size: 12.4px; color: var(--text-3); align-items: center;
-}
-.vz-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.vz-lg-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.vz-lg-ring { width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid var(--text-3); display: inline-block; }
-.vz-lg-outline { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--danger); display: inline-block; }
-
-/* ---- 方案 A：环形仪表盘 ---- */
-.vz-rings { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 4px; }
-.vz-ring {
-  position: relative; text-align: center; padding: 8px 2px 6px; border-radius: 12px; cursor: pointer;
-  transition: background .25s, transform .25s, box-shadow .25s;
-}
-.vz-ring:hover { background: var(--surface-2); transform: translateY(-2px); }
-.vz-ring.spot { background: var(--primary-soft); box-shadow: inset 0 0 0 1px #c3d4ff; }
-.vz-ring-svg { width: 90px; height: 90px; display: block; margin: 0 auto; }
-.vz-ring-center { position: absolute; left: 0; right: 0; top: 38px; pointer-events: none; }
-.vz-ring-center b { display: block; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
-.vz-ring-center span { font-size: 10.5px; color: var(--text-3); }
-.vz-ring-name { font-size: 12.2px; font-weight: 700; margin-top: 3px; }
-.vz-ring-meta { font-size: 11px; color: var(--text-3); }
-.vz-ring-meta em { font-style: normal; font-weight: 700; color: var(--danger); }
-.vz-ring.is-bad .vz-ring-svg { animation: vzRingGlow 2.1s ease-in-out infinite; }
-.vz-ring.is-warn .vz-ring-svg { animation: vzRingGlow2 2.6s ease-in-out infinite; }
-@keyframes vzRingGlow { 50% { filter: drop-shadow(0 0 7px rgba(204,47,42,.5)); } }
-@keyframes vzRingGlow2 { 50% { filter: drop-shadow(0 0 6px rgba(168,98,11,.42)); } }
-
-/* ---- 方案 B：流向桑基 ---- */
-.vz-flow { width: 100%; height: auto; display: block; }
-.vz-flow .vz-fl-n { font-size: 12px; font-weight: 700; fill: var(--text-2); }
-.vz-flow .vz-fl-v { font-size: 11px; font-weight: 500; fill: var(--text-3); }
-.vz-flow .vz-fl-hd { font-size: 11.5px; fill: var(--text-3); font-weight: 600; }
-.vz-fl-rib { animation: vzRibIn .8s ease-out both; }
-@keyframes vzRibIn { from { opacity: 0; } }
-.vz-fl-node { animation: wipFadeUp .5s ease-out both; cursor: pointer; }
-.vz-fl-node:hover .vz-fl-n { fill: var(--primary); }
-.vz-fl-node rect { transition: filter .2s; }
-.vz-fl-node:hover rect { filter: drop-shadow(0 0 5px rgba(29,78,216,.45)); }
-.vz-fl-dash { stroke-dasharray: 5 9; animation: vzFlow 1.15s linear infinite; }
-@keyframes vzFlow { to { stroke-dashoffset: -28; } }
-
-/* ---- 方案 C：CT 气泡象限 ---- */
-.vz-bubwrap { overflow: visible; }
-.vz-bub { transform-box: fill-box; transform-origin: center; animation: vzPop .55s cubic-bezier(.2,.75,.3,1) both; cursor: pointer; }
-.vz-bub:hover { fill-opacity: .95; stroke-width: 2; }
-@keyframes vzPop { from { transform: scale(.15); opacity: 0; } }
-.vz-bub.al { stroke: var(--danger); animation: vzPop .55s cubic-bezier(.2,.75,.3,1) both, vzBubPulse 1.9s ease-in-out infinite; }
-.vz-bub.ay { stroke: var(--warn); }
-@keyframes vzBubPulse { 50% { opacity: .4; } }
-.vz-band-y, .vz-band-r { animation: vzBandIn .9s ease-out both; }
-.vz-band-r { animation-delay: .18s; }
-@keyframes vzBandIn { from { opacity: 0; } }
-.vz-axis { font-size: 11px; fill: var(--text-3); }
-.vz-axis-ttl { font-size: 11.5px; fill: var(--text-3); font-weight: 600; }
-
-/* ---- 方案 D：批次点阵 ---- */
-.vz-dots { display: flex; flex-direction: column; gap: 10px; }
-.vz-dot-line { display: flex; gap: 14px; align-items: flex-start; }
-.vz-dot-name { width: 154px; flex: none; text-align: right; font-size: 12.3px; padding-top: 1px; }
-.vz-dot-name b { display: block; font-weight: 700; }
-.vz-dot-name small { color: var(--text-3); font-size: 11.2px; }
-.vz-dot-name em { font-style: normal; color: var(--danger); font-weight: 700; }
-.vz-dot-grid { display: grid; grid-template-columns: repeat(var(--cols, 34), 10px); gap: 4px; flex: 1; }
-.vz-dot {
-  width: 10px; height: 10px; border-radius: 3px; display: block; cursor: pointer;
-  animation: vzDotIn .45s cubic-bezier(.2,.75,.3,1) both; animation-delay: var(--d, 0s);
-  transition: transform .15s;
-}
-.vz-dot:hover { transform: scale(1.7); }
-.vz-dot.is-warn { box-shadow: 0 0 0 1.5px rgba(168, 98, 11, .8); }
-.vz-dot.is-bad {
-  box-shadow: 0 0 0 1.5px rgba(204, 47, 42, .92); border-radius: 2px;
-  animation: vzDotIn .45s cubic-bezier(.2,.75,.3,1) both, vzDotPulse 1.8s ease-in-out infinite;
-  animation-delay: var(--d, 0s), calc(var(--d, 0s) + .5s);
-}
-.vz-dot.is-hold { outline: 1.5px dashed var(--danger); outline-offset: 1.5px; }
-@keyframes vzDotIn { from { opacity: 0; transform: scale(.2); } }
-@keyframes vzDotPulse { 50% { box-shadow: 0 0 0 3.5px rgba(204, 47, 42, .22); } }
-
-/* ---- 方案 E：极坐标弧 ---- */
-.vz-polar { width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto; }
-.vz-pbar-g { cursor: pointer; }
-.vz-pbar {
-  transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(0);
-  transition: transform .95s cubic-bezier(.2,.75,.3,1); transition-delay: var(--d, 0s);
-}
-.vz-pbar.in { transform: none; }
-.vz-pbar-g:hover .vz-pbar { filter: drop-shadow(0 0 6px rgba(29, 78, 216, .5)); }
-.vz-pbar-g:hover .vz-pl { fill: var(--primary); font-weight: 700; }
-.vz-pbar.is-bad { stroke: var(--danger); stroke-width: 1.4; }
-.vz-darc { cursor: pointer; transition-property: stroke-dasharray, stroke-width; }
-.vz-darc:hover { stroke-width: 34; }
-.vz-pl { font-size: 10.5px; fill: var(--text-3); }
-.vz-dc-v { font-size: 27px; font-weight: 800; fill: var(--text); font-variant-numeric: tabular-nums; }
-.vz-dc-l { font-size: 11.5px; fill: var(--text-3); }
-.vz-dc-s { font-size: 11px; fill: var(--text-3); }

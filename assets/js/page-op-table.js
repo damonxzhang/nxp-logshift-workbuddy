@@ -40,6 +40,13 @@
   };
 
   let week = genOpWeek(year, weekNo);
+  /* 来自 OP 大屏浮窗点击的「定位日」（0-6 = 六→五）：一次性消费，表格高亮对应列 */
+  let focusDay = (function () {
+    const fd = store.get('op_table_focus', null);
+    if (fd && Number.isInteger(fd.day) && fd.day >= 0 && fd.day <= 6) return fd.day;
+    return null;
+  })();
+  if (focusDay != null) store.set('op_table_focus', null);
   let days, wdLabel, lastIdx, todayIdx, focusIdx, weekRange, hasActual, focusLabel, realInfo;
   function recalc() {
     days = week.days;
@@ -68,7 +75,7 @@
     const agg6 = aggAt(ids, 6);
     const aggNow = aggAt(ids, focusIdx);
     const aggSt = opAggStatus(ids, focusIdx, week);
-    const earn = opEarnSeries(ids, week, OPTypeStore.all());
+    const earn = opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
     const redTypes = ids.filter(id => opTypeAlarm(id, week).red > 0);
     const warnTypes = ids.filter(id => opTypeAlarm(id, week).red === 0 && opTypeAlarm(id, week).yellow > 0);
     const overCells = countOverCells(ids);
@@ -119,8 +126,10 @@
             <span class="chip">${icon('activity', 14)} 周实际 ${hasActual ? fmt(aggNow.t) + 'K（' + focusLabel + '）' : '—'}</span>
             <span class="chip">${icon('check', 14)} 达成率 ${aggSt.rate == null ? '—' : aggSt.rate + '%'} ${badge(aggSt.status)}</span>
             <span class="chip">${icon('database', 14)} Earn 实际 ${earn.totalCum[focusIdx] == null ? '—' : earn.totalCum[focusIdx] + ' 万'}</span>
+            <span class="chip" title="数量口径沿用周目标均摊；金额口径按配置页口径：周目标均摊 / 递进式（周六看上周五实际、周日看周六实际，逐日递进）">${icon('trend', 14)} Earn 目标口径：${earn.mode === 'progressive' ? '递进式 ±' + earn.pct + '%' : '周目标均摊'}</span>
             <span class="chip ${realInfo.real ? 'chip-real' : 'chip-demo'}">${icon('database', 14)} ${esc(realInfo.text)}</span>
             ${overCells ? `<span class="chip chip-danger">${icon('alert', 14)} 超标单元格 ${overCells} 个</span>` : ''}
+            ${focusDay != null ? `<span class="chip chip-real" id="chipFocusDay" title="来自 Output 大屏浮窗点击 · 已在表中定位到该日（切换筛选后清除）">${icon('arrowRight', 14)} 已定位到大屏所选日期：${days[focusDay].label}（${days[focusDay].weekday}）</span>` : ''}
           </div>
         </div>
       </div>
@@ -204,10 +213,11 @@
 
   /* ---------------- 周维度累计表 ---------------- */
   function renderWeekTable(ids) {
+    const focusCls = i => (i === focusDay ? ' is-focus' : '');
     const head = `<thead><tr>
       <th class="lbl">PKG Type</th>
       <th class="lbl">Output 目标 [K]</th>
-      ${wdLabel.map((w, i) => `<th class="${i === todayIdx ? 'is-today' : ''}">${w} [K]${i === todayIdx ? ' <span class="tod">今</span>' : ''}</th>`).join('')}
+      ${wdLabel.map((w, i) => `<th class="${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${w} [K]${i === todayIdx ? ' <span class="tod">今</span>' : ''}${focusDay === i ? ' <span class="tod">定</span>' : ''}</th>`).join('')}
     </tr></thead>`;
 
     const body = ids.map(id => {
@@ -215,17 +225,17 @@
       const info = pkgTypes.find(p => p.id === id) || {};
       const stNow = opStatus(id, focusIdx, week);
       const meta = `<div class="small muted" style="margin-top:2px">${focusLabel}：差额 ${stNow.diff == null ? '—' : (stNow.diff >= 0 ? '+' : '') + stNow.diff + 'K'} · ${opStatusInfo(stNow.status).label}</div>`;
-      const goalCells = t.goalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}">${v}</td>`).join('');
+      const goalCells = t.goalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}</td>`).join('');
       const totalCells = t.totalCum.map((v, i) => {
         if (v == null) {
           // 未来日期 → 斜纹「无数据」；已过去但无产出的日期（真实数据未覆盖）→ 浅灰「—」，两者含义不同
           const cls = days[i].isFuture ? 'cell-future' : 'cell-nodata';
-          return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}">—</td>`;
+          return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">—</td>`;
         }
         const st = opStatus(id, i, week);
         const cls = st.status === 'over' ? 'cell-bad' : (st.status === 'critical' ? 'cell-warn' : '');
         const flag = st.status === 'met' ? '' : `<span class="cell-flag ${st.status === 'over' ? 'flag-bad' : 'flag-warn'}">${st.status === 'over' ? '超' : '警'}</span>`;
-        return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}">${v}${flag}</td>`;
+        return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}${flag}</td>`;
       }).join('');
       const feCells = `<td colspan="7" class="cell-fe">—（预留扩展行 · FE total）</td>`;
       return `
@@ -243,13 +253,13 @@
         </tr>`;
     }).join('');
 
-    const earn = opEarnSeries(ids, week, OPTypeStore.all());
-    const earnGoalCells = earn.goalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}">${v}</td>`).join('');
-    const earnTotalCells = earn.totalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}">${v == null ? '—' : v}</td>`).join('');
+    const earn = opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
+    const earnGoalCells = earn.goalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}</td>`).join('');
+    const earnTotalCells = earn.totalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v == null ? '—' : v}</td>`).join('');
     const foot = `
       <tr class="row-earn row-earn-goal">
         <td class="lbl"></td>
-        <td class="lbl">Earn 目标(累计) 万</td>${earnGoalCells}
+        <td class="lbl">Earn 目标(累计) 万<div class="small muted" style="font-weight:400">${earn.mode === 'progressive' ? '递进式 ±' + earn.pct + '%' : '周目标均摊'}</div></td>${earnGoalCells}
       </tr>
       <tr class="row-earn row-earn-total">
         <td class="lbl"></td>
@@ -286,15 +296,17 @@
 
   /* ---------------- 事件绑定 ---------------- */
   function bindCommon() {
+    /* 「定位日」是一次性定位：用户在本页做任何筛选变更后即清除 */
+    const clearFocus = () => { if (focusDay != null) { focusDay = null; store.set('op_table_focus', null); } };
     const sy = document.getElementById('selYear');
     if (sy) sy.onchange = () => {
       year = Number(sy.value);
       const n = opWeeksInYear(year);
       if (weekNo > n) weekNo = n;
-      saveSel(); reload();
+      clearFocus(); saveSel(); reload();
     };
     const sw = document.getElementById('selWeek');
-    if (sw) sw.onchange = () => { weekNo = Number(sw.value); saveSel(); reload(); };
+    if (sw) sw.onchange = () => { clearFocus(); weekNo = Number(sw.value); saveSel(); reload(); };
 
     const sd = document.getElementById('selDept');
     if (sd) sd.onchange = () => {
@@ -302,7 +314,7 @@
       OPDeptStore.setPreviewDept(dept);
       applyDeptScope();
       filter = []; cfg.filter = []; saveCfg();
-      reload();
+      clearFocus(); reload();
       toast('已切换视角部门：' + dept + '（可见 ' + pkgTypes.length + ' 类）', 'success');
     };
 
@@ -317,7 +329,7 @@
         if (filter.length === 0) filter = [];
       }
       cfg.filter = filter.slice(); saveCfg();
-      render();
+      clearFocus(); render();
     });
 
     const bp = document.getElementById('btnCfgPage');
@@ -339,7 +351,7 @@
         rows.push([id, '实际(累计)', '', ...t.totalCum.map(v => v == null ? '—' : v), st.diff == null ? '—' : st.diff, opStatusInfo(st.status).label]);
         rows.push([id, 'FE 实际(累计)', '—', ...Array(7).fill('—'), '—', '预留']);
       });
-      const earn = opEarnSeries(ids, week, OPTypeStore.all());
+      const earn = opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
       rows.push(['Earn', '目标(累计) 万', '', ...earn.goalCum, '', '—']);
       rows.push(['Earn', '实际(累计) 万', '', ...earn.totalCum.map(v => v == null ? '—' : v), '', '—']);
       exportExcel('Output_OP_' + year + '_W' + String(weekNo).padStart(2, '0') + '_周维度累计表.xls', headers, rows);

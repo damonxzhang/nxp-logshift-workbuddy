@@ -1,6 +1,8 @@
 /* ============ OP 专属大屏：Output（OP）周维度累计追踪 ============
    权威规格：《Output 大屏（周维度追踪）需求提示词》+ 客户补充口径。
-   界面：年份 / 周别 / 视角部门 / PKG Type 筛选 → 两张累计对比图（上下排布，高度按视口自适应，力争一屏可见）→ 数据刷新。
+   界面：年份 / 周别 / 视角部门 / PKG Type 筛选 → 累计对比图 → 数据刷新。
+   图表排布（10-08 客户确认）：默认「双部门 2×2」= LEAD / NON-LEAD 两个部门 ×（数量 / 金额）两张图，
+     行 = 口径、列 = 部门，同一行共用 Y 轴上限以便横向比高低；可切「单部门」回到原上下两张图。
    周维度累计表与「异常报警 · 周维度」均已拆分为独立页面 op-table.html（本屏只保留筛选与两张累计对比曲线）。
    PKG Type 维护、每周目标数量、部门可见范围统一在独立配置页 op-config.html 完成。 */
 (function () {
@@ -9,7 +11,7 @@
   const canExport = CurrentUser.can('output', 'export');
   const canConfig = CurrentUser.can('output', 'edit');
 
-  let fitCharts = null;        // 两张累计图的「按视口高度自适应」回调，由 render() 内注册
+  let fitCharts = null;        // 全部累计图的「按视口高度自适应」回调，由 render() 内注册
 
   /* ---------------- 年份 / 周别 选择（默认定位到本周） ---------------- */
   const cur = opCurrentWeek();
@@ -36,6 +38,22 @@
     pkgTypes = all.filter(t => deptScope.indexOf(t.id) >= 0);
   }
   applyDeptScope();
+
+  /* ---------------- 视图模式（10-08 客户确认） ----------------
+     dual（默认）：LEAD + NON-LEAD 两个部门 ×（数量 / 金额）= 四张图，2×2 排布
+                  （行 = 口径，列 = 部门，同一行共用 Y 轴上限以便直接横向对比）
+     single：沿用原来的「单一视角部门 · 上下两张图」 */
+  const DUAL_DEPTS = ['LEAD', 'NON-LEAD'];
+  let viewMode = store.get('op_view_mode', 'dual') === 'single' ? 'single' : 'dual';
+  const saveViewMode = () => store.set('op_view_mode', viewMode);
+  /* 某部门实际参与统计的 PKG Type = 该部门可见范围 ∩ 当前 PKG Type 筛选 */
+  function idsForDept(d) {
+    const all = OPTypeStore.all().filter(t => t.enabled !== false);
+    const scope = OPDeptStore.visibleTypes(d, all.map(t => t.id));
+    const f = (filter && filter.length) ? filter : all.map(t => t.id);
+    const inter = scope.filter(id => f.indexOf(id) >= 0);
+    return inter.length ? inter : scope;
+  }
 
   // 筛选：选中的 PKG Type id（多选）；空数组 = 全部
   const allIds = () => pkgTypes.map(t => t.id);
@@ -89,8 +107,59 @@
     const redDays = redDaysOf(ids);
     const redTypes = ids.filter(id => opTypeAlarm(id, week).red > 0);
     const warnTypes = ids.filter(id => opTypeAlarm(id, week).red === 0 && opTypeAlarm(id, week).yellow > 0);
-    const gk = goalSeries(ids), ek = earnSeries(ids);      // 两张图各两条线（目标·虚线 / 实际·实线）
-    const gap1 = gapAt(gk, focusIdx), gap2 = gapAt(ek, focusIdx);
+    /* Earn 口径提示（10-08 修正）：数量口径固定「周目标均摊」；金额口径可切「递进式 ±5%」 */
+    const ei = earnMeta(ids) || { mode: 'even', pct: 5 };
+    const earnOverN = (ei.prog || []).filter(p => p && (p.status === 'critical' || p.status === 'over')).length;
+    const earnSub = ei.mode === 'progressive'
+      ? ` · 递进式 ±${ei.pct}%（基准=前一日实际）${earnOverN ? ` · <span class="red-inline">超差 ${earnOverN} 天</span>` : ''}`
+      : '';
+
+    /* ---------------- 图表面板 ----------------
+       dual   → 行=口径（数量 / 金额），列=部门（LEAD / NON-LEAD），四张图 2×2
+       single → 单一视角部门上排数量、下排金额 */
+    const isDual = viewMode === 'dual';
+    const panelDepts = isDual ? DUAL_DEPTS : [dept];
+    function makePanel(d, kind) {
+      const pids = isDual ? idsForDept(d) : ids;
+      const srs = kind === 'goal' ? goalSeries(pids) : earnSeries(pids);
+      return {
+        key: kind + '-' + d, dept: d, kind, ids: pids, series: srs,
+        redDays: redDaysOf(pids),
+        st: opAggStatus(pids, focusIdx, week),
+        gap: gapAt(srs, focusIdx),
+        em: earnMeta(pids)
+      };
+    }
+    const panels = [];
+    if (isDual) ['goal', 'earn'].forEach(kind => panelDepts.forEach(d => panels.push(makePanel(d, kind))));
+    else ['goal', 'earn'].forEach(kind => panels.push(makePanel(dept, kind)));
+    /* 同一行（同一口径）共用 Y 轴上限，两个部门可直接横向比高低 */
+    const maxByKind = {};
+    ['goal', 'earn'].forEach(kind => {
+      maxByKind[kind] = Math.max(1, ...panels.filter(p => p.kind === kind).map(p => chartMax(p.series)));
+    });
+
+    const panelCard = p => {
+      const isG = p.kind === 'goal';
+      const overN = (p.em.prog || []).filter(x => x && (x.status === 'critical' || x.status === 'over')).length;
+      const deptTag = isDual ? `<span class="chip">${icon('users', 14)} ${esc(p.dept)} · 可见 ${p.ids.length} 类</span> ` : '';
+      const gapTxt = p.gap != null
+        ? ` · ${focusLabel}差额 <strong class="${p.gap < 0 ? 'red-inline' : 'green-inline'}">${p.gap >= 0 ? '+' : ''}${p.gap}${isG ? 'K' : '万'}</strong>`
+        : '';
+      const redTxt = p.redDays.length ? ` · <span class="red-inline">红灯 ${p.redDays.length} 天</span>` : '';
+      const earnTag = (!isG && p.em.mode === 'progressive')
+        ? ` · 递进式 ±${p.em.pct}%${overN ? ` · <span class="red-inline">超差 ${overN} 天</span>` : ''}`
+        : '';
+      return `<div class="card op-chart-card">
+          <div class="card-head">
+            <div class="card-title">${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K）' : '累计 Earn 目标 vs 实际（万元）'}
+              <span class="card-sub">${deptTag}目标（虚线）vs 实际（实线）· 悬停看当日明细 · 点击图表查看「周维度累计表」 · ${badge(p.st.status)}${gapTxt}${redTxt}${earnTag}</span></div>
+            <div class="legend">${p.series.map(legendItem).join('')}
+              ${p.redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
+          </div>
+          <div class="card-body"><div id="pc_${esc(p.key)}"></div></div>
+        </div>`;
+    };
 
     document.getElementById('content').innerHTML = `
 
@@ -114,8 +183,15 @@
               <select class="input" id="selWeek" style="width:150px">${weekOptions()}</select>
             </div>
             <div class="fi">
-              <label class="field-label">视角部门</label>
-              <select class="input" id="selDept" style="width:130px">${OP_DEPARTMENTS.map(d => `<option value="${esc(d)}" ${d === dept ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+              <label class="field-label">视角部门${isDual ? '<span class="tag-hint">仅影响筛选清单</span>' : ''}</label>
+              <select class="input" id="selDept" style="width:130px" title="${isDual ? '双部门视图下仅用于决定 PKG Type 筛选清单；单部门视图下决定图表统计对象' : '决定图表统计对象与 PKG Type 筛选清单'}">${OP_DEPARTMENTS.map(d => `<option value="${esc(d)}" ${d === dept ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+            </div>
+            <div class="fi">
+              <label class="field-label">图表视图</label>
+              <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（数量 / 金额）四张图；单部门：当前视角部门上下两张图">
+                <button data-v="dual" class="${isDual ? 'active' : ''}">双部门 2×2</button>
+                <button data-v="single" class="${isDual ? '' : 'active'}">单部门</button>
+              </div>
             </div>
             <div class="fi grow">
               <label class="field-label">PKG Type ${redTypes.length ? `<span class="tag-hint red">${redTypes.length} 类红灯</span>` : (warnTypes.length ? `<span class="tag-hint warn">${warnTypes.length} 类黄灯</span>` : '')}</label>
@@ -130,37 +206,13 @@
               </div>
             </div>
           </div>
-          <div class="flex acenter gap8 mt8 flex-wrap">
-            <span class="chip">${icon('calendar', 14)} ${year} 年 第 ${weekNo} 周 · ${weekRange}（周六起始）</span>
-            <span class="chip">${icon('users', 14)} 部门 ${esc(dept)} · 可见 ${pkgTypes.length} 类${scopeConfigured ? '' : '（未配置，默认全部可见）'}</span>
-            <span class="chip" title="报警阈值逐 PKG Type 维护；汇总视图取各品类阈值之和">${icon('alert', 14)} 阈值 ${opAlarmText(ids)}</span>
-            <span class="chip ${realInfo.real ? 'chip-real' : 'chip-demo'}">${icon('database', 14)} ${esc(realInfo.text)}</span>
-            ${redDays.length ? `<span class="chip chip-danger">${icon('alert', 14)} 本周红灯 ${redDays.length} 天</span>` : ''}
-            <a class="chip chip-link" href="op-config.html">${icon('settings', 14)} 配置 PKG Type / 每周目标 / 部门可见范围</a>
-          </div>
         </div>
       </div>
 
-      <div class="grid op-chart-stack mt16" id="chartStack">
-        <div class="card op-chart-card">
-          <div class="card-head">
-            <div class="card-title">${icon('activity', 20)} 累计 goal vs total 曲线对比（K）
-              <span class="card-sub">目标（虚线）vs 实际（实线）· 悬停看当日明细 · ${badge(aggSt.status)}${gap1 != null ? ` · ${focusLabel}差额 <strong class="${gap1 < 0 ? 'red-inline' : 'green-inline'}">${gap1 >= 0 ? '+' : ''}${gap1}K</strong>` : ''}${redDays.length ? ` · <span class="red-inline">红灯 ${redDays.length} 天</span>` : ''}</span></div>
-            <div class="legend">${gk.map(legendItem).join('')}
-              ${redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
-          </div>
-          <div class="card-body"><div id="cGoal"></div></div>
-        </div>
-        <div class="card op-chart-card">
-          <div class="card-head">
-            <div class="card-title">${icon('database', 20)} 累计 Earn 目标 vs 实际（万元）
-              <span class="card-sub">目标（虚线）vs 实际（实线）· 悬停看当日明细 · 单价 × 累计实际${gap2 != null ? ` · ${focusLabel}差额 <strong class="${gap2 < 0 ? 'red-inline' : 'green-inline'}">${gap2 >= 0 ? '+' : ''}${gap2}万</strong>` : ''}${redDays.length ? ` · <span class="red-inline">红灯 ${redDays.length} 天</span>` : ''}</span></div>
-            <div class="legend">${ek.map(legendItem).join('')}
-              ${redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
-          </div>
-          <div class="card-body"><div id="cEarn"></div></div>
-        </div>
+      <div class="grid ${isDual ? 'g-2 op-chart-grid' : ''} op-chart-stack mt16" id="chartStack">
+        ${panels.map(panelCard).join('')}
       </div>
+      ${isDual ? `<div class="sub-note mt8">2×2 排布：行 = 口径（数量 / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。</div>` : ''}
 
       <div class="card mt16 no-print">
         <div class="card-head"><div class="card-title">${icon('refresh', 19)} 数据刷新
@@ -176,11 +228,7 @@
 
     bindCommon();
     setTimeout(() => {
-      const g = gk, e = ek;
-      const gWrap = document.getElementById('cGoal'), eWrap = document.getElementById('cEarn');
       const stack = document.getElementById('chartStack');
-      const gMarks = redDays.map(i => ({ i, v: g[1].data[i], color: '#cc2f2a', text: '超标' }));
-      const eMarks = redDays.map(i => ({ i, v: e[1].data[i], color: '#cc2f2a', text: '超标' }));
       /* 悬停浮层附加行：当日差额 + 状态（未来日显示占位说明） */
       const tipGap = (srs, unit) => i => {
         const g0 = srs[0].data[i], t0 = srs[1].data[i];
@@ -193,39 +241,55 @@
         const d = +(t0 - g0).toFixed(1);
         return `<div class="lc-tgap ${d < 0 ? '' : 'ok'}">差额(实际-目标) <strong>${d >= 0 ? '+' : ''}${d.toLocaleString('en-US')}${unit}</strong></div>`;
       };
-      const tipTitleG = i => `${days[i].label} · 周六起第 ${i + 1} 天${days[i].isToday ? '（今天）' : ''}`;
-      const gTip = tipGap(g, 'K');
-      const eTip = tipGap(e, '万');
+      const tipTitle = i => `${days[i].label} · 周六起第 ${i + 1} 天${days[i].isToday ? '（今天）' : ''}`;
 
-      /* 上下排布：两张图各占满整行；SVG 以 width:100% + height:auto 铺满，
-         显示高度 = 容器宽 × height / vw，故只调 height（视图单位）即可精确控制每张图占多高。 */
-      const VW = 1000;
-      const draw = H => {
-        lineChart(gWrap, {
-          series: g, labels: wdLabel, height: H, vw: VW, hover: true, tipUnit: 'K', tipTitle: tipTitleG, tipExtra: gTip,
-          min: 0, max: chartMax(g) * 1.08, yUnit: ' K', marks: gMarks, endAt: focusIdx, endUnit: 'K'
-        });
-        lineChart(eWrap, {
-          series: e, labels: wdLabel, height: H, vw: VW, hover: true, tipUnit: '万', tipTitle: tipTitleG, tipExtra: eTip,
-          min: 0, max: chartMax(e) * 1.08, yUnit: ' 万', marks: eMarks, endAt: focusIdx, endUnit: '万'
+      /* 全部面板一次绘制。SVG 以 width:100% + height:auto 铺满容器：
+         · 显示高度(px) = 容器宽 × height / vw → 由 height 控制每张图占多高；
+         · 图内文字像素尺寸 ∝ 1000 × 容器宽 / vw² → 卡片变窄（2×2）时同步调小 vw，
+           保证「整行单图」与「半宽双列」两种排布下文字看起来一样大。 */
+      const BASE_VW = 1000, BASE_CW = 1400;                 // 基准：整行单图（容器约 1400px，vw=1000）
+      const vwFor = cw => Math.max(520, Math.round(BASE_VW * Math.sqrt(Math.max(320, cw) / BASE_CW)));
+
+      const drawAll = H => {
+        panels.forEach(p => {
+          const el = document.getElementById('pc_' + p.key);
+          if (!el) return;
+          const unit = p.kind === 'goal' ? 'K' : '万';
+          const cw = el.clientWidth || BASE_CW;
+          lineChart(el, {
+            series: p.series, labels: wdLabel, height: Math.round(H * vwFor(cw) / cw), vw: vwFor(cw),
+            hover: true, tipUnit: unit, tipTitle, tipExtra: tipGap(p.series, unit),
+            min: 0, max: maxByKind[p.kind] * 1.08, yUnit: ' ' + unit,
+            marks: p.redDays.map(i => ({ i, v: p.series[1].data[i], color: '#cc2f2a', text: '超标' })),
+            endAt: focusIdx, endUnit: unit,
+            /* 图表直接可点（2026-10-08 客户要求：不再挂在浮窗上）：
+               点击图内任意位置 → 取该处所在的「日」→ 跳转周维度累计表并定位到该列 */
+            onClick: i => {
+              store.set('op_table_focus', { day: i });
+              location.href = 'op-table.html';
+            }
+          });
         });
       };
 
       /* 按视口余量自适应：先画一版量出「卡头 + 内边距 + 图例」的固定占用，
-         再把剩余高度平分给两张图，力争两块图在一个屏内同时可见。 */
+         再把剩余高度按「两行」平分（2×2 = 两行两列；单部门 = 两行一列），
+         力争全部图卡在一个屏内同时可见。 */
       const fit = () => {
-        draw(300);
-        const card = stack.querySelector('.op-chart-card');
-        if (!card) return;
-        const overhead = card.offsetHeight - gWrap.offsetHeight;              // 卡头 + body 内边距
-        const topAbs = stack.getBoundingClientRect().top + window.scrollY;    // 文档坐标：不受当前滚动位置影响
+        drawAll(240);
+        const cards = Array.prototype.slice.call(stack.querySelectorAll('.op-chart-card'));
+        if (!cards.length) return;
+        let overhead = 0;                                                    // 取最「厚」的卡头作为统一占用
+        cards.forEach(c => {
+          const w = c.querySelector('[id^="pc_"]');
+          if (w) overhead = Math.max(overhead, c.offsetHeight - w.offsetHeight);
+        });
+        const topAbs = stack.getBoundingClientRect().top + window.scrollY;   // 文档坐标：不受当前滚动位置影响
         const GAP = 14;                                                      // 与 .op-chart-stack 的 gap 一致
         const avail = window.innerHeight - topAbs - 18;
-        const perCard = (avail - GAP) / 2;                                   // 两张卡 + 卡间距
-        const wantPx = Math.max(150, Math.min(340, perCard - overhead));
-        const cw = gWrap.clientWidth || VW;
-        const wantH = Math.max(120, Math.round(wantPx * VW / cw));
-        if (Math.abs(wantH - 300) > 6) draw(wantH);
+        const perRow = (avail - GAP) / 2;                                    // 两行 + 行间距
+        const wantPx = Math.max(150, Math.min(340, perRow - overhead));
+        if (Math.abs(wantPx - 240) > 6) drawAll(wantPx);
       };
       fit();
       fitCharts = fit;                                                       // 供窗口尺寸变化时重排
@@ -266,8 +330,15 @@
       { name: '累计实际 total（实线）', color: '#12805a', width: 2.6, data: total }
     ];
   }
+  /* Earn 目标序列按配置页口径生成（even 周目标均摊 / progressive 递进式 ±5%） */
+  let earnInfo = null;
+  /* Earn 口径元信息（模式 / pct / 逐日基准 / 逐日判定），供卡片副标题与红字提示使用 */
+  function earnMeta(ids) {
+    return opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
+  }
   function earnSeries(ids) {
-    const e = opEarnSeries(ids, week, OPTypeStore.all());
+    const e = earnMeta(ids);
+    earnInfo = e;
     return [
       { name: '累计 Earn 目标（虚线）', color: '#8b5cf6', dash: true, width: 2.2, data: e.goalCum },
       { name: '累计 Earn 实际（实线）', color: '#0b6a86', width: 2.6, data: e.totalCum }
@@ -309,6 +380,17 @@
       reload();
       toast('已切换视角部门：' + dept + '（可见 ' + pkgTypes.length + ' 类）', 'success');
     };
+
+    const sv = document.getElementById('segView');
+    if (sv) sv.querySelectorAll('button').forEach(b => b.onclick = () => {
+      const v = b.dataset.v === 'single' ? 'single' : 'dual';
+      if (v === viewMode) return;
+      viewMode = v; saveViewMode();
+      render();
+      toast(v === 'dual'
+        ? '已切换：双部门 2×2（LEAD / NON-LEAD × 数量 / 金额）'
+        : '已切换：单部门视图（' + dept + '）', 'primary');
+    });
 
     const sf = document.getElementById('segFilter');
     if (sf) sf.querySelectorAll('button').forEach(b => b.onclick = () => {
@@ -359,7 +441,7 @@
 
   render();
 
-  /* 窗口尺寸变化后重排两张图的高度（沿用同一套「一屏可见」策略） */
+  /* 窗口尺寸变化后重排全部图卡的高度（沿用同一套「一屏可见」策略） */
   let rzTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(rzTimer);

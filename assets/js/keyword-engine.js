@@ -62,8 +62,10 @@ function resolveDispatch(ctx) {
   return { hits, bindings: bs, receivers, level, emails: receivers.map(r => r.mail) };
 }
 
-/* 统计某条绑定覆盖到的「子系统 × 联系人」组合数 */
+/* 统计某条绑定覆盖到的「子系统 × 报警级别 × 联系人」组合数
+   （2026-10-08：子系统收敛为 ALERT_SYSTEMS 三个，绑定维度由「关键词」改为「报警级别」） */
 function bindingCoverage(b) {
-  const s = b.sys.includes('ALL') ? SUBSYSTEMS.length : b.sys.length;
-  return s * b.contacts.length;
+  const s = b.sys.includes('ALL') ? ALERT_SYSTEMS.length : b.sys.length;
+  const lv = (b.levels && b.levels.length) ? b.levels.length : ALERT_LEVELS.length;
+  return s * lv * b.contacts.length;
 }

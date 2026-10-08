@@ -50,28 +50,44 @@ const NOTIFY_RULES = [
   { sys: '仓储管理 WMS', dept: '仓储部', to: '田守义', mail: 'tian.sy@corp.example.com', level: 'Critical + 日报', voice: true, enabled: true }
 ];
 
-/* ============ 关键词联动：紧急联系人 / 关键词库 / 多对多绑定 ============
-   客户可在页面自行维护这三类数据，并按「关键词 × 子系统 × 紧急联系人」多对多绑定。
-   命中关键词的异常即视为紧急邮件，按绑定关系即时投递给对应紧急联系人。
+/* ============ 预警通知：紧急联系人 / 子系统 × 报警级别 × 联系人 多对多绑定 ============
+   2026-10-08 客户确认两项调整：
+     ① 去掉「关键词库」——预警不再依赖关键词命中，改由大屏多级报警（红 / 黄）直接触发；
+     ② 子系统收敛为本次实际接入的 3 个：Output（OP）/ WIP 在制品 / 次品管理，与接入范围口径一致。
+   触发链路：某子系统出现红色 / 黄色报警 → 按「子系统 × 报警级别 × 紧急联系人」绑定关系即时投递紧急邮件。
    字段说明：
-     contacts  level: 仅特急 / 特急+重要 / 全部
-     keywords  match: 包含 / 前缀 / 精确 / 正则 / 多词任一（以 | 分隔）
-               level: 特急 / 重要    dnd: 是否跳过免打扰时段
-     bindings  sys: 子系统 id 数组，含 'ALL' 表示全部子系统
+     ALERT_SYSTEMS  本次接入的 3 个子系统（不再使用旧的 12 个通用子系统 SUBSYSTEMS）
+     ALERT_LEVELS   red 红色报警（红屏 + 强制弹窗 + 语音） / yellow 黄色报警（黄灯 · 仅邮件）
+     contacts       level: 仅特急（只收红色）/ 特急+重要（红 + 黄）/ 全部（含常规告警）
+     bindings       sys: ALERT_SYSTEMS 的 id 数组，含 'ALL' 表示全部子系统
+                    levels: ['red'] / ['yellow'] / ['red','yellow']
+   注：KEYWORDS_SEED 予以保留，仅供总览页「关键词命中」试算使用；预警组件页不再提供关键词库维护入口。
 */
 
-const CONTACTS_SEED = [
-  { id: 'C01', name: '钱志强', dept: '安保部', role: '值班班长', mail: 'qian.zq@corp.example.com', level: '仅特急', enabled: true },
-  { id: 'C02', name: '田守义', dept: '仓储部', role: '库管主管', mail: 'tian.sy@corp.example.com', level: '仅特急', enabled: true },
-  { id: 'C03', name: '孙立群', dept: '财务处', role: '支付业务负责人', mail: 'sun.lq@corp.example.com', level: '特急+重要', enabled: true },
-  { id: 'C04', name: '周雅琴', dept: '结算中心', role: '结算主管', mail: 'zhou.yq@corp.example.com', level: '特急+重要', enabled: true },
-  { id: 'C05', name: '李国栋', dept: '网络组', role: '网络工程师', mail: 'li.gd@corp.example.com', level: '全部', enabled: true },
-  { id: 'C06', name: '吴海涛', dept: '安全合规部', role: '安全经理', mail: 'wu.ht@corp.example.com', level: '特急+重要', enabled: true },
-  { id: 'C07', name: '郑文斌', dept: '平台架构组', role: '系统架构师', mail: 'zheng.wb@corp.example.com', level: '全部', enabled: true },
-  { id: 'C08', name: '王海涛', dept: '信息中心', role: '夜间值班班长', mail: 'wang.ht@corp.example.com', level: '全部', enabled: true },
-  { id: 'C09', name: '刘振华', dept: '分管领导', role: '副总经理', mail: 'liu.zh@corp.example.com', level: '仅特急', enabled: true }
+const ALERT_SYSTEMS = [
+  { id: 'OP', name: 'Output（OP）产出', cat: '已接入', owner: '制造处 · 产出大屏（P2）' },
+  { id: 'WIP', name: 'WIP 在制品', cat: '已接入', owner: '制造处 · 在制品看板（P2）' },
+  { id: 'DEFECT', name: '次品管理（质量预警）', cat: '已接入', owner: '质量部 · PPM 预警大屏' }
 ];
 
+const ALERT_LEVELS = [
+  { id: 'red', name: '红色报警', desc: '红屏 + 强制弹窗 + 语音播报' },
+  { id: 'yellow', name: '黄色报警', desc: '黄灯预警 · 仅邮件通知' }
+];
+
+const CONTACTS_SEED = [
+  { id: 'C01', name: '王海涛', dept: '制造处 · BE 段', role: '白班值班班长', mail: 'wang.ht@corp.example.com', level: '全部', enabled: true },
+  { id: 'C02', name: '刘洋', dept: '制造处 · BE 段', role: '夜班值班班长', mail: 'liu.y@corp.example.com', level: '全部', enabled: true },
+  { id: 'C03', name: '孙立群', dept: '生产计划处', role: '产出计划负责人', mail: 'sun.lq@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C04', name: '周雅琴', dept: '质量部', role: '质量工程师（PPM 预警）', mail: 'zhou.yq@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C05', name: '李国栋', dept: '设备工程部', role: '设备工程师（机台）', mail: 'li.gd@corp.example.com', level: '全部', enabled: true },
+  { id: 'C06', name: '吴海涛', dept: '工艺部', role: '工艺工程师', mail: 'wu.ht@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C07', name: '郑文斌', dept: '信息中心', role: 'IT 系统对接负责人', mail: 'zheng.wb@corp.example.com', level: '全部', enabled: true },
+  { id: 'C08', name: '田守义', dept: '制造处 · 在制品', role: 'WIP 跟线主管', mail: 'tian.sy@corp.example.com', level: '特急+重要', enabled: true },
+  { id: 'C09', name: '刘振华', dept: '分管领导', role: '生产副总经理', mail: 'liu.zh@corp.example.com', level: '仅特急', enabled: true }
+];
+
+/* 关键词库（2026-10-08 起仅用于总览页「关键词命中」试算，预警组件页已下线该维护入口） */
 const KEYWORDS_SEED = [
   { id: 'K01', word: '宕机', match: '包含', level: '特急', dnd: true, enabled: true, note: '全系统通用', hits: 2 },
   { id: 'K02', word: '心跳中断', match: '包含', level: '特急', dnd: true, enabled: true, note: '主机 / 数据库主节点', hits: 3 },
@@ -87,11 +103,11 @@ const KEYWORDS_SEED = [
 ];
 
 const BINDINGS_SEED = [
-  { id: 'B01', name: '视频与存储类故障', kws: ['K01', 'K02', 'K03'], sys: ['VMS'], contacts: ['C01', 'C08'], enabled: true },
-  { id: 'B02', name: '资金支付链路阻断', kws: ['K04', 'K05'], sys: ['PAY', 'SET'], contacts: ['C03', 'C04', 'C09'], enabled: true },
-  { id: 'B03', name: '网络与安全事件', kws: ['K06', 'K07'], sys: ['NET', 'BAS', 'IAM'], contacts: ['C05', 'C06', 'C07'], enabled: true },
-  { id: 'B04', name: '仓储物流作业中断', kws: ['K08', 'K01'], sys: ['WMS', 'TMS'], contacts: ['C02', 'C08'], enabled: true },
-  { id: 'B05', name: '全局兜底（事后复盘）', kws: ['K01', 'K09', 'K10'], sys: ['ALL'], contacts: ['C08', 'C09'], enabled: true }
+  { id: 'B01', name: 'OP 产出缺口（累计未达标 / 金额偏离）', sys: ['OP'], levels: ['red', 'yellow'], contacts: ['C01', 'C03', 'C09'], enabled: true },
+  { id: 'B02', name: 'WIP 在制品积压与 OTD 逾期', sys: ['WIP'], levels: ['red', 'yellow'], contacts: ['C02', 'C08'], enabled: true },
+  { id: 'B03', name: '次品 PPM 超标（机台 / 料号）', sys: ['DEFECT'], levels: ['red', 'yellow'], contacts: ['C04', 'C06'], enabled: true },
+  { id: 'B04', name: '设备与机台异常（跨三系统）', sys: ['OP', 'WIP', 'DEFECT'], levels: ['red'], contacts: ['C05', 'C07'], enabled: true },
+  { id: 'B05', name: '全局兜底（事后复盘）', sys: ['ALL'], levels: ['red'], contacts: ['C07', 'C09'], enabled: true }
 ];
 
 /* ============ RBAC 用户与权限管理 ============

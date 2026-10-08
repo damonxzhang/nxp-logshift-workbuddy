@@ -4,6 +4,9 @@ shot-*.png
 .cdp-profile/
 .chrome-debug/
 
+# ---- 文档生成中间产物 ----
+.doc-data.json
+
 # ---- 临时/导出文件 ----
 *.tmp
 *.log

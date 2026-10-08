@@ -1,14 +1,21 @@
-/* ============ 预警通知：关键词联动 + 紧急邮件分发 ============ */
+/* ============ 预警通知：子系统 × 报警级别 × 紧急联系人 ============
+   2026-10-08 客户确认：① 去掉「关键词库」，预警由大屏多级报警（红 / 黄）直接触发；
+                       ② 子系统收敛为本次实际接入的 3 个（Output / WIP / 次品管理）。
+   ================================================================ */
 (function () {
   renderShell('alerts');
 
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  /* ---------------- 关键词联动数据（客户可自行维护） ---------------- */
+  /* ---------------- 预警通知配置（客户可自行维护） ----------------
+     localStorage key 沿用历史名 'keywordCfg'，避免客户已维护的联系人丢失。 */
   const K = store.get('keywordCfg', null) || {};
   if (!Array.isArray(K.contacts)) K.contacts = clone(CONTACTS_SEED);
-  if (!Array.isArray(K.keywords)) K.keywords = clone(KEYWORDS_SEED);
-  if (!Array.isArray(K.bindings)) K.bindings = clone(BINDINGS_SEED);
+  /* 旧结构迁移：绑定里带 kws（关键词）或无 levels 字段的一律按新种子重置 */
+  if (!Array.isArray(K.bindings) || K.bindings.some(b => b.kws || !Array.isArray(b.levels))) {
+    K.bindings = clone(BINDINGS_SEED);
+    delete K.keywords;
+  }
   const saveK = () => store.set('keywordCfg', K);
 
   const nextId = (prefix, list) => {
@@ -17,24 +24,31 @@
     return prefix + String(i).padStart(2, '0');
   };
 
-  const sysName = id => id === 'ALL' ? '全部子系统' : (SUBSYSTEMS.find(s => s.id === id) || { name: id }).name;
-  const kwWord = id => (K.keywords.find(k => k.id === id) || { word: id }).word;
+  const sysName = id => id === 'ALL' ? '全部子系统（3 个）' : (ALERT_SYSTEMS.find(s => s.id === id) || { name: id }).name;
   const ctName = id => (K.contacts.find(c => c.id === id) || { name: id, dept: '—' }).name;
-  const kwLevel = id => (K.keywords.find(k => k.id === id) || {}).level === '特急';
-  const kwLevelChip = id => kwLevel(id) ? 'danger' : 'warn';
+  const lvName = id => (ALERT_LEVELS.find(l => l.id === id) || { name: id }).name;
+  const lvChip = id => (id === 'red' ? 'danger' : 'warn');
   const optsSel = (list, cur) => list.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('');
+
+  /* 各子系统的红 / 黄触发口径（与三块大屏实际口径一致） */
+  const SYS_RULE = {
+    OP: '红：累计产出缺口 ≥ 红灯阈值（逐 PKG Type 可配）；黄：≥ 黄灯阈值。金额（Earn）口径按递进 ±5% 判定',
+    WIP: '红：BE CT ≥ 红阈值 / OTD 逾期超红线；黄：≥ 黄阈值（均在二级抽屉按工序配置）',
+    DEFECT: '红：周 PPM 突破红线 2000（良率 < 0.998）；黄：达预警线口径 3000 PPM（CWAAY 0.997）'
+  };
+  const sysRule = id => SYS_RULE[id] || '阈值由该子系统大屏的报警配置决定';
 
   /* ================= 页面 ================= */
   function render() {
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
       ${icon('mail', 19)}
-      <div><strong>预警通道说明：</strong>本系统预警<strong>仅通过邮件发送</strong>，不含短信通道。异常命中<strong>关键词</strong>后即判定为<strong>紧急邮件</strong>，按「关键词 × 子系统 × 紧急联系人」的绑定关系即时投递。</div>
+      <div><strong>预警通道说明：</strong>本系统预警<strong>仅通过邮件发送</strong>，不含短信通道。大屏出现<strong>红色 / 黄色报警</strong>时，按下方「子系统 × 报警级别 × 紧急联系人」的绑定关系即时投递紧急邮件。</div>
     </div>
 
     <div class="notice mt16" style="--nc:var(--warn)">
-      ${icon('key', 19)}
-      <div><strong>关键词 × 子系统 × 紧急联系人（多对多，客户自助配置）：</strong>关键词库与紧急联系人均可自助增删改，三者自由绑定——同一关键词可绑多个子系统与多个联系人，一个联系人也可承接多个关键词。</div>
+      ${icon('layers', 19)}
+      <div><strong>子系统 × 报警级别 × 紧急联系人（多对多，客户自助配置）：</strong>子系统即本次实际接入的 <strong>Output（OP）/ WIP 在制品 / 次品管理</strong> 三个（2026-10-08 收敛，与接入范围口径一致）；报警级别分<strong>红色报警</strong>（红屏 + 强制弹窗 + 语音播报）与<strong>黄色报警</strong>（黄灯 · 仅邮件）。三者自由绑定——同一子系统可绑多个联系人，一个联系人也可承接多个子系统。</div>
     </div>
 
     <div class="grid g-2 mt16">
@@ -71,51 +85,41 @@
           </table>
           </div>
         </div>
-        <div class="card-foot">${icon('alert', 15)} 「仅特急」联系人只在紧急邮件时收信，「全部」则同时接收常规告警。</div>
+        <div class="card-foot">${icon('alert', 15)} 「仅特急」= 只收<strong>红色报警</strong>邮件；「特急+重要」= 红 + 黄都收；「全部」= 同时接收常规告警。与绑定的「报警级别」取交集后投递。</div>
       </section>
 
       <section class="card">
         <div class="card-head">
-          <div class="card-title">${icon('key', 19)} 关键词库
-            <span class="card-sub">命中即升级为紧急邮件</span></div>
-          <div class="toolbar">
-            <span class="badge b-danger">${K.keywords.filter(k => k.enabled && k.level === '特急').length} 个特急</span>
-            <button class="btn btn-sm btn-primary" id="btnNewKw">${icon('plus', 15)} 新增关键词</button>
-          </div>
+          <div class="card-title">${icon('server', 19)} 预警子系统与报警级别
+            <span class="card-sub">本次接入的 3 个子系统 · 只读</span></div>
+          <div class="toolbar"><span class="badge b-info">${ALERT_SYSTEMS.length} 个子系统 · ${ALERT_LEVELS.length} 级报警</span></div>
         </div>
         <div class="card-body" style="padding:0">
-          <div style="overflow-x:auto;max-height:430px;overflow-y:auto">
           <table class="table">
-            <thead style="position:sticky;top:0;z-index:2"><tr>
-              <th>关键词 / 表达式</th><th class="center">匹配方式</th><th class="center">等级</th>
-              <th class="center">跳过免打扰</th><th class="center">今日命中</th><th class="center">启用</th><th class="center">操作</th>
-            </tr></thead>
+            <thead><tr><th>子系统</th><th>归属与入口</th><th>触发口径（红 / 黄）</th></tr></thead>
             <tbody>
-              ${K.keywords.map((k, i) => `
+              ${ALERT_SYSTEMS.map(s => `
                 <tr>
-                  <td><div class="tname" style="font-size:14.5px">${esc(k.word)}</div><div class="tsub">${esc(k.note || '')}</div></td>
-                  <td class="center"><span class="chip lang">${esc(k.match)}</span></td>
-                  <td class="center"><span class="badge ${k.level === '特急' ? 'b-danger' : 'b-warn'}">${esc(k.level)}</span></td>
-                  <td class="center">${k.dnd ? '<span class="chip success">是</span>' : '<span class="muted">否</span>'}</td>
-                  <td class="center num">${k.hits || 0}</td>
-                  <td class="center"><label class="switch"><input type="checkbox" data-kw="${i}" ${k.enabled ? 'checked' : ''}><span class="slider"></span></label></td>
-                  <td class="center">
-                    <button class="btn btn-sm btn-ghost" data-kwedit="${i}" title="编辑">${icon('settings', 16)}</button>
-                    <button class="btn btn-sm btn-ghost" data-kwdel="${i}" title="删除">${icon('trash', 16)}</button>
-                  </td>
+                  <td><div class="tname" style="font-size:14.5px">${esc(s.name)}</div><div class="tsub">${esc(s.id)} · ${esc(s.cat)}</div></td>
+                  <td class="small">${esc(s.owner)}</td>
+                  <td class="small">${esc(sysRule(s.id))}</td>
                 </tr>`).join('')}
+              <tr>
+                <td><div class="tname" style="font-size:14.5px">${icon('alert', 15)} 报警级别</div><div class="tsub">red / yellow</div></td>
+                <td class="small">大屏 + 弹窗 + 邮件</td>
+                <td class="small">${ALERT_LEVELS.map(l => `<span class="chip ${lvChip(l.id)}">${esc(l.name)}</span> ${esc(l.desc)}`).join('<br>')}</td>
+              </tr>
             </tbody>
           </table>
-          </div>
         </div>
-        <div class="card-foot">${icon('zap', 15)} 「多词任一」以竖线 <code>|</code> 分隔多个词，「正则」直接填表达式，例如 <code>^\\s*(越权|提权)</code>。</div>
+        <div class="card-foot">${icon('database', 15)} 子系统清单与「接入范围」口径一致（Output / WIP / 次品管理），后续新增子系统在此同步后即可被绑定关系引用。</div>
       </section>
     </div>
 
     <section class="card mt24">
       <div class="card-head">
         <div class="card-title">${icon('layers', 19)} 多对多绑定关系
-          <span class="card-sub">关键词 × 子系统 × 紧急联系人</span></div>
+          <span class="card-sub">子系统 × 报警级别 × 紧急联系人</span></div>
         <div class="toolbar">
           <span class="badge b-info">${K.bindings.filter(b => b.enabled).length} / ${K.bindings.length} 条生效</span>
           <button class="btn btn-sm btn-primary" id="btnNewBind">${icon('plus', 15)} 新增绑定</button>
@@ -124,13 +128,13 @@
       <div class="card-body" style="padding:0">
         <div style="overflow-x:auto">
         <table class="table">
-          <thead><tr><th style="width:170px">绑定名称</th><th>关键词</th><th>子系统</th><th>紧急联系人</th><th class="center">组合数</th><th class="center">启用</th><th class="center">操作</th></tr></thead>
+          <thead><tr><th style="width:190px">绑定名称</th><th>子系统</th><th style="width:150px">报警级别</th><th>紧急联系人</th><th class="center">组合数</th><th class="center">启用</th><th class="center">操作</th></tr></thead>
           <tbody>
             ${K.bindings.length ? K.bindings.map((b, i) => `
               <tr>
                 <td><div class="tname" style="font-size:14.5px">${esc(b.name)}</div><div class="tsub">${b.id}</div></td>
-                <td><div class="chips">${b.kws.length ? b.kws.map(k => `<span class="chip ${kwLevelChip(k)}">${esc(kwWord(k))}</span>`).join('') : '<span class="muted small">未选择</span>'}</div></td>
                 <td><div class="chips">${b.sys.map(s => `<span class="chip">${esc(sysName(s))}</span>`).join('') || '<span class="muted small">未选择</span>'}</div></td>
+                <td><div class="chips">${(b.levels || []).map(l => `<span class="chip ${lvChip(l)}">${esc(lvName(l))}</span>`).join('') || '<span class="muted small">未选择</span>'}</div></td>
                 <td><div class="chips">${b.contacts.map(c => `<span class="chip info">${esc(ctName(c))}</span>`).join('') || '<span class="muted small">未选择</span>'}</div></td>
                 <td class="center num">${bindingCoverage(b)}</td>
                 <td class="center"><label class="switch"><input type="checkbox" data-bd="${i}" ${b.enabled ? 'checked' : ''}><span class="slider"></span></label></td>
@@ -143,7 +147,7 @@
         </table>
         </div>
       </div>
-      <div class="card-foot">${icon('activity', 15)} 一条绑定即一个笛卡尔积：任一关键词在该子系统上被命中，就向列表内全部紧急联系人发出紧急邮件。</div>
+      <div class="card-foot">${icon('activity', 15)} 一条绑定即一个笛卡尔积：任一被选子系统触发所选级别的报警，就向列表内全部紧急联系人发出紧急邮件（再按联系人「接收级别」取交集）。</div>
     </section>`;
 
     bind();
@@ -155,7 +159,7 @@
     const c = edit ? K.contacts[idx] : { name: '', dept: '', role: '', mail: '', level: '仅特急', enabled: true };
     openDialog({
       title: edit ? '编辑紧急联系人' : '新增紧急联系人',
-      sub: '命中关键词后，紧急邮件将即时投递到该邮箱',
+      sub: '子系统触发红色 / 黄色报警后，紧急邮件将即时投递到该邮箱',
       width: 620,
       body: `
         <div class="field-row">
@@ -168,7 +172,7 @@
         </div>
         <div class="field"><label class="field-label">接收级别</label>
           <select class="select" id="fLevel">${optsSel(['仅特急', '特急+重要', '全部'], c.level)}</select>
-          <div class="field-hint">仅特急=只收紧急邮件；全部=同时接收常规告警</div>
+          <div class="field-hint">仅特急 = 只收红色报警；特急+重要 = 红 + 黄；全部 = 同时接收常规告警</div>
         </div>
         <label class="checkline"><input type="checkbox" id="fEnabled" ${c.enabled ? 'checked' : ''}><span>启用该联系人</span></label>`,
       onOk: (mask, close) => {
@@ -183,38 +187,6 @@
     });
   }
 
-  /* ================= 弹窗：关键词 ================= */
-  function openKwDlg(idx) {
-    const edit = idx >= 0;
-    const k = edit ? K.keywords[idx] : { word: '', match: '包含', level: '特急', dnd: true, note: '', hits: 0, enabled: true };
-    openDialog({
-      title: edit ? '编辑关键词' : '新增关键词',
-      sub: '异常内容命中该词时，立即升级为紧急邮件并通知绑定联系人',
-      width: 620,
-      body: `
-        <div class="field"><label class="field-label">关键词 / 表达式</label>
-          <input class="input" id="fWord" autofocus placeholder="例如：宕机，或：支付失败率|渠道中断" value="${esc(k.word)}"></div>
-        <div class="field-row">
-          <div class="field"><label class="field-label">匹配方式</label>
-            <select class="select" id="fMatch">${optsSel(MATCH_MODES, k.match)}</select></div>
-          <div class="field"><label class="field-label">命中等级</label>
-            <select class="select" id="fLevel">${optsSel(['特急', '重要'], k.level)}</select></div>
-        </div>
-        <div class="field"><label class="field-label">备注</label>
-          <input class="input" id="fNote" placeholder="说明该关键词的业务含义" value="${esc(k.note)}"></div>
-        <label class="checkline"><input type="checkbox" id="fDnd" ${k.dnd ? 'checked' : ''}><span>夜间免打扰时段（23:00 - 06:30）仍即时投递</span></label>
-        <label class="checkline"><input type="checkbox" id="fEnabled" ${k.enabled ? 'checked' : ''}><span>启用该关键词</span></label>`,
-      onOk: (mask, close) => {
-        const word = getVal('fWord');
-        if (!word) { toast('请填写关键词', 'warn'); return; }
-        const data = { word, match: getVal('fMatch'), level: getVal('fLevel'), note: getVal('fNote'), dnd: getChk('fDnd'), enabled: getChk('fEnabled'), hits: edit ? k.hits : 0 };
-        if (edit) Object.assign(K.keywords[idx], data); else K.keywords.push(Object.assign({ id: nextId('K', K.keywords) }, data));
-        saveK(); close(); render();
-        toast(edit ? `已更新关键词「${word}」` : `已新增关键词「${word}」`, 'success');
-      }
-    });
-  }
-
   /* ================= 弹窗：绑定 ================= */
   const pickList = (name, items) => items.map(it => `
     <label class="pick-item">
@@ -225,28 +197,28 @@
 
   function openBindDlg(idx) {
     const edit = idx >= 0;
-    const b = edit ? K.bindings[idx] : { name: '', kws: [], sys: [], contacts: [], enabled: true };
+    const b = edit ? K.bindings[idx] : { name: '', sys: [], levels: ['red'], contacts: [], enabled: true };
     openDialog({
       title: edit ? '编辑绑定关系' : '新增绑定关系',
-      sub: '关键词 × 子系统 × 紧急联系人，三项均可多选（多对多）',
+      sub: '子系统 × 报警级别 × 紧急联系人，三项均可多选（多对多）',
       width: 860,
       body: `
         <div class="field"><label class="field-label">绑定名称</label>
-          <input class="input" id="fName" autofocus placeholder="例如：资金支付链路阻断" value="${esc(b.name)}"></div>
+          <input class="input" id="fName" autofocus placeholder="例如：OP 产出缺口（累计未达标）" value="${esc(b.name)}"></div>
         <div class="grid g-3 mt16" style="gap:14px">
-          <div class="field">
-            <div class="flex between acenter"><label class="field-label">关键词</label>
-              <button class="link-btn" data-all="kws">全选 / 清空</button></div>
-            <div class="pick">
-              ${pickList('kws', K.keywords.map(k => ({ value: k.id, label: k.word, sub: k.level, checked: b.kws.includes(k.id) })))}
-            </div>
-          </div>
           <div class="field">
             <div class="flex between acenter"><label class="field-label">子系统</label>
               <button class="link-btn" data-all="sys">全选 / 清空</button></div>
             <div class="pick">
               <label class="pick-item"><input type="checkbox" data-pick="sys" value="ALL" ${b.sys.includes('ALL') ? 'checked' : ''}><span>全部子系统</span><span class="pi-sub">含后续新增</span></label>
-              ${pickList('sys', SUBSYSTEMS.map(s => ({ value: s.id, label: s.name, checked: b.sys.includes(s.id) })))}
+              ${pickList('sys', ALERT_SYSTEMS.map(s => ({ value: s.id, label: s.name, sub: s.cat, checked: b.sys.includes(s.id) })))}
+            </div>
+          </div>
+          <div class="field">
+            <div class="flex between acenter"><label class="field-label">报警级别</label>
+              <button class="link-btn" data-all="levels">全选 / 清空</button></div>
+            <div class="pick">
+              ${pickList('levels', ALERT_LEVELS.map(l => ({ value: l.id, label: l.name, sub: l.desc, checked: (b.levels || []).includes(l.id) })))}
             </div>
           </div>
           <div class="field">
@@ -261,12 +233,12 @@
       onOk: (mask, close) => {
         const name = getVal('fName');
         if (!name) { toast('请填写绑定名称', 'warn'); return; }
-        const kws = getChkList('kws'), sys = getChkList('sys'), contacts = getChkList('contacts');
-        if (!kws.length || !sys.length || !contacts.length) { toast('关键词、子系统、紧急联系人均需至少选择一项', 'warn'); return; }
-        const data = { name, kws, sys, contacts, enabled: getChk('fEnabled') };
+        const sys = getChkList('sys'), levels = getChkList('levels'), contacts = getChkList('contacts');
+        if (!sys.length || !levels.length || !contacts.length) { toast('子系统、报警级别、紧急联系人均需至少选择一项', 'warn'); return; }
+        const data = { name, sys, levels, contacts, enabled: getChk('fEnabled') };
         if (edit) Object.assign(K.bindings[idx], data); else K.bindings.push(Object.assign({ id: nextId('B', K.bindings) }, data));
         saveK(); close(); render();
-        toast(edit ? `已更新绑定「${name}」` : `已新增绑定「${name}」，覆盖 ${bindingCoverage(data)} 种子系统 × 联系人组合`, 'success');
+        toast(edit ? `已更新绑定「${name}」` : `已新增绑定「${name}」，覆盖 ${bindingCoverage(data)} 组子系统 × 报警级别 × 联系人组合`, 'success');
       }
     });
 
@@ -292,32 +264,23 @@
 
   /* ================= 事件绑定 ================= */
   function bind() {
-    /* --- 关键词联动 --- */
+    /* --- 预警通知配置 --- */
     const $ = id => document.getElementById(id);
     $('btnNewContact') && ($('btnNewContact').onclick = () => openContactDlg(-1));
-    $('btnNewKw') && ($('btnNewKw').onclick = () => openKwDlg(-1));
     $('btnNewBind') && ($('btnNewBind').onclick = () => openBindDlg(-1));
 
     const togSw = (attr, cb) => document.querySelectorAll(`[data-${attr}]`).forEach(el => el.addEventListener('change', e => cb(Number(el.dataset[attr]), e.target.checked)));
     togSw('ct', (i, v) => { K.contacts[i].enabled = v; saveK(); render(); });
-    togSw('kw', (i, v) => { K.keywords[i].enabled = v; saveK(); render(); });
     togSw('bd', (i, v) => { K.bindings[i].enabled = v; saveK(); render(); });
 
     const act = (attr, fn) => document.querySelectorAll(`[data-${attr}]`).forEach(el => el.addEventListener('click', () => fn(Number(el.dataset[attr]))));
     act('ctedit', i => openContactDlg(i));
-    act('kwedit', i => openKwDlg(i));
     act('bdedit', i => openBindDlg(i));
     act('ctdel', i => confirmDel(`联系人「${K.contacts[i].name}」`, () => {
       const id = K.contacts[i].id;
       K.contacts.splice(i, 1);
       K.bindings.forEach(b => { b.contacts = b.contacts.filter(c => c !== id); });
       saveK(); render(); toast('联系人已删除，相关绑定已同步清理', 'success');
-    }));
-    act('kwdel', i => confirmDel(`关键词「${K.keywords[i].word}」`, () => {
-      const id = K.keywords[i].id;
-      K.keywords.splice(i, 1);
-      K.bindings.forEach(b => { b.kws = b.kws.filter(k => k !== id); });
-      saveK(); render(); toast('关键词已删除，相关绑定已同步清理', 'success');
     }));
     act('bddel', i => confirmDel(`绑定「${K.bindings[i].name}」`, () => {
       K.bindings.splice(i, 1); saveK(); render(); toast('绑定关系已删除', 'success');

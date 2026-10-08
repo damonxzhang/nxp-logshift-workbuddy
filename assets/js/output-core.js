@@ -70,13 +70,45 @@ const OP_DEFAULTS = {
     mode: 'diff'             // diff 差额比对（支持后续扩展 composite 复合比对）
   },
   refresh: { mode: 'manual', autoSec: 600 }, // 刷新机制：手动 + 自动（频率待 IT 确认，默认 10 分钟）
-  dst: 'auto',               // 夏令时/冬令时：auto 自动 / summer 夏令时 / winter 冬令时
-  dstWindow: {
+
+  /* ---------------- 预警逻辑分口径（2026-10-08 客户修正） ----------------
+     数量口径（K）：累计 goal vs total 曲线对比 —— 沿用「周目标均摊」逻辑不变
+       （周总目标均摊到每天、逐日累计展示，与实际累计值对比）。
+     金额口径（Earn，万元）：目标基准改用「递进式 ±5%」——
+       第 i 天的目标基准 = 前一日「当日实际 Earn」（周六取上周五当日实际 Earn）；
+       当日实际落在 基准 ×(1 ± pct%) 内为正常，超出 1 倍容差 → 黄灯，超出 redX 倍 → 红灯。
+       周二下午拿到准确出库数据后，由用户在配置页手动修正后续几天的目标（manual 覆盖，按周保存）。
+     两个口径互不影响：数量口径的判定阈值仍是各 PKG Type 的黄 / 红阈值（K）。 */
+  goalMode: {
+    qty: 'even',            // 数量口径：even 周目标均摊（沿用，逻辑不变）
+    earn: 'progressive'      // 金额口径：even 周目标均摊 / progressive 递进式 ±5%
+  },
+  earnProg: {
+    pct: 5,                 // 递进容差 ±%（当日实际 vs 递进基准）
+    redX: 2,                // 超出容差 × redX → 红灯（1 倍内正常，1~redX 倍黄灯）
+    anchor: 'prevDay',      // 递进基准：前一日当日实际（周六取上周五当日实际）
+    manual: {}              // { '2026-W40': [六,日,一,二,三,四,五] } 万元；空位按规则自动
+  },
+
+  /* 夏令时 / 冬令时（2026-10-08 客户修正）：取消自动切换，默认保持夏令时；
+     切冬令时由用户手动点击；查询窗口开始时间可手动指定 6 点 / 7 点。 */
+  dst: 'summer',             // summer 夏令时（默认）/ winter 冬令时（手动切换）
+  dstManual: true,           // 已取消 auto 自动切换
+  dstStartHour: 6,           // 查询窗口开始时间：6 或 7（点）
+  dstWindow: {               // 兼容旧配置；实际展示以 opDstWindow() 按 dstStartHour 计算
     summer: '周六 06:00 - 周日 06:00',
     winter: '周六 07:00 - 周日 07:00'
   },
   source: '客户 IT 导出《BE1 Output Report V5.xls》'   // 实际 total 数据来源（已接入真实导出报表）
 };
+
+/* 夏令时查询窗口（改为手动后，窗口只由「开始时间」决定）：6 点 → 周六 06:00 - 周日 06:00 */
+function opDstWindow(cfg) {
+  const c = cfg || OP_DEFAULTS;
+  const h = Number(c.dstStartHour) === 7 ? 7 : 6;
+  const hh = pad2(h) + ':00';
+  return { hour: h, text: `周六 ${hh} - 周日 ${hh}` };
+}
 
 /* =========================================================================
    一、三个配置仓库（localStorage）· 大屏与配置页共用同一份数据
@@ -455,6 +487,107 @@ function opEarnSeries(typeIds, week, typeList) {
     goalCum: goalCum.map(v => +v.toFixed(1)),
     totalCum: totalCum.map(v => (v == null ? null : +v.toFixed(1))),
     started
+  };
+}
+
+/* =========================================================================
+   五·补 Earn 预警分口径（2026-10-08 客户修正）
+   数量口径：沿用「周目标均摊」（genOpWeek 内已实现，逻辑不变）。
+   金额口径（本段）：goalMode.earn = 'progressive' 时启用递进式基准——
+     base[0] = 上周五「当日」实际 Earn；base[i] = 第 i-1 天「当日」实际 Earn；逐日递进。
+     当日实际 vs base 的偏差 ≤ pct% 正常；> pct% 黄灯；> pct×redX% 红灯。
+     配置页可对某周某天填 manual 值覆盖（周二下午拿到准确出库数据后修正后续几天目标）。
+     某天无前值可依时（如首日无上周数据）回落「周目标均摊」的当日增量，保证目标线不断。
+   注意：递进基准是「当日值」，累计目标线 = 各日基准的逐日累加（等价于实际线右移一天）。
+   ========================================================================= */
+
+/* 由 Earn 累计序列求「当日」Earn（万元），缺失日留 null */
+function opEarnDailyActual(earnCum) {
+  const out = []; let prev = 0;
+  for (let i = 0; i < 7; i++) {
+    const v = earnCum[i];
+    if (v == null) { out.push(null); continue; }
+    out.push(+(v - prev).toFixed(1)); prev = v;
+  }
+  return out;
+}
+
+/* 上一周最后一天（周五）的「当日」Earn 实际（万元）；无数据返回 null */
+function opPrevLastDailyEarn(typeIds, week, typeList) {
+  const y = week.year, w = week.week;
+  const p = w > 1 ? { year: y, week: w - 1 } : { year: y - 1, week: opWeeksInYear(y - 1) };
+  const pw = genOpWeek(p.year, p.week);
+  return opEarnDailyActual(opEarnSeries(typeIds, pw, typeList).totalCum)[6];
+}
+
+/* 单日递进预警：当日实际 vs 基准 ±pct% */
+function opEarnProgStatusOf(actual, base, ep) {
+  const e = Object.assign({}, OP_DEFAULTS.earnProg, ep || {});
+  const p = Math.max(0, Number(e.pct) || 0), rx = Math.max(1, Number(e.redX) || 2);
+  if (actual == null || base == null || base <= 0) return { dev: null, level: 'none', status: 'none' };
+  const dev = +((actual - base) / base * 100).toFixed(1);
+  const a = Math.abs(dev);
+  let level = 'green', status = 'met';
+  if (a > p * rx) { level = 'red'; status = 'over'; }
+  else if (a > p) { level = 'yellow'; status = 'critical'; }
+  return { dev, level, status, lo: +(base * (1 - p / 100)).toFixed(1), hi: +(base * (1 + p / 100)).toFixed(1) };
+}
+
+/* 按配置生成 Earn 目标 / 实际序列（万元）
+   返回 { mode, goalCum, totalCum, started, dailyActual, base, band, src, prog, pct, redX }
+   mode='progressive' 时 base / band / src / prog 才有值
+   src：manual 当日手动修正 / prevManual 前一日被手动修正（沿用其修正值） / prevDay 前一日实际 /
+        prevWeekFri 上周五实际（周六） / even 均摊兜底。 */
+function opEarnSeriesCfg(typeIds, week, typeList, cfg) {
+  const c = cfg || {};
+  const gm = Object.assign({}, OP_DEFAULTS.goalMode, c.goalMode || {});
+  const ep = Object.assign({}, OP_DEFAULTS.earnProg, c.earnProg || {});
+  const even = opEarnSeries(typeIds, week, typeList);
+  const act = opEarnDailyActual(even.totalCum);
+
+  if (gm.earn !== 'progressive') {
+    return {
+      mode: 'even', goalCum: even.goalCum, totalCum: even.totalCum, started: even.started,
+      dailyActual: act, base: null, band: null, src: null, prog: null,
+      pct: Number(ep.pct), redX: Number(ep.redX)
+    };
+  }
+
+  /* 均摊兜底：某天没有可递进的前值时，用「周目标均摊」的当日增量，保证目标线连续 */
+  const evenDaily = []; let acc = 0;
+  for (let i = 0; i < 7; i++) { evenDaily.push(+(even.goalCum[i] - acc).toFixed(1)); acc = even.goalCum[i]; }
+
+  const prevLast = opPrevLastDailyEarn(typeIds, week, typeList);
+  const man = (ep.manual && ep.manual[week.key]) || [];
+  const manOf = i => {
+    const v = man[i];
+    return (v != null && v !== '' && isFinite(Number(v))) ? Number(v) : null;
+  };
+  const base = [], src = [];
+  for (let i = 0; i < 7; i++) {
+    let b = null, s = 'even';
+    const mv = manOf(i);
+    if (mv != null) { b = mv; s = 'manual'; }                                  // 当日被手动修正
+    else if (i === 0 && prevLast != null) { b = prevLast; s = 'prevWeekFri'; } // 周六看上周五实际
+    else if (i > 0) {
+      /* 10-08 客户口径：前一日若被手动修正，则当日基准沿用「修正后的数值」，
+         而不是前一日实际值 —— 修正值会顺着递进链往后传一天。 */
+      const pm = manOf(i - 1);
+      if (pm != null) { b = pm; s = 'prevManual'; }
+      else if (act[i - 1] != null) { b = act[i - 1]; s = 'prevDay'; }
+    }
+    if (b == null) { b = evenDaily[i]; s = 'even'; }
+    base.push(+Number(b).toFixed(1)); src.push(s);
+  }
+
+  const goalCum = []; let g = 0;
+  for (let i = 0; i < 7; i++) { g += base[i]; goalCum.push(+g.toFixed(1)); }
+  const pct = Math.max(0, Number(ep.pct) || 0);
+  const band = base.map(b => [+(b * (1 - pct / 100)).toFixed(1), +(b * (1 + pct / 100)).toFixed(1)]);
+  const prog = base.map((b, i) => opEarnProgStatusOf(act[i], b, ep));
+  return {
+    mode: 'progressive', goalCum, totalCum: even.totalCum, started: even.started,
+    dailyActual: act, base, band, src, prog, pct, redX: Math.max(1, Number(ep.redX) || 2)
   };
 }
 

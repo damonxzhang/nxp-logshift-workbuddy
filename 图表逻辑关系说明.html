@@ -1,0 +1,9921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图表逻辑关系说明 · NXP OneBE 交接演示</title>
+<style>
+:root{
+  --bg:#eef2f8; --bg2:#f8fafd; --surface:#fff; --surface-2:#f6f9fd;
+  --border:#e3e8f0; --border-strong:#cfd8e6;
+  --text:#16202e; --text-2:#4a5567; --text-3:#8a95a5;
+  --primary:#1d4ed8; --primary-soft:#e7eeff; --primary-ink:#1b3fa8;
+  --success:#12805a; --success-soft:#e3f6ee;
+  --warn:#a8620b; --warn-soft:#fdf1e0;
+  --danger:#cc2f2a; --danger-soft:#fdecea;
+  --teal:#0b6a86; --teal-soft:#e2f3f9;
+  --purple:#8b5cf6; --purple-soft:#f1ebfe;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,"Courier New",monospace;
+  --shadow:0 1px 2px rgba(16,32,64,.04),0 10px 26px -14px rgba(16,32,64,.16);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;font-weight:800;letter-spacing:-.2px}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+code,.num{font-variant-numeric:tabular-nums}
+
+/* ---------------- 顶栏 ---------------- */
+.topbar{
+  position:sticky;top:0;z-index:60;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.topbar-in{max-width:1440px;margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;font-size:16.5px;font-weight:800}
+.brand small{font-size:12px;font-weight:600;color:var(--text-3);letter-spacing:0}
+.tb-spacer{flex:1}
+.tbtn{
+  display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  border:1px solid var(--border);background:#fff;color:var(--text-2);
+  border-radius:9px;padding:6px 11px;font-size:13px;transition:.18s;font-family:inherit;
+}
+.tbtn:hover{border-color:var(--border-strong);color:var(--text)}
+.tbtn.on{background:var(--primary-soft);border-color:#c3d4ff;color:var(--primary);font-weight:700}
+
+/* ---------------- 布局 ---------------- */
+.layout{max-width:1440px;margin:0 auto;padding:22px 22px 90px;display:grid;grid-template-columns:236px minmax(0,1fr);gap:28px;align-items:start}
+.toc{position:sticky;top:70px;font-size:13.4px;max-height:calc(100vh - 96px);overflow:auto;padding-right:4px}
+.toc-t{font-size:11.5px;font-weight:800;color:var(--text-3);letter-spacing:1.2px;margin:0 0 9px 10px}
+.toc a{display:block;padding:5.5px 10px;border-radius:8px;color:var(--text-2);border-left:2px solid transparent}
+.toc a:hover{background:#fff;text-decoration:none;color:var(--text)}
+.toc a.sub{padding-left:22px;font-size:12.8px;color:var(--text-3)}
+.toc a.on{background:var(--primary-soft);color:var(--primary);font-weight:700;border-left-color:var(--primary)}
+@media(max-width:1080px){
+  .layout{grid-template-columns:1fr;gap:14px}
+  .toc{position:static;max-height:none;display:none}
+}
+
+/* ---------------- 排版 ---------------- */
+.hero{background:linear-gradient(135deg,#1d4ed8,#0b6a86);color:#fff;border-radius:16px;padding:24px 26px;margin-bottom:22px;box-shadow:var(--shadow)}
+.hero h1{font-size:25px;margin-bottom:9px}
+.hero p{margin:0;font-size:14px;line-height:1.85;color:#dbe7ff;max-width:960px}
+.hero .hl{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.hero .hl span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:600}
+
+.sec{margin:34px 0 0;scroll-margin-top:74px}
+.sec-h{display:flex;align-items:center;gap:11px;padding-bottom:10px;border-bottom:2px solid var(--border-strong);margin-bottom:6px}
+.sec-n{width:29px;height:29px;flex:none;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+.sec-h h2{font-size:20px}
+.sec-sub{color:var(--text-3);font-size:13.4px;margin:8px 0 0;line-height:1.8}
+.sub-h{font-size:15.5px;font-weight:800;margin:26px 0 10px;padding-left:11px;border-left:4px solid var(--primary);scroll-margin-top:74px;display:flex;align-items:center;gap:9px}
+
+p{margin:11px 0}
+ul,ol{margin:11px 0;padding-left:22px}
+li{margin:5px 0}
+.note{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:0 11px 11px 0;padding:12px 15px;margin:14px 0;font-size:13.8px;color:var(--text-2);line-height:1.8}
+.note.warn{border-left-color:var(--warn)}
+.note.danger{border-left-color:var(--danger)}
+.note.ok{border-left-color:var(--success)}
+.note b{color:var(--text)}
+.formula{
+  font-family:var(--mono);font-size:12.6px;line-height:1.9;color:#243049;
+  background:var(--surface-2);border:1px solid var(--border);border-left:3px solid #b9c8e4;
+  border-radius:0 10px 10px 0;padding:11px 14px;margin:12px 0;white-space:pre;overflow-x:auto;
+}
+.formula em{font-style:normal;color:var(--text-3)}
+.formula b{color:var(--primary-ink)}
+table{width:100%;border-collapse:collapse;font-size:13.4px;background:#fff;border-radius:11px;overflow:hidden;box-shadow:0 0 0 1px var(--border);margin:13px 0}
+th{background:var(--surface-2);text-align:left;padding:9px 11px;font-weight:700;color:var(--text-2);font-size:12.7px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid #eef2f8;vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12.4px;color:var(--primary-ink);background:var(--primary-soft);padding:1px 5px;border-radius:5px;white-space:nowrap}
+
+/* ---------------- 徽标 ---------------- */
+.bdg{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2.5px 9px;font-size:11.8px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.bdg.b1{background:var(--primary-soft);color:var(--primary-ink);border-color:#c9dcff}
+.bdg.b2{background:var(--success-soft);color:var(--success);border-color:#c3ead9}
+.bdg.b3{background:var(--teal-soft);color:var(--teal);border-color:#c2e4ef}
+.bdg.gray{background:#eef1f6;color:var(--text-3);border-color:#e0e6ef}
+.bdg.real{background:var(--success-soft);color:var(--success);border-color:#c3ead9}
+.bdg.demo{background:var(--warn-soft);color:var(--warn);border-color:#f0dcc0}
+.bdg.warn{background:var(--warn-soft);color:var(--warn);border-color:#f0dcc0}
+.bdg.danger{background:var(--danger-soft);color:var(--danger);border-color:#f7cfcd}
+
+/* ---------------- 图卡 ---------------- */
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:16px 0 22px;scroll-margin-top:74px}
+.fig-head{display:flex;align-items:center;gap:9px;padding:12px 16px;background:linear-gradient(180deg,#fbfcfe,#f4f8fd);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.fig-head h3{font-size:14.8px}
+.fig-sub{padding:9px 16px;font-size:13.2px;color:var(--text-3);border-bottom:1px dashed var(--border);background:#fff}
+.fig-sub b{color:var(--text-2)}
+.fig-body{display:grid;grid-template-columns:minmax(0,1fr) 276px}
+@media(max-width:1100px){.fig-body{grid-template-columns:1fr}}
+.fig-canvas{position:relative;padding:16px 18px;background:#fff;min-height:120px}
+.fig-side{border-left:1px dashed var(--border-strong);padding:12px;background:var(--bg2)}
+@media(max-width:1100px){.fig-side{border-left:0;border-top:1px dashed var(--border-strong)}}
+.fig-foot{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg2);font-size:12.8px;color:var(--text-3);line-height:1.8}
+.fig-foot b{color:var(--text-2)}
+.side-t{font-size:11.5px;font-weight:800;color:var(--text-3);letter-spacing:1.1px;margin:2px 0 8px 6px}
+
+.co{display:flex;gap:8px;padding:7px 8px;border-radius:9px;transition:.18s;align-items:flex-start}
+.co:hover{background:#fff;box-shadow:0 0 0 1px var(--border),0 4px 12px -8px rgba(16,32,64,.3)}
+.co>b{font-size:13.1px;font-weight:800;display:block;color:var(--text);line-height:1.55}
+.co>div>span{font-size:12.5px;color:var(--text-3);line-height:1.7;display:block}
+.co-n{width:19px;height:19px;flex:none;border-radius:50%;background:var(--primary);color:#fff;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.co.on{background:#fff;box-shadow:0 0 0 1px #c3d4ff,0 4px 14px -8px rgba(29,78,216,.5)}
+.co.on .co-n{background:var(--primary-ink);transform:scale(1.12)}
+
+.chartwrap{position:relative}
+.pinlayer{position:absolute;inset:0;pointer-events:none;z-index:6}
+.pin{
+  position:absolute;transform:translate(-50%,-50%);width:21px;height:21px;border-radius:50%;pointer-events:auto;
+  background:var(--primary);color:#fff;font-size:11.5px;font-weight:800;border:2px solid #fff;
+  display:flex;align-items:center;justify-content:center;z-index:6;cursor:pointer;
+  box-shadow:0 2px 8px rgba(29,78,216,.45);transition:transform .2s,box-shadow .2s;
+}
+.pin:hover,.pin.on{transform:translate(-50%,-50%) scale(1.42);box-shadow:0 0 0 7px rgba(29,78,216,.16),0 2px 8px rgba(29,78,216,.5)}
+body.nopin .pin{display:none}
+
+/* ---------------- 小型图表专用 ---------------- */
+.lc-wrap{position:relative}
+.lc-tip{position:absolute;pointer-events:none;background:rgba(22,32,46,.95);color:#fff;border-radius:9px;padding:8px 11px;font-size:12.2px;line-height:1.65;box-shadow:0 6px 22px rgba(0,0,0,.28);z-index:9;min-width:130px}
+.lc-ttitle{font-weight:800;margin-bottom:4px;font-size:12.4px;color:#e8eeff}
+.lc-trow{display:flex;justify-content:space-between;gap:16px}
+.lc-tname{display:inline-flex;align-items:center;gap:5px;color:#b9c6da}
+.lc-trow i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.lc-trow i.lc-dash{border-top:2px dashed;background:none;height:0;width:11px;border-radius:0}
+.lc-tval{font-weight:700}
+.lc-hl line{stroke-dasharray:4 4}
+
+.heat{display:flex;flex-direction:column;gap:5px}
+.heat-row{display:flex;gap:5px;align-items:center}
+.heat-lb{width:96px;flex:none;text-align:right;font-size:11.6px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heat-cell{flex:1;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700;transition:.2s;cursor:default}
+.heat-cell:hover{outline:2px solid var(--primary);outline-offset:1px}
+.heat-hd{display:flex;gap:5px;align-items:center;margin-bottom:3px}
+.heat-hd .heat-lb{font-weight:700;color:var(--text-3);font-size:11.2px}
+.heat-hd .heat-cell{height:auto;background:none!important;color:var(--text-3);font-size:11.2px;font-weight:700}
+.rank-b{display:flex;flex-direction:column;gap:9px}
+.rank-r{display:flex;align-items:center;gap:9px}
+.rank-lb{width:92px;flex:none;text-align:right;font-size:12.2px;color:var(--text-2)}
+.rank-bar{flex:1;height:19px;border-radius:5px;overflow:hidden;display:flex;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border)}
+.rank-bar i{height:100%;transition:width .9s cubic-bezier(.2,.75,.3,1)}
+.rank-v{width:74px;flex:none;font-size:12.2px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-2)}
+.rank-r.spot .rank-lb{color:var(--primary);font-weight:800}
+
+.dotm{display:flex;flex-direction:column;gap:7px}
+.dotm-r{display:flex;gap:10px;align-items:center}
+.dotm-lb{width:88px;flex:none;text-align:right;font-size:11.4px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dotm-g{display:flex;flex-wrap:wrap;gap:3px;flex:1}
+.dotm i{width:9px;height:9px;border-radius:2px;display:block}
+.dotm i.r{box-shadow:0 0 0 1.5px rgba(204,47,42,.9)}
+.dotm i.h{outline:1.4px dashed var(--danger);outline-offset:1.2px}
+
+.kpirow{display:flex;gap:9px;flex-wrap:wrap}
+.kpi{flex:1;min-width:118px;background:#fff;border:1px solid var(--border);border-radius:11px;padding:10px 12px;box-shadow:0 1px 2px rgba(16,32,64,.04)}
+.kpi b{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.kpi span{font-size:11.8px;color:var(--text-3)}
+.kpi.hot{border-color:#f7cfcd;background:#fff8f8}
+.kpi.hot b{color:var(--danger)}
+
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.2px;color:var(--text-3);margin-top:11px}
+.leg span{display:inline-flex;align-items:center;gap:5px}
+.leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.leg i.ring{border-radius:50%;border:2px solid var(--text-3);background:none}
+
+.mini-cap{font-size:12.2px;color:var(--text-3);margin-top:9px;line-height:1.75}
+.mini-cap b{color:var(--text-2)}
+
+/* 联动关系图 */
+.flow-svg{width:100%;height:auto;display:block}
+.flow-svg text{font-family:inherit}
+.fm-node{transition:.2s;cursor:default}
+.fm-node:hover rect{filter:drop-shadow(0 3px 8px rgba(29,78,216,.35))}
+
+/* ---------------- 动效 ---------------- */
+@keyframes docPulse { 0%,100%{opacity:1;r:6} 50%{opacity:.35} }
+.op-pulse-ring{animation:docPulse 2.1s ease-in-out infinite;transform-box:fill-box}
+@keyframes docFade { from{opacity:0;transform:translateY(6px)} }
+.sec{animation:docFade .45s cubic-bezier(.2,.7,.3,1) both}
+
+/* 方案 A：环形仪表盘阵列 */
+.vz-rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px}
+.vz-ring{position:relative;text-align:center;padding:6px 2px;border-radius:11px;transition:.22s}
+.vz-ring:hover{background:var(--surface-2);transform:translateY(-2px)}
+.vz-ring-svg{width:76px;height:76px;display:block;margin:0 auto}
+.vz-rc{position:absolute;left:0;right:0;top:30px;pointer-events:none;line-height:1.1}
+.vz-rc b{display:block;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.vz-rc span{font-size:9.5px;color:var(--text-3)}
+.vz-rn{font-size:11.6px;font-weight:700;margin-top:2px}
+.vz-rm{font-size:10.4px;color:var(--text-3)}
+.vz-rm em{font-style:normal;font-weight:700;color:var(--danger)}
+.vz-ring.is-bad .vz-ring-svg{animation:docRingGlow 2.1s ease-in-out infinite}
+@keyframes docRingGlow{50%{filter:drop-shadow(0 0 7px rgba(204,47,42,.5))}}
+
+/* 方案 B：流向桑基 */
+.vz-flow{width:100%;height:auto;display:block}
+.vz-fl-node{cursor:default}
+.vz-fl-node rect{transition:filter .2s}
+.vz-fl-node:hover rect{filter:drop-shadow(0 0 5px rgba(29,78,216,.5))}
+.vz-fl-dash{animation:docFlow 1.15s linear infinite}
+@keyframes docFlow{to{stroke-dashoffset:-24}}
+
+/* 方案 C：气泡 */
+.vz-bub{animation:docPop .5s cubic-bezier(.2,.75,.3,1) both}
+@keyframes docPop{from{transform:scale(.2);opacity:0;transform-box:fill-box;transform-origin:center}}
+.vz-bub.al{animation:docPop .5s cubic-bezier(.2,.75,.3,1) both,docBubPulse 1.9s ease-in-out infinite .5s}
+@keyframes docBubPulse{50%{fill-opacity:.95}}
+
+@media print{
+  .topbar,.toc{display:none}
+  .layout{display:block;max-width:none;padding:0}
+  .fig{break-inside:avoid;box-shadow:none}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">图表逻辑关系说明 <small>NXP OneBE 交接演示 · ops-handover-demo</small></div>
+    <div class="tb-spacer"></div>
+    <span class="bdg bdg gray" id="statBadge">加载中…</span>
+    <button class="tbtn on" id="btnPin">显示图上标注</button>
+    <button class="tbtn" onclick="window.print()">打印 / 存 PDF</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" id="toc"></nav>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ==========================================================================
+   0. 数据（由 .docgen-probe.js 从三条主干引擎真实计算后注入，非手写）
+   ========================================================================== */
+const DATA = {
+ "alarm": {
+  "total": 102,
+  "critical": 48,
+  "warn": 54,
+  "normal": 0,
+  "byStatus": {
+   "closed": 63,
+   "doing": 28,
+   "pending": 11
+  },
+  "closedRate": 62,
+  "byType": {
+   "occasional": 102,
+   "chained": 0
+  },
+  "trendDay": {
+   "labels": [
+    "4/14",
+    "4/15",
+    "4/16",
+    "4/17",
+    "4/18",
+    "4/19",
+    "4/20",
+    "4/21",
+    "4/22",
+    "4/23",
+    "4/24",
+    "4/25",
+    "4/26",
+    "4/27",
+    "4/28",
+    "4/29",
+    "4/30",
+    "5/1",
+    "5/2",
+    "5/3",
+    "5/4",
+    "5/5",
+    "5/6",
+    "5/7",
+    "5/8",
+    "5/9",
+    "5/10",
+    "5/11",
+    "5/12",
+    "5/13",
+    "5/14",
+    "5/15",
+    "5/16",
+    "5/17",
+    "5/18",
+    "5/19",
+    "5/20",
+    "5/21",
+    "5/22",
+    "5/23",
+    "5/24",
+    "5/25",
+    "5/26",
+    "5/27",
+    "5/28",
+    "5/29",
+    "5/30",
+    "5/31",
+    "6/1",
+    "6/2",
+    "6/3",
+    "6/4",
+    "6/5",
+    "6/6",
+    "6/7",
+    "6/8",
+    "6/9",
+    "6/10",
+    "6/11",
+    "6/12",
+    "6/13",
+    "6/14",
+    "6/15",
+    "6/16",
+    "6/17",
+    "6/18",
+    "6/19",
+    "6/20",
+    "6/21",
+    "6/22",
+    "6/23",
+    "6/24",
+    "6/25",
+    "6/26",
+    "6/27",
+    "6/28",
+    "6/29",
+    "6/30",
+    "7/1",
+    "7/2",
+    "7/3",
+    "7/4",
+    "7/5",
+    "7/6",
+    "7/7",
+    "7/8",
+    "7/9",
+    "7/10",
+    "7/11",
+    "7/12",
+    "7/13",
+    "7/14",
+    "7/15",
+    "7/16",
+    "7/17",
+    "7/18",
+    "7/19",
+    "7/20",
+    "7/21",
+    "7/22",
+    "7/23",
+    "7/24",
+    "7/25",
+    "7/26",
+    "7/27",
+    "7/28",
+    "7/29",
+    "7/30",
+    "7/31",
+    "8/1",
+    "8/2",
+    "8/3",
+    "8/4",
+    "8/5",
+    "8/6",
+    "8/7",
+    "8/8",
+    "8/9",
+    "8/10",
+    "8/11",
+    "8/12",
+    "8/13",
+    "8/14",
+    "8/15",
+    "8/16",
+    "8/17",
+    "8/18",
+    "8/19",
+    "8/20",
+    "8/21",
+    "8/22",
+    "8/23",
+    "8/24",
+    "8/25",
+    "8/26",
+    "8/27",
+    "8/28",
+    "8/29",
+    "8/30",
+    "8/31",
+    "9/1",
+    "9/2",
+    "9/3",
+    "9/4",
+    "9/5",
+    "9/6",
+    "9/7",
+    "9/8",
+    "9/9",
+    "9/10",
+    "9/11",
+    "9/12",
+    "9/13",
+    "9/14",
+    "9/15",
+    "9/16",
+    "9/17",
+    "9/18",
+    "9/19",
+    "9/20",
+    "9/21",
+    "9/22",
+    "9/23",
+    "9/24",
+    "9/25",
+    "9/26",
+    "9/27",
+    "9/28",
+    "9/29",
+    "9/30"
+   ],
+   "counts": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    2,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    2,
+    0,
+    0,
+    1,
+    1,
+    2,
+    1,
+    1,
+    0,
+    0,
+    2,
+    1,
+    2,
+    2,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    3,
+    1,
+    1,
+    2,
+    0,
+    0,
+    2,
+    1,
+    2,
+    2,
+    3,
+    0,
+    0,
+    2,
+    1,
+    2,
+    2,
+    2,
+    0,
+    0,
+    1,
+    1,
+    3,
+    2,
+    1,
+    0,
+    0,
+    2,
+    3,
+    3,
+    2,
+    2,
+    0,
+    0,
+    2,
+    1,
+    2,
+    2,
+    1,
+    0,
+    0,
+    2,
+    2,
+    2
+   ],
+   "criticals": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    0,
+    1,
+    0,
+    2,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    2,
+    1,
+    0,
+    1,
+    2,
+    0,
+    0,
+    1,
+    1,
+    1,
+    2,
+    0,
+    0,
+    0,
+    0,
+    1,
+    2,
+    1,
+    1,
+    0,
+    0,
+    1,
+    1,
+    3,
+    1,
+    2,
+    0,
+    0,
+    2,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    2,
+    2,
+    1
+   ]
+  },
+  "trendWeek": {
+   "labels": [
+    "第16周",
+    "第21周",
+    "第22周",
+    "第24周",
+    "第25周",
+    "第26周",
+    "第27周",
+    "第28周",
+    "第29周",
+    "第30周",
+    "第31周",
+    "第32周",
+    "第33周",
+    "第34周",
+    "第35周",
+    "第36周",
+    "第37周",
+    "第38周",
+    "第39周",
+    "第40周"
+   ],
+   "counts": [
+    2,
+    2,
+    2,
+    3,
+    2,
+    2,
+    4,
+    2,
+    1,
+    4,
+    6,
+    8,
+    3,
+    8,
+    10,
+    9,
+    8,
+    12,
+    8,
+    6
+   ],
+   "criticals": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    2,
+    4,
+    2,
+    1,
+    4,
+    6,
+    5,
+    5,
+    8,
+    3,
+    5
+   ]
+  },
+  "trendMonth": {
+   "labels": [
+    "2026年4月",
+    "2026年5月",
+    "2026年6月",
+    "2026年7月",
+    "2026年8月",
+    "2026年9月"
+   ],
+   "counts": [
+    2,
+    4,
+    8,
+    16,
+    31,
+    41
+   ],
+   "criticals": [
+    0,
+    0,
+    2,
+    7,
+    14,
+    25
+   ]
+  },
+  "top10": [
+   {
+    "label": "同步延迟",
+    "value": 17,
+    "systems": 3,
+    "pct": 16.7,
+    "recent": 2
+   },
+   {
+    "label": "渠道中断",
+    "value": 17,
+    "systems": 1,
+    "pct": 16.7,
+    "recent": 10
+   },
+   {
+    "label": "成功率跌破阈值",
+    "value": 14,
+    "systems": 1,
+    "pct": 13.7,
+    "recent": 5
+   },
+   {
+    "label": "只读副本延迟",
+    "value": 12,
+    "systems": 3,
+    "pct": 11.8,
+    "recent": 1
+   },
+   {
+    "label": "支付失败率升高",
+    "value": 12,
+    "systems": 1,
+    "pct": 11.8,
+    "recent": 5
+   },
+   {
+    "label": "录像丢失风险",
+    "value": 9,
+    "systems": 1,
+    "pct": 8.8,
+    "recent": 3
+   },
+   {
+    "label": "录像空间不足",
+    "value": 8,
+    "systems": 1,
+    "pct": 7.8,
+    "recent": 6
+   },
+   {
+    "label": "存储节点掉线",
+    "value": 5,
+    "systems": 1,
+    "pct": 4.9,
+    "recent": 3
+   },
+   {
+    "label": "丢包率升高",
+    "value": 3,
+    "systems": 1,
+    "pct": 2.9,
+    "recent": 2
+   },
+   {
+    "label": "主备切换",
+    "value": 3,
+    "systems": 1,
+    "pct": 2.9,
+    "recent": 3
+   }
+  ],
+  "clusters": [
+   {
+    "kw": "同步延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "PAY",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   },
+   {
+    "kw": "只读副本延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "SET",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   },
+   {
+    "kw": "只读副本延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "PAY",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   },
+   {
+    "kw": "同步延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "PAY",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   },
+   {
+    "kw": "同步延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "TMS",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   },
+   {
+    "kw": "同步延迟",
+    "cat": "副本同步延迟",
+    "n": 1,
+    "sys": "PAY",
+    "type": "occasional",
+    "root": "",
+    "suggestion": "检查复制链路与网络带宽，优化大事务拆分与索引"
+   }
+  ],
+  "clusterTotal": 102,
+  "range": {
+   "from": "2026-04-14T05:55:06.000Z",
+   "to": "2026-09-30T03:06:35.000Z"
+  }
+ },
+ "op": {
+  "weekKey": "2026-W39",
+  "isReal": true,
+  "realTypes": 4,
+  "dayLabels": [
+   "09/26",
+   "09/27",
+   "09/28",
+   "09/29",
+   "09/30",
+   "10/01",
+   "10/02"
+  ],
+  "dayDates": [
+   "2026-09-25T16:00:00.000Z",
+   "2026-09-26T16:00:00.000Z",
+   "2026-09-27T16:00:00.000Z",
+   "2026-09-28T16:00:00.000Z",
+   "2026-09-29T16:00:00.000Z",
+   "2026-09-30T16:00:00.000Z",
+   "2026-10-01T16:00:00.000Z"
+  ],
+  "todayIdx": 4,
+  "focusIdx": 0,
+  "types": [
+   "BGA/LGA",
+   "PQFN",
+   "QFN",
+   "FCCSP"
+  ],
+  "goalCum": [
+   919,
+   1837,
+   2756,
+   3674,
+   4593,
+   5511,
+   6430
+  ],
+  "totalCum": [
+   857,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "earnGoalCum": [
+   160.4,
+   320.7,
+   481.1,
+   641.4,
+   801.8,
+   962.1,
+   1122.5
+  ],
+  "earnTotalCum": [
+   151.1,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "statuses": [
+   "over",
+   "none",
+   "none",
+   "none",
+   "none",
+   "none",
+   "none"
+  ],
+  "redDays": [
+   0
+  ],
+  "yellows": [],
+  "sumYellow": 4,
+  "sumRed": 40,
+  "alarmText": "黄 4K / 红 40K（4 类合计）",
+  "gapAtFocusQty": -62,
+  "earnNormalizedMax": 6944,
+  "byType": [
+   {
+    "id": "BGA/LGA",
+    "color": "#1d4ed8",
+    "price": 1.85,
+    "weekGoal": 3680,
+    "goal": 526,
+    "actual": 481,
+    "diff": -45,
+    "rate": 91.4,
+    "status": "over",
+    "yellowK": 1,
+    "redK": 10,
+    "redDays": 1,
+    "yellowDays": 0,
+    "maxGap": 45,
+    "goalCum": [
+     526,
+     1051,
+     1577,
+     2103,
+     2629,
+     3154,
+     3680
+    ],
+    "totalCum": [
+     481,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "id": "PQFN",
+    "color": "#0b6a86",
+    "price": 0.92,
+    "weekGoal": 200,
+    "goal": 29,
+    "actual": 29,
+    "diff": 0,
+    "rate": 100,
+    "status": "met",
+    "yellowK": 1,
+    "redK": 10,
+    "redDays": 0,
+    "yellowDays": 0,
+    "maxGap": 0,
+    "goalCum": [
+     29,
+     57,
+     86,
+     114,
+     143,
+     171,
+     200
+    ],
+    "totalCum": [
+     29,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "id": "QFN",
+    "color": "#8b5cf6",
+    "price": 1.62,
+    "weekGoal": 2400,
+    "goal": 343,
+    "actual": 299,
+    "diff": -44,
+    "rate": 87.2,
+    "status": "over",
+    "yellowK": 1,
+    "redK": 10,
+    "redDays": 1,
+    "yellowDays": 0,
+    "maxGap": 44,
+    "goalCum": [
+     343,
+     686,
+     1029,
+     1371,
+     1714,
+     2057,
+     2400
+    ],
+    "totalCum": [
+     299,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "id": "FCCSP",
+    "color": "#a8620b",
+    "price": 2.3,
+    "weekGoal": 150,
+    "goal": 21,
+    "actual": 48,
+    "diff": 27,
+    "rate": 228.6,
+    "status": "met",
+    "yellowK": 1,
+    "redK": 10,
+    "redDays": 0,
+    "yellowDays": 0,
+    "maxGap": 0,
+    "goalCum": [
+     21,
+     43,
+     64,
+     86,
+     107,
+     129,
+     150
+    ],
+    "totalCum": [
+     48,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  ],
+  "demo": {
+   "year": 2026,
+   "week": 38,
+   "key": "2026-W38",
+   "dayDates": [
+    "2026-09-18T16:00:00.000Z",
+    "2026-09-19T16:00:00.000Z",
+    "2026-09-20T16:00:00.000Z",
+    "2026-09-21T16:00:00.000Z",
+    "2026-09-22T16:00:00.000Z",
+    "2026-09-23T16:00:00.000Z",
+    "2026-09-24T16:00:00.000Z"
+   ],
+   "goalCum": [
+    919,
+    1837,
+    2756,
+    3674,
+    4593,
+    5511,
+    6430
+   ],
+   "totalCum": [
+    963,
+    1866,
+    2710,
+    3494,
+    4264,
+    5066,
+    5930
+   ],
+   "earnGoalCum": [
+    160.4,
+    320.7,
+    481.1,
+    641.4,
+    801.8,
+    962.1,
+    1122.5
+   ],
+   "earnTotalCum": [
+    167.9,
+    325,
+    471.2,
+    606.6,
+    739.2,
+    877.9,
+    1028
+   ],
+   "statuses": [
+    "met",
+    "met",
+    "over",
+    "over",
+    "over",
+    "over",
+    "over"
+   ],
+   "redDays": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "yellows": [],
+   "byDayGoal": [
+    919,
+    918,
+    919,
+    918,
+    919,
+    918,
+    919
+   ]
+  }
+ },
+ "wip": {
+  "meta": {
+   "source": "BE1 WIP Report-V26.xls",
+   "note": "客户 IT 导出的在制品明细快照（重跑 .extract-wip.py 刷新）",
+   "lots": 813,
+   "totalQty": 2668699,
+   "holdLots": 22,
+   "otdRisk": 130,
+   "extractedAt": "2026-09-30"
+  },
+  "alarm": {
+   "ctY": 7,
+   "ctR": 14,
+   "otd": 0
+  },
+  "totalQtyK": 2668.7,
+  "totalLots": 813,
+  "totalHold": 22,
+  "totalOtd": 130,
+  "totalEarnWan": 469.9,
+  "stepOrder": [
+   "PREM_PLS",
+   "BR",
+   "NLD_HPC",
+   "BLMARK",
+   "NLD_PMC",
+   "PSSWND",
+   "BMOLD",
+   "QMARK",
+   "QMOLD",
+   "FCMARK",
+   "FMOLD",
+   "NLD_SI",
+   "BE_DT",
+   "BE_TTJBI",
+   "BFOI_GATE",
+   "BE_SAW",
+   "FVI_GATE",
+   "FLUX_CLEAN",
+   "BE_DC",
+   "BE_MT",
+   "PINSP",
+   "BE_KESFT",
+   "SAW_STAGE",
+   "BE_KESBI"
+  ],
+  "typeOrder": [
+   "BGA",
+   "QFN",
+   "LGA",
+   "FCCSP",
+   "PQFN"
+  ],
+  "typeMap": [
+   {
+    "id": "BGA",
+    "qty": 1397863,
+    "lots": 480,
+    "color": "#1d4ed8",
+    "qtyK": 1397.9
+   },
+   {
+    "id": "QFN",
+    "qty": 1083520,
+    "lots": 276,
+    "color": "#8b5cf6",
+    "qtyK": 1083.5
+   },
+   {
+    "id": "LGA",
+    "qty": 83189,
+    "lots": 13,
+    "color": "#1d4ed8",
+    "qtyK": 83.2
+   },
+   {
+    "id": "FCCSP",
+    "qty": 78051,
+    "lots": 35,
+    "color": "#a8620b",
+    "qtyK": 78.1
+   },
+   {
+    "id": "PQFN",
+    "qty": 26076,
+    "lots": 9,
+    "color": "#0b6a86",
+    "qtyK": 26.1
+   }
+  ],
+  "stepMap": [
+   {
+    "name": "PREM_PLS",
+    "qty": 221071,
+    "lots": 77,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     197692,
+     0,
+     18398,
+     4981,
+     0
+    ],
+    "qtyK": 221.1
+   },
+   {
+    "name": "BR",
+    "qty": 76264,
+    "lots": 33,
+    "hold": 0,
+    "otd": 1,
+    "byType": [
+     62948,
+     0,
+     0,
+     13316,
+     0
+    ],
+    "qtyK": 76.3
+   },
+   {
+    "name": "NLD_HPC",
+    "qty": 24808,
+    "lots": 10,
+    "hold": 0,
+    "otd": 2,
+    "byType": [
+     24808,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 24.8
+   },
+   {
+    "name": "BLMARK",
+    "qty": 32335,
+    "lots": 18,
+    "hold": 8,
+    "otd": 0,
+    "byType": [
+     32335,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 32.3
+   },
+   {
+    "name": "NLD_PMC",
+    "qty": 181729,
+    "lots": 54,
+    "hold": 0,
+    "otd": 7,
+    "byType": [
+     122163,
+     49391,
+     0,
+     10175,
+     0
+    ],
+    "qtyK": 181.7
+   },
+   {
+    "name": "PSSWND",
+    "qty": 149676,
+    "lots": 52,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     46448,
+     100048,
+     0,
+     3180,
+     0
+    ],
+    "qtyK": 149.7
+   },
+   {
+    "name": "BMOLD",
+    "qty": 19551,
+    "lots": 5,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     19551,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 19.6
+   },
+   {
+    "name": "QMARK",
+    "qty": 22759,
+    "lots": 7,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     22759,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 22.8
+   },
+   {
+    "name": "QMOLD",
+    "qty": 785,
+    "lots": 1,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     785,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 0.8
+   },
+   {
+    "name": "FCMARK",
+    "qty": 9939,
+    "lots": 4,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     0,
+     0,
+     9939,
+     0
+    ],
+    "qtyK": 9.9
+   },
+   {
+    "name": "FMOLD",
+    "qty": 3196,
+    "lots": 1,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     0,
+     0,
+     3196,
+     0
+    ],
+    "qtyK": 3.2
+   },
+   {
+    "name": "NLD_SI",
+    "qty": 4952,
+    "lots": 2,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     4952,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 5
+   },
+   {
+    "name": "BE_DT",
+    "qty": 629295,
+    "lots": 170,
+    "hold": 0,
+    "otd": 5,
+    "byType": [
+     373626,
+     173313,
+     53205,
+     29151,
+     0
+    ],
+    "qtyK": 629.3
+   },
+   {
+    "name": "BE_TTJBI",
+    "qty": 88451,
+    "lots": 46,
+    "hold": 0,
+    "otd": 36,
+    "byType": [
+     88451,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 88.5
+   },
+   {
+    "name": "BFOI_GATE",
+    "qty": 180091,
+    "lots": 54,
+    "hold": 0,
+    "otd": 11,
+    "byType": [
+     61268,
+     107096,
+     11570,
+     157,
+     0
+    ],
+    "qtyK": 180.1
+   },
+   {
+    "name": "BE_SAW",
+    "qty": 557842,
+    "lots": 149,
+    "hold": 7,
+    "otd": 33,
+    "byType": [
+     58177,
+     499665,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 557.8
+   },
+   {
+    "name": "FVI_GATE",
+    "qty": 74222,
+    "lots": 37,
+    "hold": 7,
+    "otd": 23,
+    "byType": [
+     61794,
+     8536,
+     16,
+     3876,
+     0
+    ],
+    "qtyK": 74.2
+   },
+   {
+    "name": "FLUX_CLEAN",
+    "qty": 29027,
+    "lots": 11,
+    "hold": 0,
+    "otd": 3,
+    "byType": [
+     28947,
+     0,
+     0,
+     80,
+     0
+    ],
+    "qtyK": 29
+   },
+   {
+    "name": "BE_DC",
+    "qty": 132235,
+    "lots": 19,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     132235,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 132.2
+   },
+   {
+    "name": "BE_MT",
+    "qty": 135109,
+    "lots": 42,
+    "hold": 0,
+    "otd": 8,
+    "byType": [
+     0,
+     112070,
+     0,
+     0,
+     23039
+    ],
+    "qtyK": 135.1
+   },
+   {
+    "name": "PINSP",
+    "qty": 3037,
+    "lots": 1,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     0,
+     0,
+     0,
+     3037
+    ],
+    "qtyK": 3
+   },
+   {
+    "name": "BE_KESFT",
+    "qty": 30658,
+    "lots": 7,
+    "hold": 0,
+    "otd": 1,
+    "byType": [
+     30658,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 30.7
+   },
+   {
+    "name": "SAW_STAGE",
+    "qty": 56762,
+    "lots": 12,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     56762,
+     0,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 56.8
+   },
+   {
+    "name": "BE_KESBI",
+    "qty": 4905,
+    "lots": 1,
+    "hold": 0,
+    "otd": 0,
+    "byType": [
+     0,
+     4905,
+     0,
+     0,
+     0
+    ],
+    "qtyK": 4.9
+   }
+  ],
+  "ct": {
+   "have": 799,
+   "red": 138,
+   "amber": 0,
+   "redWithCt": 126,
+   "min": 0,
+   "p25": 0.75,
+   "med": 1.6,
+   "p75": 2.84,
+   "p90": 4.06,
+   "max": 57.29,
+   "avg": 2.72
+  },
+  "lots": [
+   [
+    0,
+    0,
+    0.22,
+    1951,
+    0,
+    0.88
+   ],
+   [
+    1,
+    0,
+    2.79,
+    1364,
+    0,
+    -0.04
+   ],
+   [
+    1,
+    0,
+    2.74,
+    707,
+    0,
+    0.87
+   ],
+   [
+    1,
+    0,
+    2.4,
+    1298,
+    0,
+    0.88
+   ],
+   [
+    1,
+    0,
+    2.94,
+    1316,
+    0,
+    0.88
+   ],
+   [
+    1,
+    0,
+    2.95,
+    502,
+    0,
+    0.9
+   ],
+   [
+    2,
+    0,
+    2.96,
+    473,
+    0,
+    0.9
+   ],
+   [
+    0,
+    0,
+    0.96,
+    1386,
+    0,
+    1.96
+   ],
+   [
+    0,
+    0,
+    0.91,
+    1730,
+    0,
+    1.96
+   ],
+   [
+    1,
+    0,
+    1.01,
+    2926,
+    0,
+    0.97
+   ],
+   [
+    1,
+    0,
+    1.87,
+    2206,
+    0,
+    0.97
+   ],
+   [
+    1,
+    0,
+    1.49,
+    2295,
+    0,
+    0.97
+   ],
+   [
+    2,
+    0,
+    0.92,
+    2223,
+    0,
+    0.97
+   ],
+   [
+    3,
+    0,
+    0.86,
+    2096,
+    0,
+    0.97
+   ],
+   [
+    1,
+    0,
+    1.62,
+    1512,
+    0,
+    0.97
+   ],
+   [
+    4,
+    0,
+    0.64,
+    1539,
+    0,
+    0.97
+   ],
+   [
+    1,
+    0,
+    0.53,
+    1632,
+    0,
+    0.97
+   ],
+   [
+    0,
+    0,
+    0.31,
+    706,
+    0,
+    0.97
+   ],
+   [
+    0,
+    0,
+    0.39,
+    674,
+    0,
+    0.97
+   ],
+   [
+    0,
+    0,
+    0.43,
+    693,
+    0,
+    0.97
+   ],
+   [
+    0,
+    0,
+    0.41,
+    1267,
+    0,
+    0.97
+   ],
+   [
+    0,
+    0,
+    0.45,
+    1504,
+    0,
+    0.97
+   ],
+   [
+    4,
+    0,
+    0.86,
+    3012,
+    0,
+    1.85
+   ],
+   [
+    1,
+    0,
+    1.37,
+    2252,
+    0,
+    1.85
+   ],
+   [
+    0,
+    0,
+    0.29,
+    1568,
+    0,
+    1.85
+   ],
+   [
+    5,
+    0,
+    0.73,
+    1555,
+    0,
+    1.85
+   ],
+   [
+    0,
+    0,
+    0.2,
+    3029,
+    0,
+    1.85
+   ],
+   [
+    5,
+    0,
+    1.02,
+    2188,
+    0,
+    1.85
+   ],
+   [
+    0,
+    0,
+    0.47,
+    2159,
+    0,
+    1.85
+   ],
+   [
+    3,
+    0,
+    1.37,
+    1219,
+    0,
+    1.89
+   ],
+   [
+    1,
+    0,
+    1.42,
+    1458,
+    0,
+    1.89
+   ],
+   [
+    1,
+    0,
+    1.93,
+    2181,
+    0,
+    1.89
+   ],
+   [
+    1,
+    0,
+    1.52,
+    2209,
+    0,
+    1.89
+   ],
+   [
+    0,
+    0,
+    0.76,
+    740,
+    0,
+    1.89
+   ],
+   [
+    1,
+    0,
+    1.14,
+    1053,
+    0,
+    0.88
+   ],
+   [
+    4,
+    0,
+    1.38,
+    1036,
+    0,
+    0.88
+   ],
+   [
+    1,
+    0,
+    0.74,
+    1583,
+    0,
+    1.97
+   ],
+   [
+    4,
+    0,
+    0.35,
+    1604,
+    0,
+    1.97
+   ],
+   [
+    4,
+    0,
+    0.4,
+    1208,
+    0,
+    1.97
+   ],
+   [
+    1,
+    0,
+    0.83,
+    1591,
+    0,
+    1.97
+   ],
+   [
+    2,
+    0,
+    0.57,
+    2568,
+    0,
+    1.97
+   ],
+   [
+    1,
+    0,
+    0.67,
+    1641,
+    0,
+    2.03
+   ],
+   [
+    4,
+    0,
+    0.5,
+    1636,
+    0,
+    2.03
+   ],
+   [
+    4,
+    0,
+    0.47,
+    1592,
+    0,
+    2.03
+   ],
+   [
+    5,
+    0,
+    0.22,
+    1629,
+    0,
+    2.03
+   ],
+   [
+    2,
+    0,
+    0.64,
+    1706,
+    0,
+    2.03
+   ],
+   [
+    4,
+    0,
+    0.55,
+    1212,
+    0,
+    2.03
+   ],
+   [
+    5,
+    0,
+    0.52,
+    1489,
+    0,
+    2.03
+   ],
+   [
+    3,
+    0,
+    0.87,
+    1654,
+    0,
+    2.03
+   ],
+   [
+    4,
+    0,
+    0.85,
+    2460,
+    0,
+    2.03
+   ],
+   [
+    0,
+    0,
+    0.25,
+    1495,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.04,
+    1522,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.2,
+    1489,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.11,
+    1480,
+    0,
+    2.88
+   ],
+   [
+    5,
+    0,
+    0.43,
+    1527,
+    0,
+    2.88
+   ],
+   [
+    5,
+    1,
+    0.01,
+    5849,
+    0,
+    3.89
+   ],
+   [
+    3,
+    0,
+    2.11,
+    1795,
+    0,
+    1.88
+   ],
+   [
+    4,
+    0,
+    2.19,
+    3038,
+    0,
+    1.88
+   ],
+   [
+    4,
+    0,
+    2.52,
+    2069,
+    0,
+    1.88
+   ],
+   [
+    4,
+    0,
+    1.45,
+    3902,
+    0,
+    1.89
+   ],
+   [
+    3,
+    0,
+    1.64,
+    2351,
+    0,
+    1.89
+   ],
+   [
+    4,
+    0,
+    1.94,
+    1517,
+    0,
+    1.89
+   ],
+   [
+    3,
+    0,
+    1.18,
+    740,
+    0,
+    1.89
+   ],
+   [
+    2,
+    0,
+    1.75,
+    2155,
+    0,
+    1.89
+   ],
+   [
+    3,
+    0,
+    2.04,
+    1476,
+    0,
+    1.89
+   ],
+   [
+    5,
+    0,
+    0.66,
+    1056,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.77,
+    1537,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.59,
+    765,
+    0,
+    2.88
+   ],
+   [
+    4,
+    0,
+    1.09,
+    3104,
+    0,
+    2.88
+   ],
+   [
+    5,
+    0,
+    0.95,
+    1533,
+    0,
+    2.88
+   ],
+   [
+    4,
+    0,
+    1.34,
+    2323,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.86,
+    1537,
+    0,
+    2.88
+   ],
+   [
+    3,
+    0,
+    0.91,
+    3846,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.42,
+    1755,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.36,
+    1578,
+    0,
+    2.88
+   ],
+   [
+    5,
+    0,
+    0.47,
+    2365,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.54,
+    1579,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.02,
+    770,
+    0,
+    2.88
+   ],
+   [
+    0,
+    0,
+    0.02,
+    3910,
+    0,
+    2.88
+   ],
+   [
+    6,
+    0,
+    0.18,
+    3840,
+    0,
+    2.88
+   ],
+   [
+    7,
+    1,
+    0.07,
+    5985,
+    0,
+    1.95
+   ],
+   [
+    7,
+    1,
+    0.09,
+    5412,
+    0,
+    1.95
+   ],
+   [
+    5,
+    1,
+    0.52,
+    2554,
+    0,
+    4.88
+   ],
+   [
+    5,
+    1,
+    0.05,
+    5849,
+    0,
+    4.88
+   ],
+   [
+    5,
+    1,
+    0.35,
+    5866,
+    0,
+    4.89
+   ],
+   [
+    5,
+    1,
+    0.01,
+    5864,
+    0,
+    4.89
+   ],
+   [
+    5,
+    1,
+    0.44,
+    5868,
+    0,
+    4.89
+   ],
+   [
+    5,
+    1,
+    0.49,
+    5912,
+    0,
+    4.95
+   ],
+   [
+    8,
+    1,
+    0.19,
+    785,
+    0,
+    4.95
+   ],
+   [
+    5,
+    1,
+    0.19,
+    4836,
+    0,
+    4.95
+   ],
+   [
+    5,
+    1,
+    0.19,
+    5274,
+    0,
+    4.95
+   ],
+   [
+    2,
+    0,
+    1.18,
+    1770,
+    0,
+    0.88
+   ],
+   [
+    1,
+    0,
+    0.87,
+    2591,
+    0,
+    0.88
+   ],
+   [
+    2,
+    0,
+    1.36,
+    2607,
+    0,
+    0.88
+   ],
+   [
+    5,
+    1,
+    0.19,
+    5993,
+    0,
+    3.89
+   ],
+   [
+    0,
+    2,
+    0.1,
+    8490,
+    0,
+    3.85
+   ],
+   [
+    0,
+    2,
+    0.1,
+    9908,
+    0,
+    3.85
+   ],
+   [
+    2,
+    0,
+    2.97,
+    2823,
+    0,
+    -1.12
+   ],
+   [
+    2,
+    0,
+    1.53,
+    3137,
+    0,
+    -1.12
+   ],
+   [
+    4,
+    0,
+    0.26,
+    3173,
+    0,
+    -0.12
+   ],
+   [
+    4,
+    0,
+    1.74,
+    3299,
+    0,
+    -0.12
+   ],
+   [
+    4,
+    0,
+    1.79,
+    1862,
+    0,
+    -0.12
+   ],
+   [
+    5,
+    0,
+    0.35,
+    3263,
+    0,
+    0.96
+   ],
+   [
+    0,
+    0,
+    0.02,
+    5333,
+    0,
+    0.96
+   ],
+   [
+    1,
+    0,
+    1.44,
+    5319,
+    0,
+    1.89
+   ],
+   [
+    0,
+    0,
+    0.49,
+    5299,
+    0,
+    2.95
+   ],
+   [
+    0,
+    0,
+    0.58,
+    5307,
+    0,
+    2.95
+   ],
+   [
+    4,
+    0,
+    0.9,
+    5226,
+    0,
+    2.95
+   ],
+   [
+    0,
+    0,
+    0.68,
+    5502,
+    0,
+    2.95
+   ],
+   [
+    3,
+    0,
+    1.15,
+    5314,
+    0,
+    2.95
+   ],
+   [
+    0,
+    0,
+    0.46,
+    3518,
+    0,
+    2.95
+   ],
+   [
+    4,
+    0,
+    2.59,
+    4338,
+    0,
+    3.87
+   ],
+   [
+    4,
+    0,
+    2.09,
+    5233,
+    0,
+    4.89
+   ],
+   [
+    1,
+    0,
+    1.59,
+    1108,
+    0,
+    4.89
+   ],
+   [
+    6,
+    0,
+    1.2,
+    4269,
+    0,
+    4.89
+   ],
+   [
+    5,
+    0,
+    1.09,
+    1019,
+    0,
+    4.89
+   ],
+   [
+    2,
+    0,
+    1.37,
+    5346,
+    0,
+    4.89
+   ],
+   [
+    6,
+    0,
+    1.35,
+    4056,
+    0,
+    4.89
+   ],
+   [
+    1,
+    0,
+    1.41,
+    5472,
+    0,
+    4.89
+   ],
+   [
+    1,
+    0,
+    1.46,
+    5435,
+    0,
+    4.89
+   ],
+   [
+    4,
+    0,
+    1.11,
+    5238,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.9,
+    2131,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.99,
+    5437,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.9,
+    5446,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    1.29,
+    1016,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    1.09,
+    4625,
+    0,
+    5.95
+   ],
+   [
+    5,
+    0,
+    1.36,
+    4102,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.86,
+    2239,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.86,
+    2244,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.9,
+    2064,
+    0,
+    5.95
+   ],
+   [
+    5,
+    0,
+    0.86,
+    2150,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.66,
+    2194,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.47,
+    5320,
+    0,
+    5.95
+   ],
+   [
+    5,
+    0,
+    0.84,
+    2057,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.56,
+    5325,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.7,
+    4155,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.48,
+    3602,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.77,
+    2091,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.55,
+    5442,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.36,
+    1120,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.39,
+    1112,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.38,
+    1009,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.36,
+    1053,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.37,
+    1498,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.23,
+    1029,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.37,
+    1054,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.41,
+    3013,
+    0,
+    5.95
+   ],
+   [
+    0,
+    0,
+    0.06,
+    5378,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.01,
+    5434,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.37,
+    4051,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.14,
+    5163,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.4,
+    3917,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.26,
+    3355,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.11,
+    1008,
+    0,
+    6.85
+   ],
+   [
+    4,
+    0,
+    0.81,
+    4940,
+    0,
+    1.96
+   ],
+   [
+    4,
+    0,
+    0.44,
+    5082,
+    0,
+    1.96
+   ],
+   [
+    4,
+    0,
+    0.35,
+    5285,
+    0,
+    1.96
+   ],
+   [
+    4,
+    0,
+    0.97,
+    5106,
+    0,
+    1.97
+   ],
+   [
+    6,
+    0,
+    0.66,
+    4997,
+    0,
+    1.97
+   ],
+   [
+    5,
+    0,
+    0.63,
+    1881,
+    0,
+    1.97
+   ],
+   [
+    5,
+    0,
+    0.84,
+    5228,
+    0,
+    1.97
+   ],
+   [
+    5,
+    0,
+    0.88,
+    5167,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.06,
+    5230,
+    0,
+    1.97
+   ],
+   [
+    4,
+    0,
+    0.26,
+    5125,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.15,
+    5169,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.15,
+    5190,
+    0,
+    1.97
+   ],
+   [
+    4,
+    0,
+    0.49,
+    5133,
+    0,
+    1.97
+   ],
+   [
+    4,
+    0,
+    2.08,
+    1007,
+    0,
+    -0.07
+   ],
+   [
+    4,
+    0,
+    null,
+    85,
+    0,
+    -0.07
+   ],
+   [
+    0,
+    0,
+    0.39,
+    3485,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.54,
+    1181,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.56,
+    3459,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.35,
+    3413,
+    0,
+    1.97
+   ],
+   [
+    0,
+    0,
+    0.17,
+    2235,
+    0,
+    2.03
+   ],
+   [
+    4,
+    3,
+    null,
+    173,
+    0,
+    -58.07
+   ],
+   [
+    4,
+    3,
+    null,
+    161,
+    0,
+    -47.98
+   ],
+   [
+    1,
+    3,
+    3.31,
+    3546,
+    0,
+    0.87
+   ],
+   [
+    9,
+    3,
+    1.27,
+    2180,
+    0,
+    4.88
+   ],
+   [
+    0,
+    3,
+    0.32,
+    3083,
+    0,
+    4.88
+   ],
+   [
+    4,
+    3,
+    0.32,
+    3200,
+    0,
+    4.88
+   ],
+   [
+    9,
+    3,
+    0.82,
+    2321,
+    0,
+    4.88
+   ],
+   [
+    1,
+    3,
+    0.82,
+    3292,
+    0,
+    4.88
+   ],
+   [
+    1,
+    3,
+    1.27,
+    3210,
+    0,
+    4.88
+   ],
+   [
+    4,
+    3,
+    1.27,
+    3357,
+    0,
+    4.88
+   ],
+   [
+    1,
+    3,
+    0.82,
+    3268,
+    0,
+    4.88
+   ],
+   [
+    9,
+    3,
+    0.82,
+    3126,
+    0,
+    4.88
+   ],
+   [
+    4,
+    3,
+    0.32,
+    3284,
+    0,
+    4.88
+   ],
+   [
+    5,
+    3,
+    0.32,
+    3180,
+    0,
+    4.88
+   ],
+   [
+    0,
+    3,
+    0.32,
+    1898,
+    0,
+    4.88
+   ],
+   [
+    10,
+    3,
+    0.32,
+    3196,
+    0,
+    4.88
+   ],
+   [
+    9,
+    3,
+    0.82,
+    2312,
+    0,
+    4.88
+   ],
+   [
+    4,
+    0,
+    1.36,
+    2925,
+    0,
+    2.97
+   ],
+   [
+    1,
+    0,
+    0.86,
+    1150,
+    0,
+    2.97
+   ],
+   [
+    1,
+    0,
+    0.86,
+    1144,
+    0,
+    3.09
+   ],
+   [
+    5,
+    0,
+    0.28,
+    1730,
+    0,
+    3.09
+   ],
+   [
+    1,
+    0,
+    0.38,
+    2093,
+    0,
+    3.09
+   ],
+   [
+    1,
+    0,
+    0.56,
+    559,
+    0,
+    3.09
+   ],
+   [
+    5,
+    0,
+    0.28,
+    1834,
+    0,
+    3.87
+   ],
+   [
+    5,
+    0,
+    0.27,
+    1197,
+    0,
+    3.87
+   ],
+   [
+    6,
+    0,
+    0.38,
+    2389,
+    0,
+    3.87
+   ],
+   [
+    1,
+    0,
+    0.45,
+    3557,
+    0,
+    3.87
+   ],
+   [
+    5,
+    0,
+    0.2,
+    2378,
+    0,
+    3.87
+   ],
+   [
+    0,
+    0,
+    0.09,
+    1274,
+    0,
+    3.87
+   ],
+   [
+    5,
+    0,
+    0.14,
+    1100,
+    0,
+    3.87
+   ],
+   [
+    4,
+    0,
+    0.24,
+    2091,
+    0,
+    null
+   ],
+   [
+    0,
+    0,
+    0.1,
+    2091,
+    0,
+    null
+   ],
+   [
+    4,
+    0,
+    0.18,
+    2082,
+    0,
+    null
+   ],
+   [
+    4,
+    0,
+    0.54,
+    1681,
+    0,
+    null
+   ],
+   [
+    4,
+    0,
+    0.18,
+    2075,
+    0,
+    null
+   ],
+   [
+    4,
+    0,
+    0.67,
+    2091,
+    0,
+    null
+   ],
+   [
+    0,
+    0,
+    0.1,
+    2092,
+    0,
+    null
+   ],
+   [
+    4,
+    1,
+    1,
+    3922,
+    0,
+    2.97
+   ],
+   [
+    4,
+    1,
+    1,
+    3237,
+    0,
+    2.97
+   ],
+   [
+    4,
+    1,
+    0.89,
+    2935,
+    0,
+    2.97
+   ],
+   [
+    4,
+    1,
+    0.29,
+    12931,
+    0,
+    3.98
+   ],
+   [
+    4,
+    1,
+    0.29,
+    6151,
+    0,
+    3.98
+   ],
+   [
+    4,
+    1,
+    0.29,
+    10914,
+    0,
+    3.98
+   ],
+   [
+    4,
+    1,
+    0.29,
+    1904,
+    0,
+    4.92
+   ],
+   [
+    5,
+    1,
+    0.31,
+    2474,
+    0,
+    3.93
+   ],
+   [
+    5,
+    1,
+    0.07,
+    4950,
+    0,
+    4.98
+   ],
+   [
+    5,
+    1,
+    0.27,
+    2474,
+    0,
+    4.98
+   ],
+   [
+    5,
+    1,
+    0.2,
+    2475,
+    0,
+    5
+   ],
+   [
+    5,
+    1,
+    0.06,
+    2475,
+    0,
+    5
+   ],
+   [
+    7,
+    1,
+    0.49,
+    2479,
+    0,
+    5
+   ],
+   [
+    7,
+    1,
+    0.57,
+    1211,
+    0,
+    5
+   ],
+   [
+    5,
+    1,
+    0.2,
+    2478,
+    0,
+    5
+   ],
+   [
+    5,
+    1,
+    0.02,
+    2474,
+    0,
+    5
+   ],
+   [
+    5,
+    1,
+    0.05,
+    2473,
+    0,
+    5
+   ],
+   [
+    5,
+    1,
+    0.11,
+    2994,
+    0,
+    5.01
+   ],
+   [
+    5,
+    1,
+    0,
+    2473,
+    0,
+    5.01
+   ],
+   [
+    11,
+    1,
+    0.38,
+    2475,
+    0,
+    5.93
+   ],
+   [
+    7,
+    1,
+    0.49,
+    2478,
+    0,
+    5.93
+   ],
+   [
+    7,
+    1,
+    0.49,
+    2471,
+    0,
+    5.93
+   ],
+   [
+    7,
+    1,
+    0.52,
+    2723,
+    0,
+    5.93
+   ],
+   [
+    5,
+    1,
+    0.25,
+    2476,
+    0,
+    6.98
+   ],
+   [
+    5,
+    1,
+    0.2,
+    2469,
+    0,
+    6.98
+   ],
+   [
+    11,
+    1,
+    0.38,
+    2477,
+    0,
+    6.98
+   ],
+   [
+    5,
+    1,
+    0.38,
+    2473,
+    0,
+    6.98
+   ],
+   [
+    4,
+    1,
+    0.37,
+    2473,
+    0,
+    6.98
+   ],
+   [
+    4,
+    1,
+    0.1,
+    4924,
+    0,
+    6.98
+   ],
+   [
+    5,
+    1,
+    0.23,
+    2476,
+    0,
+    6.98
+   ],
+   [
+    5,
+    1,
+    0.17,
+    2477,
+    0,
+    6.98
+   ],
+   [
+    3,
+    0,
+    22.59,
+    711,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.62,
+    711,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.61,
+    712,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.64,
+    712,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.64,
+    712,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.62,
+    711,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.59,
+    711,
+    18.5,
+    null
+   ],
+   [
+    3,
+    0,
+    22.61,
+    712,
+    18.5,
+    null
+   ],
+   [
+    4,
+    0,
+    0.38,
+    1632,
+    0,
+    6.85
+   ],
+   [
+    4,
+    0,
+    0.29,
+    1586,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.08,
+    3171,
+    0,
+    6.85
+   ],
+   [
+    4,
+    0,
+    0.4,
+    6492,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.01,
+    2134,
+    0,
+    6.85
+   ],
+   [
+    3,
+    0,
+    0.5,
+    6152,
+    0,
+    6.85
+   ],
+   [
+    0,
+    0,
+    0.11,
+    3260,
+    0,
+    6.85
+   ],
+   [
+    4,
+    0,
+    0.17,
+    8124,
+    0,
+    6.85
+   ],
+   [
+    1,
+    0,
+    0.45,
+    4794,
+    0,
+    6.85
+   ],
+   [
+    5,
+    1,
+    0.1,
+    374,
+    0,
+    null
+   ],
+   [
+    5,
+    1,
+    0.1,
+    235,
+    0,
+    null
+   ],
+   [
+    5,
+    1,
+    0.1,
+    376,
+    0,
+    null
+   ],
+   [
+    5,
+    1,
+    0.1,
+    375,
+    0,
+    null
+   ],
+   [
+    5,
+    1,
+    0.83,
+    4712,
+    0,
+    6.94
+   ],
+   [
+    12,
+    0,
+    1.99,
+    1032,
+    0,
+    -1.04
+   ],
+   [
+    12,
+    0,
+    2.31,
+    422,
+    0,
+    -0.17
+   ],
+   [
+    12,
+    0,
+    2.38,
+    1491,
+    0,
+    0.96
+   ],
+   [
+    12,
+    0,
+    2.17,
+    738,
+    0,
+    0.96
+   ],
+   [
+    12,
+    0,
+    2.48,
+    3051,
+    0,
+    0.96
+   ],
+   [
+    12,
+    0,
+    2.22,
+    1469,
+    0,
+    0.96
+   ],
+   [
+    13,
+    0,
+    2.66,
+    1469,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    2.21,
+    733,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    2.26,
+    1666,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    2.83,
+    768,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    3.47,
+    2269,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    2.87,
+    2176,
+    0,
+    -1.13
+   ],
+   [
+    13,
+    0,
+    2.97,
+    1008,
+    0,
+    -1.03
+   ],
+   [
+    13,
+    0,
+    4.12,
+    1293,
+    0,
+    -0.11
+   ],
+   [
+    13,
+    0,
+    3.73,
+    2483,
+    0,
+    -0.11
+   ],
+   [
+    13,
+    0,
+    4.08,
+    1449,
+    0,
+    -0.11
+   ],
+   [
+    13,
+    0,
+    0.99,
+    1482,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    4.18,
+    507,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    4.29,
+    1488,
+    0,
+    -0.05
+   ],
+   [
+    14,
+    0,
+    0.99,
+    1518,
+    0,
+    -0.05
+   ],
+   [
+    15,
+    0,
+    0.99,
+    1487,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    4.15,
+    1526,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    4.12,
+    1343,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    4.25,
+    1458,
+    0,
+    -0.05
+   ],
+   [
+    13,
+    0,
+    3.97,
+    1850,
+    0,
+    -0.04
+   ],
+   [
+    13,
+    0,
+    4.08,
+    1415,
+    0,
+    -0.04
+   ],
+   [
+    16,
+    0,
+    0.99,
+    2159,
+    0,
+    -0.04
+   ],
+   [
+    13,
+    0,
+    2.76,
+    709,
+    0,
+    -0.04
+   ],
+   [
+    13,
+    0,
+    3.37,
+    2916,
+    0,
+    -0.04
+   ],
+   [
+    13,
+    0,
+    3.26,
+    2851,
+    0,
+    -0.04
+   ],
+   [
+    15,
+    0,
+    3.57,
+    475,
+    0,
+    -0.03
+   ],
+   [
+    13,
+    0,
+    3.26,
+    2731,
+    0,
+    -0.03
+   ],
+   [
+    17,
+    0,
+    3.13,
+    1421,
+    0,
+    -0.03
+   ],
+   [
+    15,
+    0,
+    3.19,
+    2785,
+    0,
+    -0.03
+   ],
+   [
+    15,
+    0,
+    3.08,
+    1512,
+    0,
+    -0.03
+   ],
+   [
+    17,
+    0,
+    0.82,
+    1410,
+    0,
+    -0.03
+   ],
+   [
+    14,
+    0,
+    3,
+    2789,
+    0,
+    -0.03
+   ],
+   [
+    14,
+    0,
+    3.25,
+    3197,
+    0,
+    0.87
+   ],
+   [
+    13,
+    0,
+    2.89,
+    2946,
+    0,
+    0.9
+   ],
+   [
+    14,
+    0,
+    2.85,
+    2361,
+    0,
+    0.9
+   ],
+   [
+    13,
+    0,
+    3.83,
+    758,
+    0,
+    -1.12
+   ],
+   [
+    13,
+    0,
+    2.74,
+    2592,
+    0,
+    -1.11
+   ],
+   [
+    13,
+    0,
+    2.02,
+    1413,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    2.49,
+    2151,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    2.93,
+    2141,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    3.43,
+    3303,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    2.58,
+    2567,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    3,
+    3704,
+    0,
+    -0.12
+   ],
+   [
+    15,
+    0,
+    2.15,
+    3659,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    1.78,
+    2295,
+    0,
+    -0.12
+   ],
+   [
+    13,
+    0,
+    2.6,
+    3677,
+    0,
+    -0.12
+   ],
+   [
+    15,
+    0,
+    1.69,
+    2278,
+    0,
+    0.97
+   ],
+   [
+    13,
+    0,
+    2.05,
+    1435,
+    0,
+    0.97
+   ],
+   [
+    15,
+    0,
+    2.1,
+    2222,
+    0,
+    0.97
+   ],
+   [
+    17,
+    0,
+    1.22,
+    3035,
+    0,
+    0.97
+   ],
+   [
+    15,
+    0,
+    1.74,
+    2991,
+    0,
+    1.89
+   ],
+   [
+    16,
+    0,
+    6.67,
+    576,
+    0,
+    -5.04
+   ],
+   [
+    12,
+    0,
+    1.09,
+    1514,
+    0,
+    -0.07
+   ],
+   [
+    12,
+    0,
+    5.73,
+    1410,
+    0,
+    0.86
+   ],
+   [
+    12,
+    0,
+    4.09,
+    2285,
+    0,
+    0.86
+   ],
+   [
+    12,
+    0,
+    4.45,
+    1507,
+    0,
+    0.86
+   ],
+   [
+    12,
+    0,
+    4.05,
+    1569,
+    0,
+    0.86
+   ],
+   [
+    12,
+    0,
+    4.3,
+    1599,
+    0,
+    0.86
+   ],
+   [
+    15,
+    0,
+    1.2,
+    1276,
+    0,
+    0.88
+   ],
+   [
+    15,
+    0,
+    1.2,
+    1276,
+    0,
+    0.88
+   ],
+   [
+    16,
+    0,
+    1.23,
+    1616,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.1,
+    1590,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.89,
+    1614,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.76,
+    1571,
+    0,
+    0.88
+   ],
+   [
+    17,
+    0,
+    0.97,
+    2464,
+    0,
+    0.88
+   ],
+   [
+    16,
+    0,
+    1.34,
+    1588,
+    0,
+    0.88
+   ],
+   [
+    18,
+    0,
+    1.58,
+    1651,
+    0,
+    0.88
+   ],
+   [
+    14,
+    0,
+    1.22,
+    1628,
+    0,
+    0.88
+   ],
+   [
+    18,
+    0,
+    1.79,
+    1525,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    3.94,
+    1638,
+    0,
+    1.87
+   ],
+   [
+    16,
+    0,
+    null,
+    95,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.63,
+    1590,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    4.21,
+    1633,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.3,
+    1805,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.75,
+    1641,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.94,
+    1608,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.83,
+    1211,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    2.69,
+    1059,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    1.5,
+    1564,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    2.71,
+    1617,
+    0,
+    1.87
+   ],
+   [
+    12,
+    0,
+    3.87,
+    1406,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.24,
+    1519,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.23,
+    1110,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.45,
+    1563,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.55,
+    1375,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.99,
+    2346,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.14,
+    1540,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.12,
+    1355,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.07,
+    1623,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.1,
+    1410,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.7,
+    1581,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    3.49,
+    1206,
+    0,
+    1.88
+   ],
+   [
+    14,
+    0,
+    0.74,
+    1593,
+    0,
+    2.03
+   ],
+   [
+    14,
+    0,
+    0.93,
+    1560,
+    0,
+    2.03
+   ],
+   [
+    15,
+    0,
+    1,
+    1436,
+    0,
+    2.03
+   ],
+   [
+    12,
+    0,
+    1.91,
+    1202,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    2.08,
+    1601,
+    0,
+    2.93
+   ],
+   [
+    19,
+    1,
+    7.3,
+    2402,
+    0,
+    -7.08
+   ],
+   [
+    15,
+    1,
+    3.54,
+    1884,
+    0,
+    -0.23
+   ],
+   [
+    15,
+    1,
+    3.54,
+    1886,
+    0,
+    -0.23
+   ],
+   [
+    15,
+    1,
+    2.53,
+    1883,
+    0,
+    -0.23
+   ],
+   [
+    15,
+    1,
+    3.54,
+    4142,
+    0,
+    -0.23
+   ],
+   [
+    19,
+    1,
+    3.54,
+    1853,
+    0,
+    -0.23
+   ],
+   [
+    19,
+    1,
+    3.54,
+    1841,
+    0,
+    -0.23
+   ],
+   [
+    15,
+    1,
+    1.26,
+    1838,
+    0,
+    -0.23
+   ],
+   [
+    15,
+    1,
+    2.53,
+    2540,
+    0,
+    -0.23
+   ],
+   [
+    14,
+    0,
+    2.08,
+    5683,
+    0,
+    -0.14
+   ],
+   [
+    15,
+    1,
+    2.02,
+    5856,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.54,
+    4985,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    2.07,
+    1039,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.25,
+    4853,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.54,
+    5321,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.25,
+    5522,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.54,
+    5321,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.01,
+    5866,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    1.25,
+    2827,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    0.29,
+    2224,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    0.29,
+    2224,
+    0,
+    0.86
+   ],
+   [
+    14,
+    1,
+    3.04,
+    1911,
+    0,
+    0.9
+   ],
+   [
+    15,
+    1,
+    1.25,
+    2203,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.55,
+    5875,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.07,
+    5284,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.24,
+    4437,
+    0,
+    2
+   ],
+   [
+    14,
+    1,
+    2.58,
+    5874,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.5,
+    6239,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.8,
+    5861,
+    0,
+    2
+   ],
+   [
+    15,
+    0,
+    5.07,
+    3690,
+    0,
+    -2.11
+   ],
+   [
+    13,
+    0,
+    3.73,
+    2929,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    4.42,
+    1438,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    2.91,
+    1187,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    4.07,
+    1379,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    3.47,
+    2204,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    3.02,
+    1506,
+    0,
+    1.88
+   ],
+   [
+    13,
+    0,
+    3.19,
+    3005,
+    0,
+    1.88
+   ],
+   [
+    15,
+    1,
+    57.29,
+    6714,
+    18.5,
+    -56.03
+   ],
+   [
+    15,
+    1,
+    57.29,
+    6714,
+    18.5,
+    -56.03
+   ],
+   [
+    15,
+    1,
+    57.29,
+    6714,
+    18.5,
+    -56.03
+   ],
+   [
+    12,
+    1,
+    0.6,
+    10953,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.6,
+    4316,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.9,
+    4313,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.52,
+    3412,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.8,
+    8575,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.51,
+    4312,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.3,
+    2146,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.38,
+    4315,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.75,
+    1856,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.52,
+    4311,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.8,
+    17219,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.3,
+    4312,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    2.3,
+    4310,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.81,
+    4296,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.72,
+    3433,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.8,
+    15510,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.8,
+    4317,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.4,
+    7670,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.26,
+    3434,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.75,
+    4314,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    1.76,
+    4311,
+    0,
+    1.87
+   ],
+   [
+    16,
+    1,
+    0.8,
+    3208,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.8,
+    4308,
+    0,
+    1.87
+   ],
+   [
+    12,
+    1,
+    0.6,
+    4307,
+    0,
+    1.87
+   ],
+   [
+    15,
+    1,
+    0.53,
+    2421,
+    0,
+    1.87
+   ],
+   [
+    15,
+    1,
+    0.38,
+    5371,
+    0,
+    1.87
+   ],
+   [
+    15,
+    1,
+    0.58,
+    5389,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.09,
+    5991,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.54,
+    1197,
+    0,
+    1.95
+   ],
+   [
+    14,
+    1,
+    0.89,
+    5997,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.08,
+    5974,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.01,
+    5965,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.09,
+    5981,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.21,
+    1013,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.54,
+    5991,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.21,
+    6000,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.09,
+    5984,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.58,
+    3594,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.48,
+    5367,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.58,
+    5776,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    1.01,
+    1773,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    1.09,
+    896,
+    0,
+    1.95
+   ],
+   [
+    14,
+    1,
+    0.21,
+    5987,
+    0,
+    1.95
+   ],
+   [
+    14,
+    1,
+    0.58,
+    11668,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.21,
+    5995,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.58,
+    3590,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.08,
+    5366,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.53,
+    5991,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.89,
+    5996,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.21,
+    8516,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.21,
+    5975,
+    0,
+    1.95
+   ],
+   [
+    14,
+    1,
+    1.08,
+    3902,
+    0,
+    1.95
+   ],
+   [
+    15,
+    1,
+    0.58,
+    3931,
+    0,
+    1.95
+   ],
+   [
+    12,
+    1,
+    1.02,
+    5972,
+    0,
+    1.95
+   ],
+   [
+    16,
+    0,
+    7.75,
+    1559,
+    2.3,
+    -5.12
+   ],
+   [
+    16,
+    0,
+    7.75,
+    1559,
+    2.3,
+    -5.12
+   ],
+   [
+    16,
+    0,
+    7.75,
+    1559,
+    2.3,
+    -5.12
+   ],
+   [
+    16,
+    0,
+    7.75,
+    1559,
+    2.3,
+    -5.12
+   ],
+   [
+    15,
+    0,
+    null,
+    162,
+    0,
+    -16.02
+   ],
+   [
+    15,
+    0,
+    null,
+    162,
+    0,
+    -16.02
+   ],
+   [
+    12,
+    0,
+    1.52,
+    1763,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.59,
+    2584,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    2.03,
+    1702,
+    0,
+    0.88
+   ],
+   [
+    15,
+    1,
+    0.58,
+    5990,
+    0,
+    3.89
+   ],
+   [
+    12,
+    2,
+    1.94,
+    5480,
+    0,
+    -0.11
+   ],
+   [
+    12,
+    2,
+    2.35,
+    8962,
+    0,
+    1.88
+   ],
+   [
+    12,
+    2,
+    1.78,
+    3730,
+    0,
+    1.88
+   ],
+   [
+    12,
+    2,
+    2.23,
+    2837,
+    0,
+    1.88
+   ],
+   [
+    12,
+    2,
+    2.14,
+    9858,
+    0,
+    1.88
+   ],
+   [
+    16,
+    2,
+    null,
+    16,
+    0,
+    1.89
+   ],
+   [
+    12,
+    2,
+    2.14,
+    4205,
+    0,
+    1.89
+   ],
+   [
+    12,
+    2,
+    1.78,
+    9634,
+    0,
+    2.95
+   ],
+   [
+    14,
+    2,
+    1.49,
+    3057,
+    0,
+    2.95
+   ],
+   [
+    14,
+    2,
+    1.45,
+    8513,
+    0,
+    2.95
+   ],
+   [
+    12,
+    2,
+    1.86,
+    8499,
+    0,
+    2.95
+   ],
+   [
+    13,
+    0,
+    2.65,
+    1612,
+    0,
+    -1.12
+   ],
+   [
+    13,
+    0,
+    3.07,
+    1827,
+    0,
+    -1.12
+   ],
+   [
+    13,
+    0,
+    2.44,
+    3619,
+    0,
+    -1.12
+   ],
+   [
+    13,
+    0,
+    2.77,
+    1352,
+    0,
+    -1.12
+   ],
+   [
+    16,
+    0,
+    4.41,
+    3727,
+    0,
+    -1.1
+   ],
+   [
+    12,
+    0,
+    4.52,
+    1347,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    2.1,
+    6128,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    4.07,
+    4642,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    3.97,
+    6254,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    3.91,
+    3197,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    4.39,
+    7978,
+    0,
+    0.88
+   ],
+   [
+    13,
+    0,
+    2.55,
+    1821,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    4.12,
+    7047,
+    0,
+    0.9
+   ],
+   [
+    12,
+    0,
+    4.58,
+    7820,
+    0,
+    0.9
+   ],
+   [
+    19,
+    4,
+    1.97,
+    2761,
+    0,
+    2.99
+   ],
+   [
+    19,
+    4,
+    2.26,
+    2847,
+    0,
+    2.99
+   ],
+   [
+    19,
+    4,
+    1.91,
+    3003,
+    0,
+    2.99
+   ],
+   [
+    20,
+    4,
+    1.37,
+    3037,
+    0,
+    2.99
+   ],
+   [
+    19,
+    4,
+    1.47,
+    2842,
+    0,
+    2.99
+   ],
+   [
+    19,
+    4,
+    1.82,
+    2864,
+    0,
+    2.99
+   ],
+   [
+    19,
+    4,
+    2.04,
+    2858,
+    0,
+    3
+   ],
+   [
+    19,
+    4,
+    1.6,
+    2861,
+    0,
+    3
+   ],
+   [
+    19,
+    4,
+    1.67,
+    3003,
+    0,
+    3
+   ],
+   [
+    16,
+    0,
+    2.08,
+    5342,
+    0,
+    -1.04
+   ],
+   [
+    16,
+    0,
+    1.99,
+    5225,
+    0,
+    -1.04
+   ],
+   [
+    21,
+    0,
+    1.05,
+    3817,
+    0,
+    -0.11
+   ],
+   [
+    15,
+    0,
+    1.6,
+    4284,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    6.46,
+    2187,
+    0,
+    1.83
+   ],
+   [
+    12,
+    0,
+    6.57,
+    3266,
+    0,
+    1.83
+   ],
+   [
+    12,
+    0,
+    5.01,
+    4318,
+    0,
+    1.86
+   ],
+   [
+    15,
+    0,
+    1.26,
+    4268,
+    0,
+    1.89
+   ],
+   [
+    15,
+    0,
+    0.99,
+    4041,
+    0,
+    1.89
+   ],
+   [
+    14,
+    0,
+    1.46,
+    3151,
+    0,
+    1.89
+   ],
+   [
+    12,
+    0,
+    3.53,
+    3103,
+    0,
+    2.89
+   ],
+   [
+    12,
+    0,
+    3.65,
+    5494,
+    0,
+    2.89
+   ],
+   [
+    12,
+    0,
+    3.86,
+    4174,
+    0,
+    2.89
+   ],
+   [
+    12,
+    0,
+    3.37,
+    3312,
+    0,
+    2.89
+   ],
+   [
+    12,
+    0,
+    3.33,
+    4298,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.98,
+    3155,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.37,
+    5123,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.24,
+    3182,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    4.06,
+    4941,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.87,
+    5292,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.89,
+    4293,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.15,
+    5266,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    3.09,
+    3411,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.97,
+    5278,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.72,
+    5322,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.9,
+    2641,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.87,
+    2166,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.58,
+    1996,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.84,
+    2171,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    2.78,
+    5497,
+    0,
+    3.87
+   ],
+   [
+    14,
+    0,
+    2.46,
+    4300,
+    0,
+    3.89
+   ],
+   [
+    17,
+    0,
+    1.89,
+    4183,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    2.14,
+    5088,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    2.29,
+    4630,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    1.8,
+    2036,
+    0,
+    4.89
+   ],
+   [
+    17,
+    0,
+    1.89,
+    4183,
+    0,
+    4.89
+   ],
+   [
+    14,
+    0,
+    2.06,
+    5160,
+    0,
+    4.89
+   ],
+   [
+    14,
+    0,
+    1.05,
+    3944,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    1.8,
+    5295,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    1.89,
+    5222,
+    0,
+    4.89
+   ],
+   [
+    21,
+    0,
+    1.91,
+    4570,
+    0,
+    4.89
+   ],
+   [
+    14,
+    0,
+    1.78,
+    5382,
+    0,
+    4.89
+   ],
+   [
+    15,
+    0,
+    1.59,
+    4710,
+    0,
+    4.89
+   ],
+   [
+    14,
+    1,
+    1.97,
+    2480,
+    0,
+    -0.16
+   ],
+   [
+    14,
+    1,
+    1.97,
+    2387,
+    0,
+    -0.16
+   ],
+   [
+    19,
+    1,
+    1.6,
+    2974,
+    0,
+    -0.15
+   ],
+   [
+    16,
+    1,
+    1.97,
+    2301,
+    0,
+    -0.15
+   ],
+   [
+    19,
+    1,
+    1.6,
+    2989,
+    0,
+    -0.15
+   ],
+   [
+    19,
+    1,
+    1.6,
+    2711,
+    0,
+    -0.15
+   ],
+   [
+    18,
+    0,
+    3.68,
+    7827,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    3.14,
+    9683,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    3.33,
+    9576,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    3.05,
+    9705,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    2.96,
+    3220,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    4.19,
+    9403,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    2.67,
+    8063,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    2.87,
+    4851,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    2.56,
+    6726,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    4.5,
+    9109,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    4.42,
+    4753,
+    0,
+    1.83
+   ],
+   [
+    18,
+    0,
+    4.01,
+    9665,
+    0,
+    1.93
+   ],
+   [
+    22,
+    0,
+    2.4,
+    3110,
+    0,
+    1.93
+   ],
+   [
+    22,
+    0,
+    2.4,
+    3110,
+    0,
+    1.93
+   ],
+   [
+    18,
+    0,
+    3.49,
+    9664,
+    0,
+    1.93
+   ],
+   [
+    18,
+    0,
+    2.45,
+    6400,
+    0,
+    1.93
+   ],
+   [
+    18,
+    0,
+    3.02,
+    6437,
+    0,
+    1.93
+   ],
+   [
+    18,
+    0,
+    3.85,
+    8983,
+    0,
+    1.93
+   ],
+   [
+    16,
+    0,
+    1.35,
+    4866,
+    0,
+    0.86
+   ],
+   [
+    18,
+    0,
+    1.6,
+    4994,
+    0,
+    0.86
+   ],
+   [
+    16,
+    0,
+    1.55,
+    4732,
+    0,
+    0.86
+   ],
+   [
+    14,
+    0,
+    1.34,
+    2844,
+    0,
+    0.86
+   ],
+   [
+    16,
+    0,
+    1.22,
+    5127,
+    0,
+    1.96
+   ],
+   [
+    16,
+    0,
+    1.06,
+    5054,
+    0,
+    1.96
+   ],
+   [
+    16,
+    0,
+    1.06,
+    4931,
+    0,
+    1.96
+   ],
+   [
+    12,
+    0,
+    1.15,
+    5096,
+    0,
+    1.97
+   ],
+   [
+    12,
+    0,
+    1.06,
+    5103,
+    0,
+    1.97
+   ],
+   [
+    16,
+    1,
+    2.37,
+    2873,
+    0,
+    1.98
+   ],
+   [
+    23,
+    1,
+    1.8,
+    4905,
+    0,
+    1.98
+   ],
+   [
+    14,
+    1,
+    1.58,
+    2609,
+    0,
+    1.98
+   ],
+   [
+    14,
+    0,
+    1.36,
+    2474,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.46,
+    3417,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.36,
+    3437,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.59,
+    3513,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.59,
+    2220,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.86,
+    3526,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.76,
+    3546,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.54,
+    3568,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    2.01,
+    3482,
+    0,
+    0.88
+   ],
+   [
+    12,
+    0,
+    1.89,
+    3469,
+    0,
+    0.88
+   ],
+   [
+    17,
+    0,
+    0.9,
+    3368,
+    0,
+    1.97
+   ],
+   [
+    17,
+    0,
+    0.97,
+    3554,
+    0,
+    1.97
+   ],
+   [
+    12,
+    0,
+    1.08,
+    3483,
+    0,
+    1.97
+   ],
+   [
+    12,
+    0,
+    1.08,
+    3520,
+    0,
+    1.97
+   ],
+   [
+    14,
+    0,
+    0.7,
+    2432,
+    0,
+    1.97
+   ],
+   [
+    16,
+    0,
+    0.84,
+    3457,
+    0,
+    1.97
+   ],
+   [
+    14,
+    3,
+    null,
+    157,
+    0,
+    -177.1
+   ],
+   [
+    16,
+    3,
+    null,
+    169,
+    0,
+    -139
+   ],
+   [
+    17,
+    3,
+    null,
+    80,
+    0,
+    -37.14
+   ],
+   [
+    16,
+    3,
+    39.05,
+    152,
+    4.5,
+    -34.21
+   ],
+   [
+    16,
+    3,
+    39.05,
+    152,
+    4.5,
+    -34.21
+   ],
+   [
+    16,
+    3,
+    39.05,
+    152,
+    4.5,
+    -34.21
+   ],
+   [
+    16,
+    3,
+    null,
+    66,
+    0,
+    -12.95
+   ],
+   [
+    16,
+    3,
+    null,
+    28,
+    0,
+    -2.12
+   ],
+   [
+    12,
+    3,
+    2.76,
+    3295,
+    0,
+    0.87
+   ],
+   [
+    16,
+    3,
+    3.31,
+    3157,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.7,
+    3172,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.31,
+    3332,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.7,
+    3181,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.31,
+    3123,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.7,
+    3289,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.7,
+    3287,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.31,
+    3384,
+    0,
+    0.87
+   ],
+   [
+    12,
+    3,
+    3.31,
+    3088,
+    0,
+    0.87
+   ],
+   [
+    12,
+    0,
+    3.77,
+    3085,
+    0,
+    null
+   ],
+   [
+    12,
+    0,
+    4.27,
+    2209,
+    0,
+    null
+   ],
+   [
+    16,
+    0,
+    11.96,
+    1151,
+    0,
+    -11.01
+   ],
+   [
+    16,
+    0,
+    12.01,
+    1121,
+    0,
+    -11.01
+   ],
+   [
+    16,
+    0,
+    11.06,
+    405,
+    0,
+    -11
+   ],
+   [
+    16,
+    0,
+    11.02,
+    401,
+    0,
+    -11
+   ],
+   [
+    16,
+    0,
+    11.02,
+    401,
+    0,
+    -11
+   ],
+   [
+    12,
+    0,
+    2.06,
+    3602,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.96,
+    3691,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.46,
+    3593,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.37,
+    2983,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.56,
+    3552,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.2,
+    3603,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.89,
+    3015,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.59,
+    1041,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.89,
+    3630,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.46,
+    3562,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    2.02,
+    3641,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.37,
+    2487,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.22,
+    1880,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.22,
+    603,
+    0,
+    1.88
+   ],
+   [
+    12,
+    0,
+    1.52,
+    3517,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.65,
+    3628,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.78,
+    3605,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.45,
+    2864,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.13,
+    3543,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.89,
+    3576,
+    0,
+    2.97
+   ],
+   [
+    15,
+    0,
+    0.9,
+    2647,
+    0,
+    2.97
+   ],
+   [
+    15,
+    0,
+    0.9,
+    1180,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.03,
+    1548,
+    0,
+    2.97
+   ],
+   [
+    12,
+    0,
+    1.22,
+    1539,
+    0,
+    2.97
+   ],
+   [
+    17,
+    0,
+    0.74,
+    1778,
+    0,
+    3.87
+   ],
+   [
+    17,
+    0,
+    0.57,
+    3551,
+    0,
+    3.87
+   ],
+   [
+    14,
+    0,
+    0.86,
+    1705,
+    0,
+    3.87
+   ],
+   [
+    12,
+    0,
+    4.92,
+    1812,
+    0,
+    -2.14
+   ],
+   [
+    15,
+    1,
+    54.69,
+    3399,
+    18.5,
+    -52.18
+   ],
+   [
+    15,
+    1,
+    54.8,
+    3420,
+    18.5,
+    -52.03
+   ],
+   [
+    14,
+    1,
+    null,
+    608,
+    0,
+    -2.05
+   ],
+   [
+    15,
+    1,
+    4.06,
+    2928,
+    0,
+    -0.06
+   ],
+   [
+    19,
+    1,
+    4.09,
+    1183,
+    0,
+    -0.06
+   ],
+   [
+    14,
+    1,
+    4.26,
+    6646,
+    0,
+    -0.06
+   ],
+   [
+    15,
+    1,
+    3.72,
+    2912,
+    0,
+    -0.06
+   ],
+   [
+    15,
+    1,
+    4.09,
+    1373,
+    0,
+    -0.06
+   ],
+   [
+    15,
+    1,
+    4.28,
+    12296,
+    0,
+    -0.06
+   ],
+   [
+    19,
+    1,
+    4.27,
+    3220,
+    0,
+    -0.06
+   ],
+   [
+    14,
+    1,
+    3.72,
+    3236,
+    0,
+    -0.06
+   ],
+   [
+    15,
+    1,
+    3.62,
+    3696,
+    0,
+    -0.06
+   ],
+   [
+    15,
+    1,
+    2.96,
+    6757,
+    0,
+    0.85
+   ],
+   [
+    15,
+    1,
+    2.96,
+    6757,
+    0,
+    0.85
+   ],
+   [
+    14,
+    1,
+    2.95,
+    9709,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    2.96,
+    3235,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    2.96,
+    3985,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    2.96,
+    3235,
+    0,
+    0.86
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3219,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.95,
+    2266,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3219,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.49,
+    9712,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.96,
+    1698,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.49,
+    9712,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.96,
+    1698,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.95,
+    2266,
+    0,
+    1.9
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3235,
+    0,
+    1.96
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3449,
+    0,
+    1.96
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3224,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3234,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3234,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3224,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3520,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.5,
+    3520,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3234,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.95,
+    3411,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3234,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.95,
+    3411,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3230,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3233,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3233,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.26,
+    7419,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.25,
+    3228,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.25,
+    3228,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3220,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3236,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3230,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    2.28,
+    3236,
+    0,
+    2
+   ],
+   [
+    15,
+    1,
+    1.26,
+    3346,
+    0,
+    2.92
+   ],
+   [
+    15,
+    1,
+    1.26,
+    3354,
+    0,
+    2.92
+   ],
+   [
+    15,
+    1,
+    1.25,
+    3365,
+    0,
+    2.92
+   ],
+   [
+    15,
+    1,
+    1.02,
+    6785,
+    0,
+    2.92
+   ],
+   [
+    15,
+    1,
+    1.26,
+    3233,
+    0,
+    2.92
+   ],
+   [
+    15,
+    1,
+    1.26,
+    3231,
+    0,
+    3.98
+   ],
+   [
+    15,
+    1,
+    1.26,
+    6470,
+    0,
+    3.98
+   ],
+   [
+    15,
+    1,
+    1.26,
+    6470,
+    0,
+    3.98
+   ],
+   [
+    15,
+    1,
+    1.25,
+    2913,
+    0,
+    3.98
+   ],
+   [
+    15,
+    1,
+    1.26,
+    3231,
+    0,
+    3.98
+   ],
+   [
+    15,
+    1,
+    1.26,
+    1081,
+    0,
+    3.98
+   ],
+   [
+    14,
+    1,
+    6.19,
+    2230,
+    0,
+    -0.13
+   ],
+   [
+    16,
+    1,
+    null,
+    154,
+    0,
+    -0.12
+   ],
+   [
+    19,
+    1,
+    2.07,
+    5507,
+    0,
+    2.9
+   ],
+   [
+    19,
+    1,
+    2.77,
+    3374,
+    0,
+    2.97
+   ],
+   [
+    19,
+    1,
+    2.58,
+    2454,
+    0,
+    2.97
+   ],
+   [
+    19,
+    1,
+    2.07,
+    2457,
+    0,
+    2.97
+   ],
+   [
+    19,
+    1,
+    2.07,
+    2460,
+    0,
+    2.97
+   ],
+   [
+    19,
+    1,
+    2.58,
+    1393,
+    0,
+    3.92
+   ],
+   [
+    19,
+    1,
+    1.8,
+    12169,
+    0,
+    3.92
+   ],
+   [
+    19,
+    1,
+    1.96,
+    4096,
+    0,
+    3.93
+   ],
+   [
+    14,
+    1,
+    1.78,
+    2470,
+    0,
+    3.93
+   ],
+   [
+    14,
+    1,
+    1.62,
+    2243,
+    0,
+    3.93
+   ],
+   [
+    19,
+    1,
+    1.71,
+    2464,
+    0,
+    3.93
+   ],
+   [
+    19,
+    1,
+    1.71,
+    2471,
+    0,
+    3.93
+   ],
+   [
+    15,
+    1,
+    0.6,
+    2476,
+    0,
+    3.93
+   ],
+   [
+    19,
+    1,
+    1.76,
+    5719,
+    0,
+    3.93
+   ],
+   [
+    15,
+    1,
+    0.79,
+    2474,
+    0,
+    3.93
+   ],
+   [
+    15,
+    1,
+    0.79,
+    2472,
+    0,
+    3.93
+   ],
+   [
+    15,
+    1,
+    0.79,
+    1658,
+    0,
+    3.93
+   ],
+   [
+    14,
+    1,
+    0.79,
+    2479,
+    0,
+    3.93
+   ],
+   [
+    14,
+    1,
+    0.79,
+    3298,
+    0,
+    3.93
+   ],
+   [
+    19,
+    1,
+    2.58,
+    2959,
+    0,
+    3.96
+   ],
+   [
+    14,
+    1,
+    2.07,
+    2475,
+    0,
+    3.96
+   ],
+   [
+    19,
+    1,
+    2.62,
+    2460,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    2.62,
+    2446,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    2.77,
+    3815,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    2.6,
+    2470,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    2.07,
+    2438,
+    0,
+    4.9
+   ],
+   [
+    14,
+    1,
+    1.78,
+    2474,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    1.96,
+    4260,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    1.96,
+    2454,
+    0,
+    4.9
+   ],
+   [
+    14,
+    1,
+    1.8,
+    1085,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    1.96,
+    6155,
+    0,
+    4.9
+   ],
+   [
+    19,
+    1,
+    1.54,
+    2467,
+    0,
+    4.9
+   ],
+   [
+    15,
+    1,
+    0.72,
+    9887,
+    0,
+    4.98
+   ],
+   [
+    15,
+    1,
+    0.52,
+    1232,
+    0,
+    4.98
+   ],
+   [
+    15,
+    1,
+    0.6,
+    1654,
+    0,
+    4.98
+   ],
+   [
+    15,
+    1,
+    0.79,
+    1553,
+    0,
+    5
+   ],
+   [
+    19,
+    1,
+    1.54,
+    2724,
+    0,
+    5.03
+   ],
+   [
+    14,
+    1,
+    1.64,
+    2474,
+    0,
+    5.93
+   ],
+   [
+    14,
+    1,
+    1.59,
+    2473,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.6,
+    2442,
+    0,
+    5.93
+   ],
+   [
+    14,
+    1,
+    0.75,
+    4916,
+    0,
+    5.93
+   ],
+   [
+    14,
+    1,
+    1.64,
+    2478,
+    0,
+    5.93
+   ],
+   [
+    14,
+    1,
+    1.59,
+    2058,
+    0,
+    5.93
+   ],
+   [
+    19,
+    1,
+    1.61,
+    2460,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.6,
+    3069,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.6,
+    2471,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.72,
+    2734,
+    0,
+    5.93
+   ],
+   [
+    14,
+    1,
+    1.52,
+    1201,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.75,
+    2470,
+    0,
+    5.93
+   ],
+   [
+    15,
+    1,
+    0.48,
+    1538,
+    0,
+    6.98
+   ],
+   [
+    15,
+    1,
+    0.48,
+    1441,
+    0,
+    6.98
+   ],
+   [
+    14,
+    1,
+    3.95,
+    2233,
+    0,
+    0.77
+   ],
+   [
+    14,
+    1,
+    3.95,
+    2476,
+    0,
+    0.77
+   ],
+   [
+    14,
+    1,
+    3.95,
+    2476,
+    0,
+    0.77
+   ],
+   [
+    12,
+    1,
+    2.8,
+    2454,
+    0,
+    0.77
+   ],
+   [
+    16,
+    0,
+    19.87,
+    358,
+    0,
+    -22.1
+   ],
+   [
+    19,
+    1,
+    2.76,
+    5602,
+    0,
+    null
+   ],
+   [
+    19,
+    1,
+    4.79,
+    1875,
+    0,
+    null
+   ],
+   [
+    19,
+    1,
+    5.25,
+    3748,
+    0,
+    null
+   ],
+   [
+    12,
+    0,
+    4.23,
+    4034,
+    0,
+    2.88
+   ],
+   [
+    14,
+    0,
+    1.87,
+    3229,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    4.33,
+    5837,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    3.09,
+    2980,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    2.18,
+    6330,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    2.08,
+    4492,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    3.48,
+    2990,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    3.7,
+    4678,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    4.13,
+    4763,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    3.55,
+    7763,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    3.16,
+    4630,
+    0,
+    2.93
+   ],
+   [
+    22,
+    0,
+    0.92,
+    8651,
+    0,
+    2.93
+   ],
+   [
+    12,
+    0,
+    1.6,
+    6527,
+    0,
+    2.93
+   ],
+   [
+    14,
+    0,
+    1.77,
+    3268,
+    0,
+    2.93
+   ],
+   [
+    14,
+    0,
+    1.98,
+    3050,
+    0,
+    2.93
+   ],
+   [
+    16,
+    0,
+    1.52,
+    3226,
+    0,
+    2.93
+   ],
+   [
+    22,
+    0,
+    0.71,
+    4988,
+    0,
+    6.84
+   ],
+   [
+    22,
+    0,
+    0.95,
+    1538,
+    0,
+    6.84
+   ],
+   [
+    22,
+    0,
+    0.99,
+    6324,
+    0,
+    6.84
+   ],
+   [
+    22,
+    0,
+    0.75,
+    4704,
+    0,
+    6.84
+   ],
+   [
+    15,
+    0,
+    1.17,
+    5998,
+    0,
+    6.84
+   ],
+   [
+    22,
+    0,
+    0.6,
+    4713,
+    0,
+    6.84
+   ],
+   [
+    15,
+    0,
+    1.1,
+    3145,
+    0,
+    6.85
+   ],
+   [
+    15,
+    0,
+    1.4,
+    2493,
+    0,
+    6.85
+   ],
+   [
+    22,
+    0,
+    0.42,
+    3328,
+    0,
+    6.85
+   ],
+   [
+    22,
+    0,
+    1.05,
+    6239,
+    0,
+    6.89
+   ],
+   [
+    15,
+    1,
+    5.07,
+    1874,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    5.25,
+    1887,
+    0,
+    -3.05
+   ],
+   [
+    14,
+    1,
+    5.07,
+    2543,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    4.8,
+    1883,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    5.07,
+    1884,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    5.25,
+    5653,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    4.8,
+    1880,
+    0,
+    -3.05
+   ],
+   [
+    15,
+    1,
+    5.25,
+    5653,
+    0,
+    -3.05
+   ],
+   [
+    22,
+    0,
+    3.36,
+    5641,
+    0,
+    3.88
+   ],
+   [
+    22,
+    0,
+    3.98,
+    4416,
+    0,
+    3.88
+   ],
+   [
+    15,
+    1,
+    54.69,
+    7967,
+    18.5,
+    -53.02
+   ],
+   [
+    15,
+    1,
+    54.23,
+    9444,
+    18.5,
+    -53.02
+   ],
+   [
+    15,
+    1,
+    1.8,
+    6628,
+    0,
+    2.82
+   ],
+   [
+    15,
+    1,
+    2.37,
+    3004,
+    0,
+    2.82
+   ],
+   [
+    15,
+    1,
+    2.37,
+    3004,
+    0,
+    2.82
+   ]
+  ]
+ },
+ "indexDemo": {
+  "hours": [
+   23,
+   22,
+   21,
+   20,
+   19,
+   18,
+   17,
+   16,
+   15,
+   14,
+   13,
+   12,
+   11,
+   10,
+   9,
+   8,
+   7,
+   6,
+   5,
+   4,
+   3,
+   2,
+   1,
+   0
+  ],
+  "base": [
+   97,
+   98,
+   97,
+   96,
+   98,
+   97,
+   96,
+   95,
+   94,
+   92,
+   88,
+   87,
+   89,
+   91,
+   86,
+   84,
+   86,
+   88,
+   89,
+   90,
+   91,
+   93,
+   94,
+   95
+  ],
+  "abase": [
+   1,
+   0,
+   2,
+   1,
+   0,
+   1,
+   1,
+   2,
+   1,
+   4,
+   7,
+   6,
+   3,
+   5,
+   8,
+   9,
+   6,
+   4,
+   3,
+   2,
+   2,
+   1,
+   1,
+   0
+  ],
+  "levelDist": [
+   {
+    "label": "特急 / Critical",
+    "value": 2,
+    "color": "#cc2f2a"
+   },
+   {
+    "label": "重要 / Major",
+    "value": 5,
+    "color": "#e0912a"
+   },
+   {
+    "label": "一般 / Minor",
+    "value": 16,
+    "color": "#1d4ed8"
+   },
+   {
+    "label": "提示 / Info",
+    "value": 9,
+    "color": "#0b6a86"
+   }
+  ],
+  "subsystems": [
+   {
+    "id": "ERP",
+    "name": "生产制造 ERP",
+    "health": 98,
+    "status": "normal"
+   },
+   {
+    "id": "PAY",
+    "name": "支付网关 Pay-Gateway",
+    "health": 82,
+    "status": "warn"
+   },
+   {
+    "id": "SET",
+    "name": "数据结算 Settlement",
+    "health": 76,
+    "status": "warn"
+   },
+   {
+    "id": "NET",
+    "name": "核心网络 Core-Network",
+    "health": 96,
+    "status": "normal"
+   },
+   {
+    "id": "BAS",
+    "name": "安全审计堡垒机",
+    "health": 94,
+    "status": "normal"
+   },
+   {
+    "id": "IAM",
+    "name": "统一身份认证 IAM",
+    "health": 99,
+    "status": "normal"
+   },
+   {
+    "id": "TMS",
+    "name": "物流调度 TMS",
+    "health": 71,
+    "status": "warn"
+   },
+   {
+    "id": "ITS",
+    "name": "客户工单 ITSM",
+    "health": 93,
+    "status": "normal"
+   },
+   {
+    "id": "VMS",
+    "name": "视频监控 VMS",
+    "health": 48,
+    "status": "critical"
+   },
+   {
+    "id": "SCM",
+    "name": "供应链采购 SCM",
+    "health": 91,
+    "status": "normal"
+   },
+   {
+    "id": "BI",
+    "name": "经营报表 BI",
+    "health": 95,
+    "status": "normal"
+   },
+   {
+    "id": "WMS",
+    "name": "仓储管理 WMS",
+    "health": 0,
+    "status": "offline"
+   }
+  ]
+ },
+ "ingestRaw": "const failDist = ['timeout', 'conn', 'auth', 'slow']\n      .map(k => ({ key: k, label: RES_META[k].label, value: logs.filter(l => l.res === k).length, color: RES_META[k].color }))\n      .filter(x => x.value > 0);\n    const slowTop = overview().filter(o => o.calls && o.avg > 400).sort((a, b) => b.avg - a.avg).slice(0, 5)\n      .map(o => ({ label: o.name, value: o.avg, color: o.avg > 1500 ? '#cc2f2a' : o.avg > 800 ? '#a8620b' : '#1d4ed8' }));\n\n    document.getElementById('content').innerHTML = `\n    <div class=\"notice\" style=\"--nc:var(--primary)\">\n      ${icon('activity', 19)}\n      <div><strong>页面说明：</strong>本页用于查看<strong>各子系统的数据对接调用日志</strong>，实时反映每一次采集调用了谁、花了多久、返回多少条、是否成功，便于快速定位哪一环没打通。</div>\n    </div>\n\n    <div class=\"grid g-6 mt16\">\n      ${[\n        { n: '今日调用总次数', v: st.total, u: '次', f: '覆盖 ' + new Set(rows.map(r => r.sys)).size + ' 个子系统', c: '#1d4ed8', s: '#e7eeff', i: 'activity' },\n        { n: '调用成功率', v: st.rate, u: '%', f: `成功 ${st.ok} · 无数据 ${rows.filter(r => r.res === 'empty').length}`, c: '#12805a', s: '#e3f6ee', i: 'check' },\n        { n: '平均响应耗时', v: st.avg, u: 'ms', f: '慢调用阈值 1500ms（模式 A）/ 2000ms（模式 B）', c: '#0b6a86', s: '#e2f3f9', i: 'clock' },\n        { n: '异常调用次数', v: st.fail + st.slow, u: '次', f: `失败 ${st.fail} · 慢响应 ${st.slow}`, c: '#cc2f2a', s: '#fdecea', i: 'alert' },\n        { n: '本日同步数据量', v: st.rows, u: '条', f: '按事件水位增量提取，不重复入库', c: '#8b5cf6', s: '#f1ebfe', i: 'database' },\n        { n: '纳管子系统', v: SUBSYSTEMS.length, u: '个', f: `其中 ${ov.filter(o => o.mode === 'B').length} 个为无接口遗留系统`, c: '#a8620b', s: '#fdf1e0', i: 'layers' }\n      ].map(k => `<div class=\"kpi\" style=\"--accent:${k.c};--accent-soft:${k.s}\">\n        <div class=\"kpi-top\"><span class=\"kpi-name\">${k.n}</span><span class=\"kpi-icon\">${icon(k.i, 20)}</span></div>\n        <div class=\"kpi-value\">${k.v}<span class=\"kpi-unit\">${k.u}</span></div>\n        <div class=\"kpi-foot\">${k.f}</div></div>`).join('')}\n    </div>\n\n    <!-- 各子系统对接情况总览 -->\n    <section class=\"card mt24\">\n      <div class=\"card-head\">\n        <div class=\"card-title\">${icon('layers', 19)} 各子系统数据对接情况总览\n          <span class=\"card-sub\">按今日调用日志实时汇总</span></div>\n        <span class=\"badge b-info\">${icon('database', 14)} 含 API 网关与只读库两类对接方式</span>\n      </div>\n      <div class=\"card-body\" style=\"padding:0\">\n        <div style=\"overflow-x:auto\">\n        <table class=\"table\">\n          <thead><tr>\n            <th>子系统</th><th class=\"center\">采集模式</th><th class=\"center\">今日调用</th>\n            <th class=\"center\">同步数据</th><th class=\"center\">平均耗时</th><th class=\"center\">成功率</th>\n            <th>最近一次调用</th><th class=\"center\">最近结果</th>\n          </tr></thead>\n          <tbody>\n            ${ov.map(o => {\n              const rm = o.lastRes ? RES_META[o.lastRes] : null;\n              return `<tr>\n                <td class=\"tname\">${o.name}<div class=\"tsub\">ID：${o.id}</div></td>\n                <td class=\"center\"><span class=\"badge ${o.mode === 'A' ? 'b-info' : 'b-warn'}\">模式 ${o.mode || '—'}</span></td>\n                <td class=\"center num\">${o.calls}</td>\n                <td class=\"center num\">${o.rows} 条</td>\n                <td class=\"center num\">${o.avg === '—' ? '—' : o.avg + ' ms'}</td>\n                <td class=\"center\">${o.rate === '—' ? '<span class=\"muted\">—</span>' : `<span class=\"num\" style=\"font-weight:700;color:${o.rate >= 95 ? '#12805a' : o.rate >= 80 ? '#a8620b' : '#cc2f2a'}\">${o.rate}%</span>`}</td>\n                <td class=\"small num\">${o.last}</td>\n                <td class=\"center\">${rm ? `<span class=\"badge ${rm.cls}\">${rm.label}</span>` : '<span class=\"muted\">未采集</span>'}</td>\n              </tr>`;\n            }).join('')}\n          </tbody>\n        </table>\n        </div>\n      </div>\n      <div class=\"card-foot\">${icon('alert', 15)} 模式 B（TMS / WMS）为无标准接口的遗留系统，通过只读库轮询；连续失败 3 次的子系统会自动降级为低频轮询并推送值班群。</div>\n    </section>\n\n    <!-- 调用日志 -->\n    <section class=\"card mt24\">\n      <div class=\"card-head\">\n        <div class=\"card-title\">${icon('file', 19)} 数据对接调用日志\n          <span class=\"card-sub\">共 ${rows.length} 条（总日志 ${logs.length} 条）</span></div>\n        <div class=\"toolbar\">\n          <label class=\"checkline\" style=\"margin:0;min-width:auto\">\n            <span class=\"${live ? '' : 'muted'}\">${live ? '<span class=\"live-dot\"></span>' : ''} 实时</span>\n            <label class=\"switch\" style=\"margin-left:6px\"><input type=\"checkbox\" id=\"live\" ${live ? 'checked' : ''}><span class=\"slider\"></span></label>\n          </label>\n          <button class=\"btn btn-sm\" id=\"btnReplay\">${icon('refresh', 15)} 手动触发全量采集</button>\n          <button class=\"btn btn-sm\" id=\"btnExport\">${icon('download', 15)} 导出日志</button>\n        </div>\n      </div>\n      <div class=\"card-body\" style=\"background:var(--surface-2);border-bottom:1px solid var(--border)\">\n        <div class=\"toolbar\">\n          <div class=\"search\">${icon('search', 17)}<input class=\"input\" id=\"kw\" placeholder=\"搜索子系统 / 调用类型 / 端点 / 日志编号\" value=\"${esc(kw)}\"></div>\n          <select class=\"select\" id=\"sysF\" style=\"width:210px\">\n            <option value=\"all\">全部子系统</option>\n            ${SUBSYSTEMS.map(s => `<option value=\"${s.id}\" ${sysF === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}\n          </select>\n          <select class=\"select\" id=\"resF\" style=\"width:170px\">\n            <option value=\"all\">全部结果</option>\n            ${Object.entries(RES_META).map(([k, v]) => `<option value=\"${k}\" ${resF === k ? 'selected' : ''}>${v.label}</option>`).join('')}\n          </select>\n          <select class=\"select\" id=\"range\" style=\"width:150px\">\n            <option value=\"1h\" ${range === '1h' ? 'selected' : ''}>近 1 小时</option>\n            <option value=\"6h\" ${range === '6h' ? 'selected' : ''}>近 6 小时</option>\n            <option value=\"today\" ${range === 'today' ? 'selected' : ''}>今日</option>\n            <option value=\"all\" ${range === 'all' ? 'selected' : ''}>全部</option>\n          </select>\n          <button class=\"btn btn-sm\" id=\"btnReset\">重置筛选</button>\n        </div>\n      </div>\n      <div class=\"card-body\" style=\"padding:0\">\n        <div style=\"overflow-x:auto;max-height:620px;overflow-y:auto\">\n        <table class=\"table\">\n          <thead style=\"position:sticky;top:0;z-index:2\">\n            <tr>\n              <th style=\"width:110px\">时间</th><th style=\"width:170px\">子系统</th>\n              <th class=\"center\" style=\"width:80px\">模式</th><th style=\"width:150px\">调用类型</th>\n              <th>调用端点 / SQL</th>\n              <th class=\"center\" style=\"width:80px\">状态码</th><th class=\"center\" style=\"width:100px\">耗时</th>\n              <th class=\"center\" style=\"width:90px\">返回条数</th><th class=\"center\" style=\"width:110px\">结果</th><th class=\"center\" style=\"width:80px\">详情</th>\n            </tr>\n          </thead>\n          <tbody>\n            ${rows.length ? rows.map(l => {\n              const rm = RES_META[l.res];"
+};
+
+/* ==========================================================================
+   1. 小工具
+   ========================================================================== */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nf = (v, d) => {
+  if (v == null || !isFinite(v)) return '—';
+  const n = Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * Math.pow(10, d == null ? 1 : d)) / Math.pow(10, d == null ? 1 : d);
+  return n.toLocaleString('en-US');
+};
+
+/* ==========================================================================
+   2. 图表基元（按 assets/js/common.js 的真实实现移植，绘制顺序与算法一致）
+   ========================================================================== */
+
+/* 2.1 lineChart —— 全站最主要的基元 */
+function docLine(host, o) {
+  const W = o.vw || 1000, H = o.height || 240, k = 1000 / W;
+  const pl = Math.round(46 * k), pr = Math.round(18 * k), pt = Math.round(16 * k), pb = Math.round(30 * k);
+  const iw = W - pl - pr, ih = H - pt - pb;
+  const F = n => (n * k).toFixed(1);
+  const { series, labels, marks = [], endAt = -1, min = 0, max = 100, yUnit = '', endUnit = '',
+    hover = true, tipUnit = '', tipTitle = null, tipExtra = null } = o;
+  const step = iw / (labels.length - 1);
+  const X = i => pl + i * step, Y = v => pt + ih - (v - min) / (max - min) * ih;
+
+  let grid = '', ticks = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = min + (max - min) * i / 4, y = Y(v);
+    grid += '<line x1="' + pl + '" y1="' + y + '" x2="' + (W - pr) + '" y2="' + y + '" stroke="#e6ebf3" stroke-width="1"/>';
+    ticks += '<text x="' + (pl - 10 * k).toFixed(1) + '" y="' + (y + 4 * k).toFixed(1) + '" text-anchor="end" font-size="' + F(12) + '" fill="#8a95a5">' + Math.round(v) + yUnit + '</text>';
+  }
+  let xt = '';
+  labels.forEach((l, i) => {
+    if (i === endAt) return;
+    if (i % 3 === 0 || i === labels.length - 1) {
+      xt += '<text x="' + X(i) + '" y="' + (H - 8 * k).toFixed(1) + '" text-anchor="middle" font-size="' + F(12) + '" fill="#8a95a5">' + esc(l) + '</text>';
+    }
+  });
+  /* null = 该日无数据：跳过该点，不编造 */
+  const seg = s => {
+    let d = '', first = -1, last = -1;
+    s.data.forEach((v, i) => {
+      if (v == null || !isFinite(v)) return;
+      if (first < 0) first = i;
+      last = i;
+      d += (first === i ? 'M' : 'L') + X(i).toFixed(1) + ',' + Y(v).toFixed(1) + ' ';
+    });
+    return { d: d.trim(), first, last };
+  };
+  const paths = series.map(s => {
+    const g = seg(s);
+    if (!g.d) return '';
+    const area = (s.fill && g.last > g.first)
+      ? '<path d="' + g.d + ' L' + X(g.last).toFixed(1) + ',' + (pt + ih) + ' L' + X(g.first).toFixed(1) + ',' + (pt + ih) + ' Z" fill="' + s.color + '" opacity=".10"/>' : '';
+    const dash = s.dash ? ' stroke-dasharray="' + String(s.dash === true ? '7 5' : s.dash).split(' ').map(n => (Number(n) * k).toFixed(1)).join(' ') + '"' : '';
+    return area + '<path d="' + g.d + '" fill="none" stroke="' + s.color + '" stroke-width="' + F(s.width || 2.4) + '"' + dash + ' stroke-linejoin="round" stroke-linecap="round"/>';
+  }).join('');
+  const dots = series.map(s => s.data.map((v, i) =>
+    (v == null || !isFinite(v)) ? ''
+      : '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="' + F(s.dash ? 2.6 : 3.4) + '" fill="' + (s.dash ? '#fff' : s.color) + '" stroke="' + s.color + '" stroke-width="' + F(2) + '"/>'
+  ).join('')).join('');
+  let mk = '';
+  (marks || []).forEach(m => {
+    if (m.v == null || !isFinite(m.v)) return;
+    const x = X(m.i), y = Y(m.v), c = m.color || '#cc2f2a';
+    mk += '<rect x="' + (x - step / 2).toFixed(1) + '" y="' + pt + '" width="' + step.toFixed(1) + '" height="' + ih + '" fill="' + c + '" opacity=".10"/>';
+    mk += '<circle class="op-pulse-ring" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + F(6) + '" fill="none" stroke="' + c + '" stroke-width="' + F(2.2) + '"/>';
+    if (m.text) mk += '<text x="' + x.toFixed(1) + '" y="' + (y - 13 * k).toFixed(1) + '" text-anchor="middle" font-size="' + F(12.5) + '" font-weight="800" fill="' + c + '">' + esc(m.text) + '</text>';
+  });
+  let ends = '';
+  if (endAt >= 0 && endAt < labels.length) {
+    ends += '<line x1="' + X(endAt).toFixed(1) + '" y1="' + pt + '" x2="' + X(endAt).toFixed(1) + '" y2="' + (pt + ih) + '" stroke="#c9d2e0" stroke-width="1" stroke-dasharray="' + F(4) + ' ' + F(4) + '"/>';
+    ends += '<text x="' + X(endAt).toFixed(1) + '" y="' + (H - 8 * k).toFixed(1) + '" text-anchor="middle" font-size="' + F(12) + '" font-weight="700" fill="#5b6577">' + esc(labels[endAt]) + '</text>';
+    series.forEach((s, si) => {
+      const v = s.data[endAt];
+      if (v == null || !isFinite(v)) return;
+      const dy = si === 0 ? -11 * k : 17 * k;
+      ends += '<text x="' + (X(endAt) + 15 * k).toFixed(1) + '" y="' + (Y(v) + dy).toFixed(1) + '" font-size="' + F(12.5) + '" font-weight="800" fill="' + s.color + '">' + nf(v) + endUnit + '</text>';
+    });
+  }
+  const hlGroup = hover ? '<g class="lc-hl" style="display:none"></g>' : '';
+  host.innerHTML = '<div class="lc-wrap">'
+    + '<svg viewBox="0 0 ' + W + ' ' + H + '" style="display:block;width:100%;height:auto;overflow:visible">'
+    + grid + xt + ticks + paths + mk + ends + dots + hlGroup + '</svg>'
+    + (hover ? '<div class="lc-tip" style="display:none"></div>' : '') + '</div>';
+
+  if (!hover) return;
+  const svg = host.querySelector('svg'), hl = host.querySelector('.lc-hl'), tipEl = host.querySelector('.lc-tip');
+  const fmtTip = v => (v == null || !isFinite(v)) ? '—' : nf(v) + tipUnit;
+  const show = (clientX, clientY) => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const vx = (clientX - r.left) / r.width * W;
+    let i = Math.round((vx - pl) / step);
+    i = Math.max(0, Math.min(labels.length - 1, i));
+    let h = '<line x1="' + X(i).toFixed(1) + '" y1="' + pt + '" x2="' + X(i).toFixed(1) + '" y2="' + (pt + ih) + '" stroke="#8d9bb0" stroke-width="' + F(1.2) + '" stroke-dasharray="' + F(4) + ' ' + F(4) + '"/>';
+    series.forEach(s => {
+      const v = s.data[i];
+      if (v == null || !isFinite(v)) return;
+      h += '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="' + F(6) + '" fill="#fff" stroke="' + s.color + '" stroke-width="' + F(2.6) + '"/>';
+    });
+    hl.innerHTML = h; hl.style.display = '';
+    const rows = series.map(s => {
+      const sw = s.dash ? '<i class="lc-dash" style="border-color:' + s.color + '"></i>' : '<i style="background:' + s.color + '"></i>';
+      return '<div class="lc-trow"><span class="lc-tname">' + sw + esc(s.name) + '</span><span class="lc-tval" style="color:' + s.color + '">' + fmtTip(s.data[i]) + '</span></div>';
+    }).join('');
+    tipEl.innerHTML = '<div class="lc-ttitle">' + (tipTitle ? tipTitle(i) : esc(labels[i])) + '</div>' + rows + (tipExtra ? tipExtra(i) : '');
+    tipEl.style.display = 'block';
+    const ratio = r.width / W, tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    let left = X(i) * ratio + 18;
+    if (left + tw > r.width - 4) left = X(i) * ratio - tw - 18;
+    if (left < 4) left = 4;
+    const vy = (clientY - r.top) / r.height * H * ratio;
+    let top = vy - th / 2;
+    if (top < 4) top = 4;
+    if (top + th > r.height - 4) top = r.height - th - 4;
+    tipEl.style.left = left.toFixed(1) + 'px';
+    tipEl.style.top = top.toFixed(1) + 'px';
+  };
+  const hide = () => { tipEl.style.display = 'none'; hl.style.display = 'none'; };
+  svg.addEventListener('mousemove', e => show(e.clientX, e.clientY));
+  svg.addEventListener('mouseleave', hide);
+}
+
+/* 2.2 donut —— 单圆 stroke-dasharray 分段，rotate(-90) 从 12 点方向开始 */
+function docDonut(host, items, size, centerTop, centerSub) {
+  const total = items.reduce((a, b) => a + b.value, 0) || 1;
+  const r = 68, cx = 95, cy = 95, C = 2 * Math.PI * r;
+  let acc = 0, segs = '';
+  items.forEach(it => {
+    const len = it.value / total * C;
+    segs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + it.color + '" stroke-width="24" '
+      + 'stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-acc) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
+    acc += len;
+  });
+  host.innerHTML = '<svg viewBox="0 0 190 190" width="' + (size || 190) + '" height="' + (size || 190) + '" style="max-width:100%">' + segs
+    + '<text x="95" y="92" text-anchor="middle" font-size="30" font-weight="700" fill="#16202e">' + esc(centerTop) + '</text>'
+    + '<text x="95" y="112" text-anchor="middle" font-size="13" fill="#8a95a5">' + esc(centerSub) + '</text></svg>';
+}
+
+/* 2.3 hBars —— 横向排行条（纯 DOM div，宽度 = value / max） */
+function docHBars(host, items, suffix) {
+  const max = Math.max.apply(null, items.map(i => i.value)) || 1;
+  host.innerHTML = items.map(i =>
+    '<div style="margin-bottom:13px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'
+    + '<span style="font-size:13.6px">' + esc(i.label) + '</span>'
+    + '<span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">' + i.value + (suffix || '') + '</span></div>'
+    + '<div style="height:8px;border-radius:5px;background:#eef2f8;overflow:hidden">'
+    + '<i style="display:block;height:100%;width:' + (i.value / max * 100).toFixed(1) + '%;background:' + i.color + ';border-radius:5px;transition:width .9s cubic-bezier(.2,.75,.3,1)"></i>'
+    + '</div></div>').join('');
+}
+
+/* 2.4 barGroup —— 全站未调用的保留基元 */
+function docBarGroup(host, o) {
+  const labels = o.labels, series = o.series, H = o.height || 220;
+  const W = 1000, pl = 46, pr = 16, pt = 14, pb = 32;
+  const iw = W - pl - pr, ih = H - pt - pb;
+  const maxV = o.max || Math.max.apply(null, series.reduce((a, s) => a.concat(s.data), [])) * 1.15;
+  const gw = iw / labels.length, bw = Math.min(26, (gw - 18) / series.length);
+  let grid = '', ticks = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = maxV * i / 4, y = pt + ih - v / maxV * ih;
+    grid += '<line x1="' + pl + '" y1="' + y + '" x2="' + (W - pr) + '" y2="' + y + '" stroke="#e6ebf3"/>';
+    ticks += '<text x="' + (pl - 10) + '" y="' + (y + 4) + '" text-anchor="end" font-size="12" fill="#8a95a5">' + Math.round(v) + '</text>';
+  }
+  let bars = '', xt = '';
+  labels.forEach((l, i) => {
+    const cx = pl + gw * i + gw / 2;
+    series.forEach((s, j) => {
+      const v = s.data[i], h = ih * (v / maxV);
+      const x = cx - (series.length * bw + (series.length - 1) * 6) / 2 + j * (bw + 6);
+      bars += '<rect x="' + x + '" y="' + (pt + ih - h) + '" width="' + bw + '" height="' + Math.max(h, 1) + '" rx="4" fill="' + s.color + '"/>';
+    });
+    xt += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="12.5" fill="#8a95a5">' + esc(l) + '</text>';
+  });
+  host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" style="overflow:visible">' + grid + ticks + bars + xt + '</svg>';
+}
+
+
+/* ==========================================================================
+   3. WIP 看板的自绘可视化（热力矩阵 / 排行堆叠条 / 五个动效方案）
+   ========================================================================== */
+const WIP = DATA.wip;
+const TYPE_COLOR = {};
+WIP.typeMap.forEach(t => { TYPE_COLOR[t.id] = t.color; });
+const typeColor = t => TYPE_COLOR[t] || '#1d4ed8';
+const stepsDesc = WIP.stepMap.slice().sort((a, b) => b.qty - a.qty);   /* ctx.steps：按在制量降序 */
+const stepsOrder = WIP.stepMap;                                        /* ctx.stepsOrder：报表工艺顺序 */
+const stepMaxQty = stepsDesc.length ? stepsDesc[0].qty : 1;
+
+/* 3.1 工序 × PKG Type 热力矩阵（列归一化：分母取「全部工序」中该品类的最大值） */
+function heatGrid(host, rows, rowCount) {
+  const types = WIP.typeOrder;
+  const colMax = types.map((t, ti) => Math.max.apply(null, WIP.stepMap.map(s => s.byType[ti])) || 1);
+  const use = rows.slice(0, rowCount || 16);
+  let h = '<div class="heat"><div class="heat-row heat-hd"><div class="heat-lb">工序 \\ 品类</div>'
+    + types.map(t => '<div class="heat-cell">' + esc(t) + '</div>').join('') + '</div>';
+  use.forEach(s => {
+    h += '<div class="heat-row" data-step="' + esc(s.name) + '"><div class="heat-lb" title="' + esc(s.name) + '">' + esc(s.name) + '</div>';
+    types.forEach((t, ti) => {
+      const v = s.byType[ti], ratio = v / colMax[ti];
+      if (!v) { h += '<div class="heat-cell" style="background:#f2f5fa;color:#b6c0cf">·</div>'; return; }
+      h += '<div class="heat-cell" style="background:' + typeColor(t) + ';opacity:' + (0.07 + ratio * 0.78).toFixed(3)
+        + '" title="' + esc(s.name) + ' × ' + esc(t) + '：' + nf(v / 1000) + 'K（列内占比 ' + Math.round(ratio * 100) + '%）">'
+        + (v / 1000 >= 10 ? Math.round(v / 1000) : '') + '</div>';
+    });
+    h += '</div>';
+  });
+  host.innerHTML = h + '</div>';
+}
+
+/* 3.2 工序 WIP 排行（堆叠条：前 12 名 + 「其余 N 个工序合计」） */
+function rankBars(host) {
+  const top = stepsDesc.slice(0, 12);
+  const rest = stepsDesc.slice(12);
+  const max = top.length ? top[0].qty : 1;
+  const restByType = WIP.typeOrder.map((t, ti) => rest.reduce((a, s) => a + s.byType[ti], 0));
+  const rows = top.map(s => ({ name: s.name, byType: s.byType, total: s.qty, small: false }));
+  if (rest.length) rows.push({ name: '其余 ' + rest.length + ' 个工序', byType: restByType, total: restByType.reduce((a, b) => a + b, 0), small: true });
+  host.innerHTML = '<div class="rank-b">' + rows.map(r => {
+    const segs = WIP.typeOrder.map((t, ti) => r.byType[ti]
+      ? '<i style="width:' + (r.byType[ti] / max * 100).toFixed(2) + '%;background:' + typeColor(t) + '" title="' + esc(t) + ' ' + nf(r.byType[ti] / 1000) + 'K"></i>' : '').join('');
+    return '<div class="rank-r" data-step="' + esc(r.name) + '">'
+      + '<div class="rank-lb" title="' + esc(r.name) + '" style="' + (r.small ? 'color:#8a95a5' : '') + '">' + esc(r.name) + '</div>'
+      + '<div class="rank-bar">' + segs + '</div>'
+      + '<div class="rank-v">' + nf(r.total / 1000) + 'K</div></div>';
+  }).join('') + '</div>';
+}
+
+/* 3.3 方案 A：环形仪表盘阵列 —— 弧长 = 0.1 + 0.9 × (该工序量 / 最大工序量) */
+function vzA(host) {
+  host.innerHTML = '<div class="vz-rings">' + stepsDesc.map((s, i) => {
+    const p = 0.1 + 0.9 * (s.qty / stepMaxQty);
+    const bad = s.hold > 0 || s.otd > 0;
+    const dom = WIP.typeOrder[s.byType.indexOf(Math.max.apply(null, s.byType))];
+    const R = 30, C = 2 * Math.PI * R;
+    return '<div class="vz-ring' + (bad ? ' is-bad' : '') + '" data-step="' + esc(s.name) + '">'
+      + '<svg viewBox="0 0 76 76" class="vz-ring-svg">'
+      + '<circle cx="38" cy="38" r="' + R + '" fill="none" stroke="#eef2f8" stroke-width="7"/>'
+      + '<circle cx="38" cy="38" r="' + R + '" fill="none" stroke="' + typeColor(dom) + '" stroke-width="7" stroke-linecap="round" '
+      + 'stroke-dasharray="' + (C * p).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 38 38)"/>'
+      + '</svg><div class="vz-rc"><b>' + nf(s.qty / 1000) + '</b><span>K</span></div>'
+      + '<div class="vz-rn">' + esc(s.name) + '</div>'
+      + '<div class="vz-rm">' + s.lots + ' 批' + (bad ? ' · <em>' + (s.hold ? 'Hold ' + s.hold : '') + (s.hold && s.otd ? ' / ' : '') + (s.otd ? 'OTD ' + s.otd : '') + '</em>' : '') + '</div>'
+      + '</div>';
+  }).join('') + '</div>';
+}
+
+/* 3.4 方案 B：工序 → 品类 流向桑基 */
+function vzB(host) {
+  const W = 760, H = 620, padT = 26, padB = 16;
+  const left = stepsOrder, types = WIP.typeOrder;
+  const total = left.reduce((a, s) => a + s.qty, 0) || 1;
+  const usable = H - padT - padB;
+  const gap = 5, minH = 6;
+  /* 左列节点高：按占比，带最小高度，避免 24 个工序里小工序被压没 */
+  let raw = left.map(s => s.qty / total);
+  let hs = raw.map(r => Math.max(minH, r * (usable - gap * (left.length - 1))));
+  let sum = hs.reduce((a, b) => a + b, 0);
+  const kk = (usable - gap * (left.length - 1)) / sum;
+  hs = hs.map(h => h * kk);
+  const tTot = types.map((t, ti) => left.reduce((a, s) => a + s.byType[ti], 0));
+  const tSum = tTot.reduce((a, b) => a + b, 0) || 1;
+  let ths = tTot.map(v => Math.max(minH, v / tSum * (usable - gap * (types.length - 1))));
+  const tk = (usable - gap * (types.length - 1)) / ths.reduce((a, b) => a + b, 0);
+  ths = ths.map(h => h * tk);
+
+  const lx = 92, lw = 12, rx = W - 96, rw = 12;
+  const ys = []; let y = padT;
+  hs.forEach(h => { ys.push(y); y += h + gap; });
+  const tys = []; let ty = padT;
+  ths.forEach(h => { tys.push(ty); ty += h + gap; });
+
+  let svg = '';
+  /* 飘带：每条工序 × 品类的连线 */
+  const lCur = ys.slice(), rCur = tys.slice();
+  types.forEach((tp, ti) => {
+    left.forEach((s, si) => {
+      const v = s.byType[ti];
+      if (!v) return;
+      const lh = v / s.qty * hs[si], rh = v / tTot[ti] * ths[ti];
+      const y1 = lCur[si] + lh / 2, y2b = rCur[ti] + rh / 2;
+      lCur[si] += lh; rCur[ti] += rh;
+      const wide = rh >= 5;
+      svg += '<path d="M' + (lx + lw) + ',' + y1.toFixed(1) + ' C' + (lx + 170) + ',' + y1.toFixed(1) + ' ' + (rx - 170) + ',' + y2b.toFixed(1) + ' ' + rx + ',' + y2b.toFixed(1) + '" '
+        + 'fill="none" stroke="' + typeColor(tp) + '" stroke-width="' + Math.max(1.2, rh).toFixed(1) + '" stroke-opacity=".30"/>';
+      /* 宽飘带叠加一条细虚线指示流向（与真实页面一致：虚线是叠加层，不是飘带本体） */
+      if (wide) svg += '<path d="M' + (lx + lw) + ',' + y1.toFixed(1) + ' C' + (lx + 170) + ',' + y1.toFixed(1) + ' ' + (rx - 170) + ',' + y2b.toFixed(1) + ' ' + rx + ',' + y2b.toFixed(1) + '" '
+        + 'fill="none" stroke="' + typeColor(tp) + '" stroke-width="2" stroke-opacity=".55" stroke-dasharray="5 7" class="vz-fl-dash"/>';
+    });
+  });
+  /* 节点 */
+  left.forEach((s, si) => {
+    const bad = s.hold > 0 || s.otd > 0;
+    svg += '<g class="vz-fl-node" data-step="' + esc(s.name) + '">'
+      + '<rect x="' + lx + '" y="' + ys[si].toFixed(1) + '" width="' + lw + '" height="' + hs[si].toFixed(1) + '" rx="3" fill="#c8d4e6"'
+      + (bad ? ' stroke="#cc2f2a" stroke-width="1.4"' : '') + '/>'
+      + '<text x="' + (lx - 7) + '" y="' + (ys[si] + hs[si] / 2 + 3.6).toFixed(1) + '" text-anchor="end" font-size="10.4" fill="#4a5567">' + esc(s.name) + '</text>'
+      + '</g>';
+  });
+  types.forEach((t, ti) => {
+    svg += '<g class="vz-fl-node">'
+      + '<rect x="' + rx + '" y="' + tys[ti].toFixed(1) + '" width="' + rw + '" height="' + ths[ti].toFixed(1) + '" rx="3" fill="' + typeColor(t) + '"/>'
+      + '<text x="' + (rx + rw + 7) + '" y="' + (tys[ti] + ths[ti] / 2 - 1).toFixed(1) + '" font-size="11.2" font-weight="700" fill="#4a5567">' + esc(t) + '</text>'
+      + '<text x="' + (rx + rw + 7) + '" y="' + (tys[ti] + ths[ti] / 2 + 11).toFixed(1) + '" font-size="10" fill="#8a95a5">' + nf(tTot[ti] / 1000) + 'K</text>'
+      + '</g>';
+  });
+  host.innerHTML = '<svg class="vz-flow" viewBox="0 0 ' + W + ' ' + H + '" style="max-height:620px">' + svg + '</svg>';
+}
+
+/* 3.5 方案 C：CT × 数量 气泡象限（一批 = 一气泡） */
+function vzC(host) {
+  const W = 760, H = 420, pl = 54, pr = 20, pt = 22, pb = 46;
+  const iw = W - pl - pr, ih = H - pt - pb;
+  const lots = WIP.lots.filter(l => l[2] != null);
+  const cts = lots.map(l => l[2]), qs = lots.map(l => l[3]);
+  const ctMax = Math.max.apply(null, cts) * 1.04;
+  const qMin = Math.max(1, Math.min.apply(null, qs)), qMax = Math.max.apply(null, qs);
+  const X = ct => pl + ct / ctMax * iw;
+  const Y = q => pt + ih - (Math.log(q) - Math.log(qMin)) / (Math.log(qMax) - Math.log(qMin)) * ih;
+  const R = q => 2.1 + Math.sqrt(q / qMax) * 6.2;
+  const AL = WIP.alarm;
+  let g = '';
+  /* 报警带：CT 黄线、红线 */
+  g += '<rect x="' + pl + '" y="' + pt + '" width="' + (X(AL.ctY) - pl).toFixed(1) + '" height="' + ih + '" fill="#12805a" opacity=".055"/>';
+  g += '<rect x="' + X(AL.ctY).toFixed(1) + '" y="' + pt + '" width="' + (X(AL.ctR) - X(AL.ctY)).toFixed(1) + '" height="' + ih + '" fill="#a8620b" opacity=".075"/>';
+  g += '<rect x="' + X(AL.ctR).toFixed(1) + '" y="' + pt + '" width="' + (W - pr - X(AL.ctR)).toFixed(1) + '" height="' + ih + '" fill="#cc2f2a" opacity=".085"/>';
+  [0, .25, .5, .75, 1].forEach(f => {
+    const v = qMin * Math.pow(qMax / qMin, f), y = Y(v);
+    g += '<line x1="' + pl + '" y1="' + y.toFixed(1) + '" x2="' + (W - pr) + '" y2="' + y.toFixed(1) + '" stroke="#e6ebf3"/>';
+    g += '<text x="' + (pl - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" fill="#8a95a5">' + (v >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v)) + '</text>';
+  });
+  for (let d = 0; d <= ctMax; d += Math.max(1, Math.round(ctMax / 6))) {
+    g += '<text x="' + X(d).toFixed(1) + '" y="' + (H - pb + 16) + '" text-anchor="middle" font-size="10.5" fill="#8a95a5">' + d + '</text>';
+  }
+  g += '<text x="' + (pl + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="#8a95a5">BE CT（天）→ 越靠右在制越久</text>';
+  g += '<text x="14" y="' + (pt - 8) + '" font-size="11" fill="#8a95a5">在制数量（颗 · 对数轴）</text>';
+  /* 按数量降序绘制 → 大泡在底层，小泡不被遮住 */
+  lots.slice().sort((a, b) => b[3] - a[3]).forEach(l => {
+    const bad = l[2] >= AL.ctR || (l[5] != null && l[5] < AL.otd);
+    g += '<circle class="vz-bub' + (bad ? ' al' : '') + '" cx="' + X(l[2]).toFixed(1) + '" cy="' + Y(l[3]).toFixed(1) + '" r="' + R(l[3]).toFixed(2) + '" '
+      + 'fill="' + typeColor(WIP.typeOrder[l[1]]) + '" fill-opacity=".62" stroke="' + (bad ? '#cc2f2a' : '#fff') + '" stroke-width="' + (bad ? 1.3 : .7) + '">'
+      + '<title>' + esc(WIP.typeOrder[l[1]]) + ' · CT ' + l[2] + ' 天 · ' + l[3] + ' 颗' + (l[4] ? ' · Hold ' + l[4] + '天' : '') + (l[5] != null && l[5] < 0 ? ' · OTD 逾期' : '') + '</title></circle>';
+  });
+  host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' + g + '</svg>';
+}
+
+/* 3.6 方案 D：批次点阵（一批 = 一方块，按工序分行） */
+function vzD(host) {
+  host.innerHTML = '<div class="dotm">' + stepsDesc.map(s => {
+    const si = WIP.stepOrder.indexOf(s.name);
+    const list = WIP.lots.filter(l => l[0] === si);
+    return '<div class="dotm-r"><div class="dotm-lb" title="' + esc(s.name) + '">' + esc(s.name) + '</div><div class="dotm-g">'
+      + list.map(l => {
+        const bad = (l[2] != null && l[2] >= WIP.alarm.ctR) || (l[5] != null && l[5] < WIP.alarm.otd);
+        return '<i class="' + (bad ? 'r' : '') + (l[4] > 0 ? ' h' : '') + '" style="background:' + typeColor(WIP.typeOrder[l[1]]) + '" '
+          + 'title="' + esc(WIP.typeOrder[l[1]]) + ' · ' + l[3] + ' 颗 · CT ' + (l[2] == null ? '—' : l[2]) + (l[4] > 0 ? ' · Hold ' + l[4] + ' 天' : '') + '"></i>';
+      }).join('') + '</div></div>';
+  }).join('') + '</div>';
+}
+
+/* 3.7 方案 E：极坐标弧（中心品类甜甜圈 + 外圈工序径向柱） */
+function vzE(host) {
+  const W = 760, H = 640, cx = 380, cy = 300;
+  const R0 = 138, maxLen = 100, donutR = 88, donutW = 24;
+  const types = WIP.typeOrder;
+  const tTot = types.map((t, ti) => WIP.stepMap.reduce((a, s) => a + s.byType[ti], 0));
+  const gt = tTot.reduce((a, b) => a + b, 0) || 1;
+  const C = 2 * Math.PI * donutR;
+  let acc = 0, donut = '';
+  types.forEach((t, ti) => {
+    const len = tTot[ti] / gt * C;
+    donut += '<circle cx="' + cx + '" cy="' + cy + '" r="' + donutR + '" fill="none" stroke="' + typeColor(t) + '" stroke-width="' + donutW + '" '
+      + 'stroke-dasharray="' + len.toFixed(1) + ' ' + (C - len).toFixed(1) + '" stroke-dashoffset="' + (-acc).toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
+    acc += len;
+  });
+  /* 外圈：按报表工艺顺序排布，长度 = 16 + 该工序量 / 最大量 × 112 */
+  const n = stepsOrder.length;
+  let bars = '';
+  stepsOrder.forEach((s, i) => {
+    const a = i / n * 360 - 90;
+    const len = 14 + (s.qty / stepMaxQty) * 96;
+    const bad = s.hold > 0 || s.otd > 0;
+    const dom = WIP.typeOrder[s.byType.indexOf(Math.max.apply(null, s.byType))];
+    const rad = (a - 90) * Math.PI / 180;
+    const lx = cx + Math.cos(rad) * (R0 + maxLen + 18), ly = cy + Math.sin(rad) * (R0 + maxLen + 18);
+    const anchor = Math.cos(rad) > 0.25 ? 'start' : (Math.cos(rad) < -0.25 ? 'end' : 'middle');
+    bars += '<g class="vz-pbar-g"><g transform="rotate(' + a.toFixed(2) + ' ' + cx + ' ' + cy + ')">'
+      + '<rect class="vz-pbar' + (bad ? ' is-bad' : '') + '" x="' + (cx - 6) + '" y="' + (cy - R0 - len).toFixed(1) + '" width="12" height="' + len.toFixed(1) + '" rx="6" fill="' + typeColor(dom) + '"/>'
+      + '</g>'
+      + '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '" font-size="10" fill="#8a95a5">' + esc(s.name) + '</text></g>';
+  });
+  host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">'
+    + '<circle cx="' + cx + '" cy="' + cy + '" r="' + R0 + '" fill="none" stroke="#eef2f8" stroke-width="1" stroke-dasharray="3 5"/>'
+    + donut + bars
+    + '<text x="' + cx + '" y="' + (cy + 2) + '" text-anchor="middle" font-size="28" font-weight="800" fill="#16202e">' + nf(WIP.totalQtyK) + 'K</text>'
+    + '<text x="' + cx + '" y="' + (cy + 22) + '" text-anchor="middle" font-size="11.5" fill="#8a95a5">在制总量</text>'
+    + '<text x="' + cx + '" y="' + (cy + 42) + '" text-anchor="middle" font-size="11" fill="#8a95a5">' + n + ' 工序 / ' + types.length + ' 品类 / ' + WIP.totalLots + ' 批</text>'
+    + '</svg>';
+}
+
+
+/* ==========================================================================
+   4. 图卡框架：图上编号标注 + 右侧说明，hover 双向联动
+   ========================================================================== */
+const MOUNT = [];
+function fig(id, o) {
+  if (o.draw) MOUNT.push({ id: id + 'c', fn: o.draw });
+  const calls = o.calls || [];
+  const pins = calls.map(c =>
+    '<div class="pin" data-n="' + c.n + '" style="left:' + c.x + '%;top:' + c.y + '%" title="' + esc(c.title) + '">' + c.n + '</div>').join('');
+  const side = calls.length
+    ? '<div class="side-t">图上标注 · 悬停高亮</div>' + calls.map(c =>
+      '<div class="co" data-n="' + c.n + '"><span class="co-n">' + c.n + '</span><div><b>' + c.title + '</b><span>' + c.text + '</span></div></div>').join('')
+    : (o.side || '');
+  return '<section class="fig" id="' + id + '">'
+    + '<div class="fig-head"><h3>' + o.title + '</h3>' + (o.tags || '') + '</div>'
+    + (o.sub ? '<div class="fig-sub">' + o.sub + '</div>' : '')
+    + '<div class="fig-body"><div class="fig-canvas"><div class="chartwrap"><div class="pinlayer">' + pins + '</div><div id="' + id + 'c"></div></div></div>'
+    + '<aside class="fig-side">' + side + '</aside></div>'
+    + (o.foot ? '<div class="fig-foot">' + o.foot + '</div>' : '')
+    + '</section>';
+}
+function bindPins() {
+  $$('.fig').forEach(f => {
+    const els = $$('.pin,.co', f);
+    const set = n => els.forEach(el => el.classList.toggle('on', el.dataset.n === n));
+    els.forEach(el => {
+      el.addEventListener('mouseenter', () => set(el.dataset.n));
+      el.addEventListener('mouseleave', () => set(null));
+    });
+  });
+}
+const b1 = '<span class="bdg b1">主干① 运维告警</span>';
+const b2 = '<span class="bdg b2">主干② OP 产出</span>';
+const b3 = '<span class="bdg b3">主干③ WIP 在制</span>';
+
+/* ==========================================================================
+   5. 各章节正文
+   ========================================================================== */
+const OP = DATA.op, AL = DATA.alarm, DEMO = OP.demo;
+
+/* ---------- §0 全局结构 ---------- */
+const SEC0 = `
+<section class="sec" id="s0">
+  <div class="sec-h"><div class="sec-n">0</div><h2>先看全局：三层结构，三条主干</h2></div>
+  <p class="sec-sub">全站的图不是各画各的，而是统一收敛到「三条数据主干 → 一层计算口径 → 四个绘制基元 → 各页面」。看懂这张图，后面每一张图的来历就都有位置可放。</p>
+
+  <svg class="flow-svg" viewBox="0 0 1000 470" style="margin:14px 0 4px">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+        <path d="M0,0 L9,4.5 L0,9 z" fill="#b9c8e4"/>
+      </marker>
+    </defs>
+    <!-- 主干层 -->
+    <text x="0" y="26" font-size="12.5" font-weight="800" fill="#8a95a5">数据主干层</text>
+    <g class="fm-node">
+      <rect x="0" y="36" width="300" height="72" rx="11" fill="#e7eeff" stroke="#c9dcff"/>
+      <text x="16" y="60" font-size="13.5" font-weight="800" fill="#1b3fa8">① 运维告警 · 演示数据</text>
+      <text x="16" y="80" font-size="11.6" fill="#4a5567">analytics-core.js · 固定种子 20260923</text>
+      <text x="16" y="97" font-size="11.6" fill="#4a5567">180 天 · 9 类场景 · 共 ${AL.total} 条</text>
+    </g>
+    <g class="fm-node">
+      <rect x="330" y="36" width="300" height="72" rx="11" fill="#e3f6ee" stroke="#c3ead9"/>
+      <text x="346" y="60" font-size="13.5" font-weight="800" fill="#0d6146">② OP 产出 · 真实 + 演示</text>
+      <text x="346" y="80" font-size="11.6" fill="#4a5567">output-core.js · 客户 IT 报表《BE1 Output Report V5》</text>
+      <text x="346" y="97" font-size="11.6" fill="#4a5567">当前周 ${OP.weekKey} 为真实数据 · 单位 K / 万元</text>
+    </g>
+    <g class="fm-node">
+      <rect x="660" y="36" width="300" height="72" rx="11" fill="#e2f3f9" stroke="#c2e4ef"/>
+      <text x="676" y="60" font-size="13.5" font-weight="800" fill="#0b5a72">③ WIP 在制 · 全真实</text>
+      <text x="676" y="80" font-size="11.6" fill="#4a5567">wip-real-data.js · 客户《BE1 WIP Report-V26》</text>
+      <text x="676" y="97" font-size="11.6" fill="#4a5567">${WIP.totalLots} 批 × 18 字段 · 合计 ${nf(WIP.totalQtyK)}K</text>
+    </g>
+
+    <path d="M150,108 L150,150" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+    <path d="M480,108 L480,150" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+    <path d="M810,108 L810,150" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+
+    <!-- 口径层 -->
+    <text x="0" y="146" font-size="12.5" font-weight="800" fill="#8a95a5">计算 / 口径层</text>
+    <g class="fm-node">
+      <rect x="0" y="152" width="300" height="86" rx="11" fill="#f4f7fc" stroke="#d7dfec"/>
+      <text x="16" y="175" font-size="12.4" font-family="monospace" fill="#1b3fa8">computeAlarmStats()</text>
+      <text x="16" y="195" font-size="12.4" font-family="monospace" fill="#1b3fa8">classifyAlerts()</text>
+      <text x="16" y="215" font-size="12.4" font-family="monospace" fill="#1b3fa8">bucketSeries / topBy()</text>
+      <text x="16" y="233" font-size="11.4" fill="#8a95a5">分桶 · 聚类 · 排行 · 闭环率</text>
+    </g>
+    <g class="fm-node">
+      <rect x="330" y="152" width="300" height="86" rx="11" fill="#f4f7fc" stroke="#d7dfec"/>
+      <text x="346" y="175" font-size="12.4" font-family="monospace" fill="#1b3fa8">genOpWeek()</text>
+      <text x="346" y="195" font-size="12.4" font-family="monospace" fill="#1b3fa8">opStatusOf / opAlarmOf / opAlarmSum</text>
+      <text x="346" y="215" font-size="12.4" font-family="monospace" fill="#1b3fa8">opEarnSeries()</text>
+      <text x="346" y="233" font-size="11.4" fill="#8a95a5">均摊目标 · 三色判定 · Earn 折算</text>
+    </g>
+    <g class="fm-node">
+      <rect x="660" y="152" width="300" height="86" rx="11" fill="#f4f7fc" stroke="#d7dfec"/>
+      <text x="676" y="175" font-size="12.4" font-family="monospace" fill="#1b3fa8">stepAgg() / globalAgg()</text>
+      <text x="676" y="195" font-size="12.4" font-family="monospace" fill="#1b3fa8">valOf() / priceOf()</text>
+      <text x="676" y="215" font-size="12.4" font-family="monospace" fill="#1b3fa8">wip_alarm 阈值</text>
+      <text x="676" y="233" font-size="11.4" fill="#8a95a5">工序聚合 · 口径换算 · 报警分级</text>
+    </g>
+
+    <path d="M150,238 L150,280" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+    <path d="M480,238 L480,280" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+    <path d="M810,238 L810,280" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+
+    <!-- 基元层 -->
+    <text x="0" y="276" font-size="12.5" font-weight="800" fill="#8a95a5">绘制基元层（common.js）</text>
+    <rect x="0" y="282" width="960" height="66" rx="11" fill="#fff" stroke="#d7dfec"/>
+    <text x="20" y="308" font-size="12.5" fill="#16202e"><tspan font-weight="800">lineChart</tspan> 折线/累计曲线　·　<tspan font-weight="800">donut</tspan> 环形占比　·　<tspan font-weight="800">hBars</tspan> 横向排行　·　<tspan font-weight="800" fill="#8a95a5">barGroup 分组柱（当前无人调用）</tspan></text>
+    <text x="20" y="331" font-size="12" fill="#8a95a5">＋ 页面自绘：热力矩阵 / 堆叠排行条 / 批次点阵 / 极坐标弧 / 桑基飘带 / 气泡象限</text>
+
+    <path d="M480,348 L480,386" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="0" y="382" font-size="12.5" font-weight="800" fill="#8a95a5">页面层</text>
+    <rect x="0" y="392" width="960" height="62" rx="11" fill="#f8fafd" stroke="#d7dfec"/>
+    <text x="20" y="417" font-size="12.5" fill="#4a5567"><tspan font-weight="800" fill="#1d4ed8">index</tspan> / analytics / monthly / ingest / alerts　·　<tspan font-weight="800" fill="#12805a">output</tspan> / op-table / op-config　·　<tspan font-weight="800" fill="#0b6a86">wip</tspan> / systems</text>
+    <text x="20" y="439" font-size="12" fill="#8a95a5">14 个业务页面（另有 2 个说明文档页不参与校验）</text>
+  </svg>
+
+  <div class="note ok"><b>关键设计原则：</b>口径计算全部下沉到「引擎层」，页面只负责取数与绘制。所以同一个指标在多张图里出现时，它们必然走同一个函数——这是本工程「图表之间逻辑一致」的根本原因，也是为什么第 5 节那张「口径一致性矩阵」里每一行都只有一个实现处。</div>
+</section>`;
+
+/* ---------- §1 三条数据主干 ---------- */
+const SEC1 = `
+<section class="sec" id="s1">
+  <div class="sec-h"><div class="sec-n">1</div><h2>三条数据主干</h2></div>
+  <p class="sec-sub">每张图的数据最终都来自这三条之一。先认识它们，就知道某张图「数从哪来、可不可信、能不能编」。</p>
+
+  <div class="sub-h" id="s1a">① 运维告警 · 演示数据（确定性生成，可复现）</div>
+  <table>
+    <tr><th style="width:120px">项</th><th>说明</th></tr>
+    <tr><td>生成者</td><td><span class="mono">analytics-core.js → genAlarmRecords()</span></td></tr>
+    <tr><td>随机源</td><td><span class="mono">mulberry32(20260923)</span> —— <b>固定种子</b>，每次刷新生成完全相同的 180 天数据，保证演示可复现</td></tr>
+    <tr><td>规模</td><td>180 天 × 9 类告警场景；每天条数 = 场景基准 × 周末衰减(0.55) × 随机抖动；<span class="mono">escalate</span> 场景越接近今天越高发。<b>实测当前共 ${AL.total} 条</b></td></tr>
+    <tr><td>每条字段</td><td><span class="mono">ts / sysId / sys / dept / keyword / category / level / status / durationMin / root / suggestion</span></td></tr>
+    <tr><td>出口</td><td>全局常量 <span class="mono">ALARM_RECORDS</span>，页面再按角色权限二次过滤</td></tr>
+  </table>
+  <div class="formula">今天起往前 180 天，逐日逐场景生成：
+    cnt = <b>floor</b>( 场景基准 base × 周末系数(0.55 或 1) × (0.7 + rng() × 0.7) )
+    若场景标记 escalate：cnt ×= (0.5 + phase × 1.3)      <em>// phase = 0→1，越接近今天越高发</em>
+  </div>
+  <div class="note warn"><b>两个必须知道的事实（不是 bug）：</b>
+    <br>① 因为 <span class="mono">floor()</span> 取整，而场景基准只有 0.3～0.8，<b>大多数日子算出来是 0 条</b> —— 所以按「日」看趋势图会非常稀疏（180 天里绝大多数是 0）。
+    <br>② 也正因为每条数据都很稀疏，<b>「批量连锁」判定（同关键词单日 ≥3 次、或跨 ≥2 系统）在当前数据集里一次都没触发</b>，所以「偶发 vs 连锁」甜甜圈现在是 100% 偶发。这是数据的形态，不是渲染错误。
+    <br>→ 看长期走势请切到「周 / 月」粒度，那里才有统计意义。</div>
+
+  <div class="sub-h" id="s1b">② OP 产出 · 真实 + 演示混合</div>
+  <table>
+    <tr><th style="width:120px">项</th><th>说明</th></tr>
+    <tr><td>引擎</td><td><span class="mono">output-core.js</span></td></tr>
+    <tr><td>真实源</td><td><span class="mono">op-real-data.js</span>（由 <span class="mono">.extract-op.py</span> 从客户《BE1 Output Report V5.xls》抽取）→ 当前覆盖 <b>${OP.weekKey}</b></td></tr>
+    <tr><td>演示源</td><td><span class="mono">OP_DEMO_PROFILE</span>（按品类的「当日实际/当日目标」比值剖面）——<b>只在该周没有真实数据时回落</b></td></tr>
+    <tr><td>周历</td><td><b>周六起始</b>，列序 六、日、一、二、三、四、五</td></tr>
+    <tr><td>单位</td><td>goal / total 为 <b>K（千颗）</b>；Earn 为 <b>万元</b></td></tr>
+  </table>
+  <div class="formula">周总目标 ${nf(OP.goalCum[6])}K  →  均摊到 7 天  →  逐日累加
+  ${DEMO.byDayGoal.join(' / ')}
+  累计： ${DEMO.goalCum.join(' / ')}
+
+状态判定 <b>opStatusOf(goal, total)</b>
+  diff = total − goal            <em>// 实际 − 目标</em>
+  s    = −diff                   <em>// 缺口</em>
+  diff ≥ 0        → met      绿灯 · 达标
+  s &lt; yellowK     → met      绿灯 · 达标（缺口在容忍带内）
+  s &lt; redK        → critical 黄灯 · 临界
+  否则            → over     红灯 · 超标
+  rate = total / goal × 100
+
+Earn 折算 <b>opEarnSeries()</b>
+  EarnCum[i] = Σ ( totalCum[i] × 单价 / 10 )     <em>// K × 元/粒 ÷ 10 → 万元</em>
+  </div>
+  <div class="note"><b>阈值是「逐 PKG Type」维护的</b>（不再有全局阈值）：
+    <br>· <span class="mono">opAlarmOf(typeId)</span> → 单品类自身阈值，缺失回落 <span class="mono">OP_DEFAULTS.alarm</span>
+    <br>· <span class="mono">opAlarmSum(ids)</span> → <b>多品类聚合阈值 = 各品类阈值之和</b>，因为聚合差额本身就是各品类的缺口之和，同量纲才能比
+    <br>· 当前 4 个品类合计：<b>${esc(OP.alarmText)}</b></div>
+
+  <div class="sub-h" id="s1c">③ WIP 在制 · 全真实</div>
+  <table>
+    <tr><th style="width:120px">项</th><th>说明</th></tr>
+    <tr><td>抽取</td><td><span class="mono">.extract-wip.py</span>（xlrd）读《BE1 WIP Report-V26.xls》→ <span class="mono">wip-real-data.js</span></td></tr>
+    <tr><td>规模</td><td><b>${WIP.totalLots} 批 × 18 字段</b>，合计 <b>${nf(WIP.totalQtyK)}K 颗</b>，Hold ${WIP.totalHold} 批，OTD 逾期 ${WIP.totalOtd} 批</td></tr>
+    <tr><td>关键约定</td><td><span class="mono">None</span> 必须转成 JS <span class="mono">null</span>，数值<b>不加引号</b>——曾因生成 <span class="mono">"None"</span> 字符串导致 <span class="mono">toFixed is not a function</span> 崩溃</td></tr>
+  </table>
+  <table>
+    <tr><th class="n">#</th><th>字段</th><th class="n">#</th><th>字段</th><th class="n">#</th><th>字段</th></tr>
+    <tr><td class="n">0</td><td>工序 <span class="mono">Specname</span></td><td class="n">6</td><td>批次号</td><td class="n">12</td><td>OTD 余量（天，<b>负 = 已逾期</b>）</td></tr>
+    <tr><td class="n">1</td><td>PKG Type</td><td class="n">7</td><td><b>数量（颗）← 统计基准</b></td><td class="n">13</td><td>Hold 天数（&gt;0 即 Hold）</td></tr>
+    <tr><td class="n">2</td><td>PKG_SIZE 尺寸</td><td class="n">8</td><td>Qty by I/O</td><td class="n">14</td><td>Hold 原因（源文件即乱码）</td></tr>
+    <tr><td class="n">3</td><td>封装料号</td><td class="n">9</td><td>机台 / 位置</td><td class="n">15</td><td>Bank</td></tr>
+    <tr><td class="n">4</td><td>器件 DEVICE</td><td class="n">10</td><td><b>BE CT（天）← 报警基准</b></td><td class="n">16</td><td>线材 WIRE_TYPE</td></tr>
+    <tr><td class="n">5</td><td>产品族 Nick_Name</td><td class="n">11</td><td>ASSY CT（天）</td><td class="n">17</td><td>DC</td></tr>
+  </table>
+  <div class="formula">口径换算（WIP 页面右上角可切换）
+  by real unit ：  valOf(qty)      = qty / 1000               → 单位 K
+  by earn      ：  valOf(qty,type) = qty × 单价 / 10000        → 单位 万元
+                                        <em>↑ 必须逐行乘单价后求和（不同品类单价不同）</em>
+  单价：opPriceOf() 取 OP 配置；BGA 与 LGA 共用「BGA/LGA」单价
+  </div>
+  <div class="note danger"><b>当日真实报警分级（口径：CT ≥ ${WIP.alarm.ctR} 天 或 OTD 逾期 → 红；CT ≥ ${WIP.alarm.ctY} 天 → 黄）：</b>
+    红 ${WIP.ct.red} 批 · 黄 <b>${WIP.ct.amber} 批</b> · 有 BE CT 的批次共 ${WIP.ct.have} 批（其中红圈 ${WIP.ct.redWithCt} 个）。
+    <br>黄档为 0 是<b>数据事实</b>：CT ≥ ${WIP.alarm.ctY} 天的批次其 OTD 全部为负，已经先被归进红档。</div>
+</section>`;
+
+/* ---------- §2 图表基元 ---------- */
+const SEC2 = `
+<section class="sec" id="s2">
+  <div class="sec-h"><div class="sec-n">2</div><h2>四个绘制基元</h2></div>
+  <p class="sec-sub">全站基础图表只有 4 个函数，全部手写 SVG、无第三方库。下面每一张都用<b>真实数据</b>渲染，并把「代码里的每一个参数」指给你看。</p>
+
+  ${fig('fP1', {
+  title: '2.1 lineChart · 折线 / 累计曲线',
+  tags: b2 + '<span class="bdg bdg real">真实渲染</span>',
+  sub: '用 <b>OP 演示周 ' + DEMO.key + '</b> 的真实计算结果渲染（该周无客户数据，走演示剖面）。<b>鼠标在图上来回移动</b>可以看悬停浮层的效果。',
+  calls: [
+    { n: 1, x: 12, y: 20, title: '虚线 = 目标，实线 = 实际', text: 'series[].dash 决定虚实。目标线用空心圆点，实际线用实心圆点，颜色各自独立。' },
+    { n: 2, x: 12, y: 63, title: '红柱 + 脉冲环 = marks（异常日）', text: 'marks[] 传入 { i 下标, v 值 }。整列红底 opacity .10、脉冲红环、上方红字，三件套同时出现。' },
+    { n: 3, x: 74, y: 34, title: '基准日 endAt：竖虚线 + 两条线各自取值', text: '目标标注在上、实际标注在下，避免互相遮挡——这是刻意的偏移设计（-11 / +17 个视图单位）。' },
+    { n: 4, x: 88, y: 84, title: 'x 轴标签每 3 个取 1', text: '避免拥挤；基准日那一格由 endAt 单独加粗渲染，所以这里会空一格。' },
+    { n: 5, x: 5, y: 47, title: '左侧 y 轴 5 等分网格', text: 'min / max / yUnit 由调用方给；OP 图的 max 是 chartMax × 1.08（先过滤 null 再取最大值）。' }
+  ],
+  foot: '<b>null 的语义</b>：series[].data[i] === null 表示「该日无数据」，折线<b>跳过该点</b>而不是画成 0——用于未来日期或源数据未覆盖的日期，宁缺毋滥。',
+  draw: h => docLine(h, {
+    series: [
+      { name: '累计目标', color: '#1d4ed8', data: DEMO.goalCum, dash: true },
+      { name: '累计实际', color: '#12805a', data: DEMO.totalCum, fill: true }
+    ],
+    labels: OP.dayLabels, height: 250, min: 0, max: Math.round(DEMO.goalCum[6] * 1.08 / 100) * 100,
+    yUnit: 'K', endUnit: 'K', endAt: 6, tipUnit: 'K',
+    marks: DEMO.redDays.map(i => ({ i, v: DEMO.totalCum[i], color: '#cc2f2a' })),
+    tipTitle: i => OP.dayDates[i] || OP.dayLabels[i],
+    tipExtra: i => {
+      const g = DEMO.goalCum[i], t = DEMO.totalCum[i];
+      if (t == null) return '<div style="margin-top:5px;color:#f0b8b5;font-size:11.5px">该日无产出记录</div>';
+      const d = Math.round((t - g) * 10) / 10;
+      return '<div style="margin-top:5px;border-top:1px solid rgba(255,255,255,.2);padding-top:4px;color:' + (d < 0 ? '#f0b8b5' : '#a9e6c9') + ';font-size:11.5px">差额 ' + (d >= 0 ? '+' : '') + d + 'K</div>';
+    }
+  })
+})}
+
+  ${fig('fP1b', {
+    title: '2.1b 同一基元 · null 是什么样子',
+    tags: b2 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '这就是当前 <b>' + OP.weekKey + '（客户真实数据周）</b> 的真实形态：只有 ' + (OP.focusIdx + 1) + ' 天有产出记录，其余 6 天 total 为 <span class="mono">null</span>。',
+    side: '<div class="side-t">为什么图是这样</div>'
+      + '<div class="co"><span class="co-n">!</span><div><b>不是没画出来，是没有数据</b><span>客户报表只覆盖 ' + OP.dayDates[0] + ' 一天，代码不会为了「图好看」去补造后 6 天。</span></div></div>'
+      + '<div class="co"><span class="co-n">→</span><div><b>所以基准日 = 第 1 天</b><span>focusIdx 取「最后一个有实际产出的日期」，而不是今天或周五。</span></div></div>'
+      + '<div class="co"><span class="co-n">K</span><div><b>真实值：目标 ' + nf(OP.goalCum[0]) + 'K / 实际 ' + nf(OP.totalCum[0]) + 'K</b><span>差额 ' + OP.gapAtFocusQty + 'K，判定为红灯。</span></div></div>',
+    foot: '页面用 chip 标注「真实数据 / 演示数据」，看到 <span class="bdg bdg real">真实数据</span> 就说明这一周没有走演示剖面。',
+    draw: h => docLine(h, {
+      series: [
+        { name: '累计目标', color: '#1d4ed8', data: OP.goalCum, dash: true },
+        { name: '累计实际', color: '#12805a', data: OP.totalCum, fill: true }
+      ],
+      labels: OP.dayLabels, height: 240, min: 0, max: Math.round(OP.goalCum[6] * 1.08 / 100) * 100,
+      yUnit: 'K', endUnit: 'K', endAt: OP.focusIdx, tipUnit: 'K',
+      marks: OP.redDays.map(i => ({ i, v: OP.totalCum[i], color: '#cc2f2a' })),
+      tipTitle: i => OP.dayDates[i] || OP.dayLabels[i],
+      tipExtra: i => OP.totalCum[i] == null
+        ? '<div style="margin-top:5px;color:#f0b8b5;font-size:11.5px">' + (i > OP.focusIdx ? '未来日期 · 暂无产出数据' : '该日无产出记录（数据未覆盖）') + '</div>'
+        : ''
+    })
+  })}
+
+  ${fig('fP2', {
+    title: '2.2 donut · 环形占比',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '用 WIP 的 5 个原始品类占比渲染，与 WIP 看板「方案 E」中心的甜甜圈同一份数据。',
+    calls: [
+      { n: 1, x: 50, y: 20, title: '单圆 stroke-dasharray 分段', text: '半径 68 / 环宽 24；每段 = 一段 dash + 一段 gap，靠 stroke-dashoffset 累计错位，不用多个 path。' },
+      { n: 2, x: 50, y: 50, title: '中心两行 = 总量 + 单位', text: 'centerTop 大字号、centerSub 小字灰字。' },
+      { n: 3, x: 84, y: 62, title: 'rotate(-90) 从 12 点开始', text: '否则第一段会从 3 点方向起画，视觉上「歪一格」。' }
+    ],
+    draw: h => docDonut(h, WIP.typeMap.map(t => ({ value: t.qty, color: t.color })), 210, nf(WIP.totalQtyK), 'K 在制总量')
+  })}
+
+  ${fig('fP3', {
+    title: '2.3 hBars · 横向排行条',
+    tags: b1 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '用「根因分析」页 TOP 高频告警排行（前 10 个关键词）渲染。纯 DOM div，不是 SVG。',
+    calls: [
+      { n: 1, x: 50, y: 8, title: '条宽 = value / max × 100%', text: '注意是「相对最大值」而不是相对总量——所以第一条永远满格。' },
+      { n: 2, x: 50, y: 34, title: '10 色调色板循环取色', text: 'hBars 自己不定义颜色，颜色由调用方在 items[].color 里给。' },
+      { n: 3, x: 88, y: 8, title: '数值贴右显示', text: 'suffix 参数决定单位后缀（次 / ms / 条…）。' }
+    ],
+    draw: h => docHBars(h, AL.top10.map((t, i) => ({
+      label: t.label + '　' + t.pct + '%',
+      value: t.value,
+      color: ['#1d4ed8', '#0b6a86', '#8b5cf6', '#a8620b', '#12805a', '#cc2f2a', '#0b8a5a', '#e0912a', '#5b6577', '#1b3fa8'][i % 10]
+    })), ' 次')
+  })}
+
+  ${fig('fP4', {
+    title: '2.4 barGroup · 分组柱状（当前全站无人调用）',
+    tags: '<span class="bdg bdg gray">保留基元</span>',
+    sub: '已实现但<b>没有任何页面调用</b>，属于备用能力。真要做柱状对比时可直接复用。',
+    side: '<div class="side-t">怎么用它</div>'
+      + '<div class="co"><span class="co-n">i</span><div><b>入参</b><span><span class="mono">labels[] + series[{name,color,data[]}] + height</span>，自动按 series(flatMap) 最大值 × 1.15 定 y 轴上限。</span></div></div>'
+      + '<div class="co"><span class="co-n">w</span><div><b>柱宽自适应</b><span>bw = min(26, (组宽 − 18) / 系列数)，组内柱间距 6。</span></div></div>'
+      + '<div class="co"><span class="co-n">?</span><div><b>为什么没有用上</b><span>本工程的对比需求都落在「曲线看趋势 + 横向条看排行」上，分组柱暂时没有场景。</span></div></div>',
+    draw: h => docBarGroup(h, {
+      labels: WIP.typeOrder,
+      series: [
+        { name: '正常', color: '#12805a', data: WIP.typeMap.map((t, i) => WIP.stepMap.reduce((a, s) => a + s.byType[i], 0) - WIP.lots.filter(l => l[1] === i).length * 0) },
+        { name: '报警批次', color: '#cc2f2a', data: WIP.typeOrder.map((t, i) => WIP.lots.filter(l => l[1] === i && ((l[2] != null && l[2] >= WIP.alarm.ctR) || (l[5] != null && l[5] < WIP.alarm.otd))).length * 20000) }
+      ], height: 200
+    }),
+    foot: '上图为纯示意：蓝柱是各品类在制量（颗），红柱把「报警批次数 × 20000」折算成同量纲摆在一起，仅用于展示基元的绘制效果。'
+  })}
+</section>`;
+
+
+/* ---------- §3 逐图表详解 ---------- */
+const SEC3 = `
+<section class="sec" id="s3">
+  <div class="sec-h"><div class="sec-n">3</div><h2>逐图表详解</h2></div>
+  <p class="sec-sub">每张图回答三个问题：<b>它在回答什么问题</b>、<b>怎么算出来的</b>、<b>能怎么操作它</b>。图上圆点编号与右侧说明一一对应，鼠标悬停任一侧都会高亮。</p>
+
+  <div class="sub-h" id="s31">3.1 Output（OP）大屏 <span class="bdg bdg real">客户真实数据</span></div>
+  <p>两张累计对比图<b>上下排布</b>，共用同一 x 轴、同一基准日、同一「红灯日」集合。</p>
+
+  ${fig('fO1', {
+  title: '累计 goal vs total ＋ 累计 Earn 目标 vs 实际（上下两图）',
+  tags: b2 + '<span class="bdg bdg demo">演示周 ' + DEMO.key + '</span>',
+  sub: '这两张图就是大屏上的实际形态。这里用上一周 <b>' + DEMO.key + '</b> 演示（数据完整，便于看清全部特征）；当前真实周 ' + OP.weekKey + ' 的实际形态见下一张。',
+  calls: [
+    { n: 1, x: 11, y: 30, title: '上图：累计目标（蓝虚线）vs 累计实际（绿实线）', text: '单位 K（千颗）。目标线是「周总目标均摊到 7 天」后的累计，所以是一条笔直的斜线；实际线是逐日累加，会上下摆动。' },
+    { n: 2, x: 11, y: 74, title: '下图：同一周的 Earn 金额口径', text: '紫虚线 = 累计 Earn 目标，青实线 = 累计 Earn 实际，单位万元。折算关系：K × 单价 ÷ 10。' },
+    { n: 3, x: 41, y: 62, title: '联动点①：marks = redDays（红灯日）', text: '两张图把各自口径下的「当日实际值」作为 mark 的 y 值，所以红柱高度不同，但 x 下标完全相同——数量图里的超标日和金额图里的超标日是同一天，可直接竖着对照。' },
+    { n: 4, x: 88, y: 20, title: '联动点②：endAt = focusIdx（基准日）', text: 'focusIdx = 本周最后一个有实际产出的日期，不是今天也不是周五。它让「两条线差多少」有确切数字，副标题里的差额也用它。' },
+    { n: 5, x: 60, y: 12, title: '联动点④：y 轴上限 = chartMax × 1.08', text: '按实际数据动态算，先过滤掉 null 再取最大值，留 8% 余量，避免曲线顶到边框。' }
+  ],
+  foot: '<b>联动点③（悬停差额行）</b>：鼠标移到图上会给出当日「实际 − 目标」；若目标有值但实际为 null，会区分两种语义——未来日期显示「未来日期 · 暂无产出数据」，已过去则显示「该日无产出记录（数据未覆盖）」。',
+  draw: h => {
+    const d1 = document.createElement('div'), d2 = document.createElement('div');
+    d2.style.marginTop = '26px';
+    const lg = document.createElement('div');
+    lg.className = 'leg';
+    lg.innerHTML = '<span><i style="background:#1d4ed8"></i>累计目标（虚线）</span><span><i style="background:#12805a"></i>累计实际（实线）</span>'
+      + '<span><i class="ring" style="border-color:#cc2f2a"></i>红灯日（超标）</span><span><i style="background:#c9d2e0"></i>基准日竖线</span>';
+    h.appendChild(d1); h.appendChild(lg); h.appendChild(d2);
+    docLine(d1, {
+      series: [{ name: '累计目标', color: '#1d4ed8', data: DEMO.goalCum, dash: true },
+      { name: '累计实际', color: '#12805a', data: DEMO.totalCum, fill: true }],
+      labels: OP.dayLabels, height: 190, min: 0, max: Math.round(DEMO.goalCum[6] * 1.08),
+      yUnit: 'K', endUnit: 'K', endAt: 6, tipUnit: 'K',
+      marks: DEMO.redDays.map(i => ({ i, v: DEMO.totalCum[i], color: '#cc2f2a' })),
+      tipTitle: i => OP.dayLabels[i]
+    });
+    docLine(d2, {
+      series: [{ name: 'Earn 目标', color: '#8b5cf6', data: DEMO.earnGoalCum, dash: true },
+      { name: 'Earn 实际', color: '#0b6a86', data: DEMO.earnTotalCum, fill: true }],
+      labels: OP.dayLabels, height: 190, min: 0,
+      max: Math.round(Math.max.apply(null, DEMO.earnGoalCum) * 1.08),
+      yUnit: '万', endUnit: '万', endAt: 6, tipUnit: '万元',
+      marks: DEMO.redDays.map(i => ({ i, v: DEMO.earnTotalCum[i], color: '#cc2f2a' })),
+      tipTitle: i => OP.dayLabels[i]
+    });
+  }
+})}
+
+  ${fig('fO2', {
+    title: '真实数据周的实际形态',
+    tags: b2 + '<span class="bdg bdg real">真实数据 · ' + OP.weekKey + '</span>',
+    sub: '这是客户 IT 报表《BE1 Output Report V5.xls》接入后，大屏上<b>当前真实的显示</b>。覆盖率 ' + OP.realTypes + ' 个品类 / 仅 ' + OP.dayDates[0] + ' 一天。',
+    side: '<div class="side-t">与演示周的差别</div>'
+      + '<div class="co"><span class="co-n">1</span><div><b>实际线只有 1 个点</b><span>因为真实报表只覆盖 ' + OP.dayDates[0] + '。代码不会补造后 6 天，所以曲线到此为止。</span></div></div>'
+      + '<div class="co"><span class="co-n">2</span><div><b>基准日 = 第 ' + (OP.focusIdx + 1) + ' 天</b><span>focusIdx 找的是「最后一个有实际产出的日期」，自然落在第 1 天。</span></div></div>'
+      + '<div class="co"><span class="co-n">3</span><div><b>红灯判定：目标 ' + nf(OP.goalCum[0]) + 'K / 实际 ' + nf(OP.totalCum[0]) + 'K</b><span>差额 ' + OP.gapAtFocusQty + 'K，超过聚合红灯阈值 ' + OP.sumRed + 'K → 红柱 + 脉冲环。</span></div></div>'
+      + '<div class="co"><span class="co-n">4</span><div><b>页面上有数据来源 chip</b><span>「真实数据 / 演示数据」标签由 <span class="mono">opRealMeta()</span> 决定，一眼分辨这张图可不可信。</span></div></div>',
+    draw: h => {
+      const d1 = document.createElement('div'), d2 = document.createElement('div');
+      d2.style.marginTop = '26px';
+      h.appendChild(d1); h.appendChild(d2);
+      docLine(d1, {
+        series: [{ name: '累计目标', color: '#1d4ed8', data: OP.goalCum, dash: true },
+        { name: '累计实际', color: '#12805a', data: OP.totalCum, fill: true }],
+        labels: OP.dayLabels, height: 180, min: 0, max: Math.round(OP.goalCum[6] * 1.08),
+        yUnit: 'K', endUnit: 'K', endAt: OP.focusIdx, tipUnit: 'K',
+        marks: OP.redDays.map(i => ({ i, v: OP.totalCum[i], color: '#cc2f2a' })),
+        tipTitle: i => OP.dayDates[i] || OP.dayLabels[i]
+      });
+      docLine(d2, {
+        series: [{ name: 'Earn 目标', color: '#8b5cf6', data: OP.earnGoalCum, dash: true },
+        { name: 'Earn 实际', color: '#0b6a86', data: OP.earnTotalCum, fill: true }],
+        labels: OP.dayLabels, height: 180, min: 0,
+        max: Math.round(Math.max.apply(null, OP.earnGoalCum) * 1.08),
+        yUnit: '万', endUnit: '万', endAt: OP.focusIdx, tipUnit: '万元',
+        marks: OP.redDays.map(i => ({ i, v: OP.earnTotalCum[i], color: '#cc2f2a' })),
+        tipTitle: i => OP.dayDates[i] || OP.dayLabels[i]
+      });
+    }
+  })}
+
+  ${fig('fO3', {
+    title: '一屏自适应 fit() · 为什么两张图总能在同一屏里',
+    tags: '<span class="bdg bdg gray">尺寸算法</span>',
+    sub: '这是这套图最容易被问到的部分：SVG 是 <span class="mono">width:100% + height:auto</span>，所以<b>显示高度 = 容器宽度 × height / vw</b>。fit() 就是反解这个关系。',
+    side: '<div class="side-t">八步推导</div>'
+      + '<div class="co"><span class="co-n">1</span><div><b>先以 H = 300 画一版</b><span>拿它当量尺，测出图表以外占了多少高度。</span></div></div>'
+      + '<div class="co"><span class="co-n">2</span><div><b>overhead = 卡片高 − 图表高</b><span>即卡头 + body 内边距 + 图例，这部分是固定的。</span></div></div>'
+      + '<div class="co"><span class="co-n">3</span><div><b>topAbs = 图表栈的文档坐标</b><span>要用 +scrollY 换算，否则滚动后就量错了。</span></div></div>'
+      + '<div class="co"><span class="co-n">4</span><div><b>avail = innerHeight − topAbs − 18</b><span>当前视口里还剩下多少可用高度（留 18px 呼吸位）。</span></div></div>'
+      + '<div class="co"><span class="co-n">5</span><div><b>perCard = (avail − 14) / 2</b><span>两张卡 + 卡间距 GAP 14。</span></div></div>'
+      + '<div class="co"><span class="co-n">6</span><div><b>wantPx = clamp(150, 340, perCard − overhead)</b><span>单张图的期望显示高度，夹在 150～340px，防止极小或极大视口画出怪物。</span></div></div>'
+      + '<div class="co"><span class="co-n">7</span><div><b>wantH = wantPx × VW / cw</b><span>反算 SVG 的 height 参数（VW 是 viewBox 宽，cw 是容器宽）。</span></div></div>'
+      + '<div class="co"><span class="co-n">8</span><div><b>|wantH − 300| &gt; 6 才重画</b><span>加 6px 死区避免抖动；窗口 resize → 180ms 防抖后重新 fit()。</span></div></div>',
+    draw: h => {
+      h.innerHTML = '<div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">'
+        + '<svg viewBox="0 0 300 250" style="width:270px;height:auto;flex:none">'
+        + '<rect x="10" y="8" width="280" height="234" rx="9" fill="#f8fafd" stroke="#cfd8e6" stroke-dasharray="5 4"/>'
+        + '<text x="22" y="26" font-size="11" fill="#8a95a5">浏览器视口</text>'
+        + '<rect x="30" y="40" width="240" height="52" rx="7" fill="#fff" stroke="#e3e8f0"/>'
+        + '<text x="150" y="60" text-anchor="middle" font-size="10.5" fill="#4a5567">卡头 + 图例 = overhead</text>'
+        + '<rect x="42" y="70" width="216" height="16" rx="4" fill="#e7eeff" stroke="#c9dcff"/>'
+        + '<text x="150" y="82" text-anchor="middle" font-size="9.6" fill="#1b3fa8">累计 goal vs total</text>'
+        + '<rect x="30" y="100" width="240" height="52" rx="7" fill="#fff" stroke="#e3e8f0"/>'
+        + '<text x="150" y="120" text-anchor="middle" font-size="10.5" fill="#4a5567">卡头 + 图例 = overhead</text>'
+        + '<rect x="42" y="130" width="216" height="16" rx="4" fill="#e3f6ee" stroke="#c3ead9"/>'
+        + '<text x="150" y="142" text-anchor="middle" font-size="9.6" fill="#0d6146">累计 Earn 目标 vs 实际</text>'
+        + '<path d="M30,166 L270,166" stroke="#b9c8e4" stroke-dasharray="4 4"/>'
+        + '<text x="150" y="182" text-anchor="middle" font-size="10" fill="#8a95a5">topAbs（图表栈顶）</text>'
+        + '<text x="150" y="206" text-anchor="middle" font-size="10.4" fill="#cc2f2a">avail = innerHeight − topAbs − 18</text>'
+        + '<text x="150" y="226" text-anchor="middle" font-size="10" fill="#8a95a5">超出部分需要滚动 → fit() 会压缩到刚好放下</text>'
+        + '</svg>'
+        + '<div style="flex:1;min-width:250px">'
+        + '<div class="formula" style="margin-top:0">wantPx = clamp(150, 340, perCard − overhead)\nwantH  = wantPx × VW / cw\n'
+        + '<em>// 因为 SVG 是 width:100% + height:auto，\n// 显示高度 = 容器宽 × height / vw</em></div>'
+        + '<div class="mini-cap">实测（1440×900 视口）：<b>两张图的底部距视口底部仍有富余</b>，且窗口高度变化时曲线会自动重绘而不是出现滚动条。</div>'
+        + '</div></div>';
+    }
+  })}
+
+  ${fig('fO4', {
+    title: '周维度累计报表（op-table）· 表格即图表',
+    tags: b2 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '没有 SVG。它把上面两张曲线图<b>数值化展开</b>——同样的 <span class="mono">opStatus</span>、同样的逐品类阈值、同样的基准日，曲线看趋势、表格看确切数字。',
+    side: '<div class="side-t">着色规则</div>'
+      + '<div class="co"><span class="co-n">超</span><div><b>over → 红底 + 角标「超」</b><span>缺口 ≥ 该品类红灯阈值。</span></div></div>'
+      + '<div class="co"><span class="co-n">警</span><div><b>critical → 橙底 + 角标「警」</b><span>缺口落在黄灯与红灯之间。</span></div></div>'
+      + '<div class="co"><span class="co-n">—</span><div><b>达标 → 无底色、无角标</b><span>diff ≥ 0 或缺口在黄灯容忍带内。</span></div></div>'
+      + '<div class="co"><span class="co-n">▨</span><div><b>空单元格有双语义</b><span>未来日期 = 斜纹 <span class="mono">.cell-future</span>；已过去但源数据未覆盖 = 浅灰 <span class="mono">.cell-nodata</span>。</span></div></div>'
+      + '<div class="co"><span class="co-n">T</span><div><b>每品类带出自己的阈值列</b><span>报警阈值下沉到 PKG Type 后新增的一列，方便横向比「谁的容忍度更大」。</span></div></div>',
+    draw: h => {
+      const cols = OP.byType.map(t => t.id);
+      let html = '<div style="overflow-x:auto"><table style="margin:0;min-width:640px"><thead><tr><th>PKG Type</th><th class="n">周目标</th><th class="n">周实际</th><th class="n">差额</th><th class="n">达成率</th><th>状态</th><th>报警阈值</th><th class="n">报警天数</th></tr></thead><tbody>';
+      OP.byType.forEach(t => {
+        const bad = t.status === 'over', warn = t.status === 'critical';
+        const st = bad ? '<span class="bdg bdg danger">超标</span>' : warn ? '<span class="bdg bdg warn">临界</span>' : '<span class="bdg bdg real">达标</span>';
+        html += '<tr>'
+          + '<td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:' + t.color + ';margin-right:6px"></span><b>' + esc(t.id) + '</b></td>'
+          + '<td class="n">' + nf(t.goal) + 'K</td>'
+          + '<td class="n" style="background:' + (bad ? '#fdecea' : warn ? '#fdf1e0' : '') + '">' + nf(t.actual) + 'K' + (bad ? ' <span class="bdg bdg danger">超</span>' : warn ? ' <span class="bdg bdg warn">警</span>' : '') + '</td>'
+          + '<td class="n" style="color:' + (t.diff < 0 ? 'var(--danger)' : 'var(--success)') + '">' + (t.diff >= 0 ? '+' : '') + nf(t.diff) + 'K</td>'
+          + '<td class="n">' + (t.rate == null ? '—' : t.rate + '%') + '</td>'
+          + '<td>' + st + '</td>'
+          + '<td class="mono">黄 ' + t.yellowK + 'K / 红 ' + t.redK + 'K</td>'
+          + '<td class="n">' + (t.redDays ? '<span class="bdg bdg danger">红 ' + t.redDays + ' 天</span>' : t.yellowDays ? '<span class="bdg bdg warn">黄 ' + t.yellowDays + ' 天</span>' : '—') + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table></div><div class="mini-cap">数据取自当前真实周 <b>' + OP.weekKey + '</b> 的基准日（第 ' + (OP.focusIdx + 1) + ' 天）。该周只有 1 天有产出，所以「周实际」实际是「截至基准日的累计」。</div>';
+      h.innerHTML = html;
+    },
+    foot: '<b>为什么表格也算「图表」：</b>它的每一格都走 <span class="mono">opStatus()</span>，和曲线图上的红柱 marks 是同一个函数产出的同一个结论——所以不会出现「图上是红的、表里是绿的」这种事故。'
+  })}
+
+  <div class="sub-h" id="s32">3.2 WIP 在制品看板 <span class="bdg bdg real">全真实数据</span></div>
+  <p>一级 / 二级双层结构。一级看态势、二级查明细，所有图形的数据都来自同一份 ${WIP.totalLots} 批明细。</p>
+
+  ${fig('fW1', {
+    title: '5 项 KPI（滚动数字）',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '进入页面时数字用 <span class="mono">countUp()</span> 缓出插值 950ms 滚上去。口径随右上角「按实际数量 / 按 Earn」切换而变。',
+    side: '<div class="side-t">口径</div>'
+      + '<div class="co"><span class="co-n">1</span><div><b>在制总量</b><span>按实际数量口径 = Σ 数量 ÷ 1000（K）；按 Earn 口径 = Σ 数量 × 单价 ÷ 10000（万元）。切换口径时这个数字会整体变化。</span></div></div>'
+      + '<div class="co"><span class="co-n">2</span><div><b>在制批次</b><span>直接数行数，${WIP.totalLots} 批。</span></div></div>'
+      + '<div class="co"><span class="co-n">3</span><div><b>Earn 占用</b><span>按金额口径算的占用，当前约 ${nf(WIP.totalEarnWan)} 万元。</span></div></div>'
+      + '<div class="co"><span class="co-n">4</span><div><b>Hold 暂停 / OTD 逾期</b><span>Hold = 字段 13 &gt; 0 的批次数；OTD 逾期 = 字段 12 &lt; 0 的批次数。<b>只要 &gt; 0 卡片就转红 + 加脉冲点</b>，这是页面唯一的「主动报警」手段。</span></div></div>',
+    draw: h => {
+      const K = [
+        { n: nf(WIP.totalQtyK) + 'K', l: '在制总量', hot: false },
+        { n: WIP.totalLots, l: '在制批次', hot: false },
+        { n: nf(WIP.totalEarnWan), l: 'Earn 占用（万元）', hot: false },
+        { n: WIP.totalHold, l: 'Hold 暂停（批）', hot: WIP.totalHold > 0 },
+        { n: WIP.totalOtd, l: 'OTD 逾期（批）', hot: WIP.totalOtd > 0 }
+      ];
+      h.innerHTML = '<div class="kpirow">' + K.map(k =>
+        '<div class="kpi' + (k.hot ? ' hot' : '') + '"><b>' + k.n + '</b><span>' + k.l + '</span></div>').join('') + '</div>'
+        + '<div class="mini-cap">Hold 与 OTD 两张卡片转红，是因为对应计数 &gt; 0。<b>这是真实值，不是样式演示。</b></div>';
+    }
+  })}
+
+  ${fig('fW2', {
+    title: '工序 × PKG Type 热力矩阵',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '显示在制量前 16 个工序。单元格深浅 = <b>列归一化</b>后的占比，鼠标悬停看明细。',
+    calls: [
+      { n: 1, x: 50, y: 6, title: '列归一化，不是全局归一化', text: 'α = 0.07 + (该格在制量 ÷ 该品类列内最大值) × 0.78。每个品类自己一档深浅，保证横着看每一列都「用满色阶」。' },
+      { n: 2, x: 30, y: 46, title: '分母取自全部 24 个工序', text: '和「只显示前 16 行」无关——否则一显示少一点颜色就会整体变深，失去可比性。' },
+      { n: 3, x: 70, y: 30, title: '无数据的格子显示 ·', text: '浅灰底 + 圆点，和「有值但很小」区分开。' },
+      { n: 4, x: 8, y: 88, title: '行序 = 在制量降序', text: '取的是工序聚合后的前 16 名，所以越靠上压得越多。' }
+    ],
+    draw: h => heatGrid(h, stepsDesc, 16)
+  })}
+
+  ${fig('fW3', {
+    title: '工序 WIP 排行（堆叠条）',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '前 12 个工序各一根条，条内按品类分段；第 13 名起合并为「其余 N 个工序合计」。悬停看分段明细。',
+    calls: [
+      { n: 1, x: 50, y: 8, title: '段宽 = 该品类量 ÷ 前12最大值', text: '注意分母是「第一名工序的总量」而不是各行自己的总量——所以整行长度直接可比。' },
+      { n: 2, x: 50, y: 46, title: '段色 = 品类色', text: '与热力矩阵、5 个动效方案用的是同一套 TYPE_COLOR 映射。' },
+      { n: 3, x: 50, y: 94, title: '末行是「其余 N 个工序合计」', text: '避免小工序把条形压成看不见的碎渣，同时不让总量失真。' }
+    ],
+    foot: '<b>动态效果</b>：条形从 0 过渡到目标宽度（双 <span class="mono">requestAnimationFrame</span> 触发 CSS transition）；3.5 秒一轮的自动巡检会逐工序高亮，<b>排行条与热力矩阵共用同一个轮询索引</b>，所以两边亮的是同一个工序。',
+    draw: h => rankBars(h)
+  })}
+
+  ${fig('fW4', {
+    title: 'Hold 批次跑马灯',
+    tags: b3 + '<span class="bdg bdg real">真实数据</span>',
+    sub: '把 ${WIP.totalHold} 个 Hold 批次的料号横向滚动展示。这是静态示意，真实页面是无限横向滚动。',
+    side: '<div class="side-t">实现方式</div>'
+      + '<div class="co"><span class="co-n">∞</span><div><b>内容双份拼接实现无缝</b><span>把同一串内容复制两份首尾相接，滚到一半时瞬间跳回起点，视觉上就永远滚不完。</span></div></div>'
+      + '<div class="co"><span class="co-n">t</span><div><b>时长 = max(24, Hold批数 × 7) 秒</b><span>批次越多滚得越慢，保证看清；当前 ' + WIP.totalHold + ' 批 → ' + Math.max(24, WIP.totalHold * 7) + ' 秒一轮。</span></div></div>'
+      + '<div class="co"><span class="co-n">⏸</span><div><b>悬停暂停</b><span>鼠标移上去就停住，方便抄料号。</span></div></div>',
+    draw: h => {
+      const holds = WIP.lots.filter(l => l[4] > 0).slice(0, 8);
+      const chips = holds.map(l => {
+        const step = WIP.stepOrder[l[0]], tp = WIP.typeOrder[l[1]];
+        return '<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid #f7cfcd;background:#fff8f8;border-radius:8px;padding:6px 11px;font-size:12.6px;white-space:nowrap">'
+          + '<i style="width:8px;height:8px;border-radius:2px;background:' + typeColor(tp) + '"></i>'
+          + '<b>' + esc(step) + '</b><span style="color:#8a95a5">' + esc(tp) + '</span>'
+          + '<span style="color:#cc2f2a;font-weight:700">Hold ' + l[4] + ' 天</span></span>';
+      }).join('');
+      h.innerHTML = '<div style="overflow:hidden;border:1px dashed var(--border-strong);border-radius:10px;padding:11px;background:#fcfdff">'
+        + '<div style="display:flex;gap:9px;flex-wrap:wrap">' + chips + '</div></div>'
+        + '<div class="mini-cap">上图只列了前 8 个 Hold 批次（共 ' + WIP.totalHold + ' 个，其中含 CT ' + Math.max.apply(null, WIP.lots.filter(l => l[4] > 0).map(l => l[2] || 0)) + ' 天的长滞留批次）。真实页面是一条匀速滚动带。</div>';
+    }
+  })}
+
+  <div class="sub-h" id="s33">3.2.1 动态可视化 · 五个备选方案</div>
+  <p>5 个方案全部由<b>同一份 ' + WIP.totalLots + ' 批明细</b>驱动，只是换了一套「视觉语法」。下面每一张都是真实数据渲染的静态定格——真实页面里它们都有入场动画与轮巡高亮。</p>
+
+  ${fig('fV1', {
+    title: '方案 A · 环形仪表盘阵列',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '每个工序一个进度环，回答「哪些工序水位高、哪些工序压着异常批次」。',
+    calls: [
+      { n: 1, x: 22, y: 24, title: '弧长 = 0.1 + 0.9 × (该工序量 ÷ 最大工序量)', text: '保底 10% 可见——否则小工序的环会完全看不到，失去「有没有这个工序」的信息。' },
+      { n: 2, x: 76, y: 24, title: '环色 = 该工序的主导品类', text: '取该工序下数量最大的那个品类的颜色，一眼看出这段工序在做什么产品。' },
+      { n: 3, x: 22, y: 62, title: '环体红色脉冲 = 有 Hold / OTD 逾期', text: 'hold > 0 或 otd > 0 就加 is-bad 类，环体做 drop-shadow 呼吸。' },
+      { n: 4, x: 76, y: 62, title: '环心数字滚动 + 3.5s 轮巡高亮', text: '数字是 countUp 滚上去的；巡检高亮与热力矩阵、排行条共用一个索引。' }
+    ],
+    draw: h => vzA(h)
+  })}
+
+  ${fig('fV2', {
+    title: '方案 B · 工序 → 品类 流向（桑基）',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '左列按<b>报表工艺顺序</b>排 24 个工序，右列 5 个品类，飘带宽度 = 在制量。回答「哪段工序压着哪类产品」。',
+    calls: [
+      { n: 1, x: 12, y: 8, title: '左列 = 报表工艺顺序', text: '不是按量排序——桑基图的价值就在于「顺着工艺顺序看物料怎么分布」，排序会破坏这个语义。' },
+      { n: 2, x: 76, y: 8, title: '右列 = 5 个品类，节点高 = 总量占比', text: '右列节点高度按品类总量分配，并带一个最小高度下限，避免小品类被压成一条线。' },
+      { n: 3, x: 48, y: 50, title: '飘带宽度 = 该工序下该品类的在制量', text: 'bandHeights() 保证每条至少 minH 不溢出——否则小品类会被压成 0 高而消失。' },
+      { n: 4, x: 12, y: 74, title: '红框工序 = 有 Hold / OTD', text: '左侧节点描红边，和「方案 A 的脉冲环」「方案 D 的红方块」是同一套判定。' }
+    ],
+    foot: '<b>动效</b>：宽度 ≥ 5px 的飘带叠加流动虚线（<span class="mono">stroke-dashoffset</span> 循环），指示物料流向；节点入场淡入上浮。',
+    draw: h => vzB(h)
+  })}
+
+  ${fig('fV3', {
+    title: '方案 C · CT × 数量 气泡象限',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '一个批次一个气泡。x = BE CT（天），y = 数量（<b>对数轴</b>），半径 = 数量。回答「哪些批次又慢又多，最该先处理」。',
+    calls: [
+      { n: 1, x: 78, y: 20, title: '红区：CT ≥ ' + WIP.alarm.ctR + ' 天', text: WIP.alarm.ctY + '～' + WIP.alarm.ctR + ' 天是黄区，≥ ' + WIP.alarm.ctR + ' 天是红区，阈值来自抽屉里的「报警配置」（wip_alarm）。' },
+      { n: 2, x: 50, y: 8, title: 'y 轴是对数轴', text: '因为数量跨度从百到几万，线性轴会把小批次全挤在底部一条线上。' },
+      { n: 3, x: 30, y: 40, title: '半径 r = 2.1 + √(q / qMax) × 6.2', text: '开根号 → <b>面积正比于数量</b>；若直接用 q 做半径，大批次会大得离谱。' },
+      { n: 4, x: 88, y: 78, title: '红圈脉冲 = CT 超红 或 OTD 逾期', text: '当前 ' + WIP.ct.have + ' 个气泡里有 ' + WIP.ct.redWithCt + ' 个红圈，集中在右侧红区。' }
+    ],
+    foot: '<b>绘制顺序</b>：按数量<b>降序</b>画——大泡先画在下层，小泡压在上层，否则小批次会被彻底遮住。入场是左→右的波浪式弹出。',
+    draw: h => vzC(h)
+  })}
+
+  ${fig('fV4', {
+    title: '方案 D · 批次点阵',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '一个方块 = 一个批次，共 ' + WIP.totalLots + ' 块，按工序分行。回答「每个工序积压了多少批次、其中多少有问题」。',
+    calls: [
+      { n: 1, x: 47, y: 8, title: '一行 = 一个工序，34 列网格，自动换行', text: '所以行长度直接反映批次数量，不用看数字就能比多少。' },
+      { n: 2, x: 30, y: 46, title: '颜色 = 品类', text: '与热力矩阵、桑基、极坐标弧同一套映射。' },
+      { n: 3, x: 70, y: 62, title: '红描边 + 脉冲 = CT 超红 / OTD 逾期', text: '方形描边比改颜色更容易在密集点阵里被发现。' },
+      { n: 4, x: 14, y: 84, title: '虚线外框 = Hold', text: 'Hold 和「报警」是两个维度，所以用外框而不是描边，可以同时表达「既 Hold 又超标」。' }
+    ],
+    foot: '<b>入场动效</b>：按 (行 + 列) 之和做波纹式点亮，从左上角向右下角扫过去。',
+    draw: h => vzD(h)
+  })}
+
+  ${fig('fV5', {
+    title: '方案 E · 极坐标弧',
+    tags: b3 + '<span class="bdg bdg real">真实渲染</span>',
+    sub: '中心甜甜圈 = 品类占比，外圈每根柱 = 一个工序。适合大屏远看：一圈就能读出「总量、结构、哪段堵」。',
+    calls: [
+      { n: 1, x: 50, y: 35, title: '中心甜甜圈 = 品类占比', text: '与外圈共用同一圆心；弧段用 stroke-dasharray 过渡展开。' },
+      { n: 2, x: 50, y: 22, title: '外圈柱长 = 14 + (该工序量 ÷ 最大量) × 96', text: '按报表工艺顺序环绕排布，不是按量排序——顺时针一圈就是一条工艺路线。' },
+      { n: 3, x: 80, y: 60, title: '红描边 = 该工序有报警', text: '同样由 hold > 0 或 otd > 0 决定。' },
+      { n: 4, x: 50, y: 66, title: '中心总量 + 下方计数', text: '总量用滚动数字，下面标注「24 工序 / 5 品类 / ' + WIP.totalLots + ' 批」。' }
+    ],
+    foot: '<b>实现坑（已写进代码注释）</b>：CSS 的 <span class="mono">transform</span> 会覆盖 SVG 元素的 <span class="mono">transform</span> 属性——所以柱子的 rotate 必须放在外层 &lt;g&gt;，否则入场动画会把旋转干掉；另外极坐标标签的极角是 <span class="mono">a − 90°</span>，初版写成 <span class="mono">a + 90°</span> 导致标签与柱相差 180°。',
+    draw: h => vzE(h)
+  })}
+</section>`;
+
+
+/* ---------- §3 续：根因分析 / 月报 / 总览 / 其他 ---------- */
+const SEC3B = `
+<section class="sec" id="s34">
+  <div class="sub-h" id="s34a">3.3 异常根因智能分析（analytics.html） <span class="bdg bdg demo">演示数据</span></div>
+  <p>数据流：<span class="mono">ALARM_RECORDS</span> → <span class="mono">effectiveRecords()</span>（按角色 + 数据范围过滤）→ <span class="mono">computeAlarmStats(recs, {granularity, dim})</span>。</p>
+
+  ${fig('fA1', {
+  title: '告警频次趋势（可切换 按日 / 按周 / 按月）',
+  tags: b1 + '<span class="bdg bdg demo">演示数据</span>',
+  sub: '点下面的按钮切换粒度——这就是页面上的交互。共用同一份 <span class="mono">st</span>，切粒度只是换一次 <span class="mono">bucketSeries(recs, gran)</span>。',
+  calls: [
+    { n: 1, x: 50, y: 8, title: '系列①告警总量（蓝 + 面积）', text: '按日看会非常稀疏——因为生成逻辑里大多数日子 floor() 后是 0 条。切到「按月」才是这条数据的正确打开方式。' },
+    { n: 2, x: 82, y: 20, title: '系列②其中特急（红）', text: '特急是总量的子集，两条线同轴，所以红线永远在蓝线下方。' },
+    { n: 3, x: 12, y: 76, title: '时间轴补零连续', text: 'bucketSeries 从最早一条到最晚一条逐日/逐周/逐月填满，无数据的桶补 0——所以 x 轴是真的连续时间，不是「有数据的日子」。' }
+  ],
+  foot: '<b>实测分布（按月）：</b>' + AL.trendMonth.labels.join(' / ') + ' → ' + AL.trendMonth.counts.join(' / ') + ' 条。可以看出 <span class="mono">escalate</span> 场景「越接近今天越高发」的设计意图。',
+  draw: h => {
+    h.innerHTML = '<div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap" id="segA1">'
+      + ['day|按日（180 个点）', 'week|按周（' + AL.trendWeek.labels.length + ' 个点）', 'month|按月（' + AL.trendMonth.labels.length + ' 个点）'].map((s, i) => {
+        const p = s.split('|');
+        return '<button class="tbtn' + (i === 2 ? ' on' : '') + '" data-g="' + p[0] + '">' + p[1] + '</button>';
+      }).join('') + '</div><div id="hostA1"></div>';
+    const host = h.querySelector('#hostA1');
+    const map = { day: AL.trendDay, week: AL.trendWeek, month: AL.trendMonth };
+    const draw = g => {
+      const d = map[g], mx = Math.max.apply(null, d.counts);
+      docLine(host, {
+        series: [
+          { name: '告警总量', color: '#1d4ed8', data: d.counts, fill: true },
+          { name: '其中特急', color: '#cc2f2a', data: d.criticals }
+        ],
+        labels: d.labels, height: 230, min: 0, max: Math.ceil(mx * 1.15) || 1,
+        yUnit: ' 条', tipUnit: ' 条', tipTitle: i => d.labels[i]
+      });
+    };
+    h.querySelectorAll('#segA1 button').forEach(b => b.onclick = () => {
+      h.querySelectorAll('#segA1 button').forEach(x => x.classList.toggle('on', x === b));
+      draw(b.dataset.g);
+    });
+    draw('month');
+  }
+})}
+
+  ${fig('fA2', {
+    title: '告警构成 · 偶发 vs 批量连锁',
+    tags: b1 + '<span class="bdg bdg demo">演示数据</span>',
+    sub: '判定规则：<b>同一关键词一天内出现 ≥3 次，或跨 ≥2 个子系统同时出现 → 批量连锁，否则偶发</b>。',
+    calls: [
+      { n: 1, x: 50, y: 50, title: '当前实测：100% 偶发，连锁 0 条', text: '这不是 bug。当前演示数据集 180 天只有 ' + AL.total + ' 条，且每条都是独立生成的，没有任何一个（关键词 + 日期）组合达到 3 条或跨 2 个系统。' },
+      { n: 2, x: 20, y: 20, title: '中心数字 = 簇数', text: '簇的定义是「关键词 + 日期」分组，所以簇数可能接近总条数（当前 ' + AL.clusterTotal + ' 簇 / ' + AL.total + ' 条）。' }
+    ],
+    side: null,
+    foot: '<b>怎么让它有值：</b>如果演示时需要看到「批量连锁」，把 <span class="mono">ALARM_SCENARIOS</span> 里的 <span class="mono">base</span> 调大（例如 ≥2），同一天同一关键词就会超过 3 条。<b>但客户现场数据一旦接进来，这一档才真正有意义</b>——现在它反映的是演示数据的稀疏程度。',
+    draw: h => {
+      h.innerHTML = '<div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;justify-content:center">'
+        + '<div id="dA2"></div>'
+        + '<div style="flex:1;min-width:180px"><div class="formula" style="margin:0">'
+        + 'key     = keyword + "|" + ymd(ts)\n'
+        + 'chained = arr.length &gt;= 3\n'
+        + '          || systems.length &gt;= 2\n\n'
+        + '<em>// 当前实测</em>\n'
+        + '偶发 occasional = <b>' + AL.byType.occasional + '</b> 条\n'
+        + '连锁 chained    = <b>' + AL.byType.chained + '</b> 条</div></div></div>';
+      docDonut(h.querySelector('#dA2'), [
+        { value: AL.byType.occasional, color: '#0b6a86' },
+        { value: AL.byType.chained || 0, color: '#cc2f2a' }
+      ], 200, AL.clusterTotal, '告警簇总数');
+    }
+  })}
+
+  ${fig('fA3', {
+    title: '告警构成 · 告警等级',
+    tags: b1 + '<span class="bdg bdg demo">演示数据</span>',
+    sub: '三档：critical（特急）/ warn（重要）/ normal（一般）。',
+    side: '<div class="side-t">实测分布</div>'
+      + '<div class="co"><span class="co-n" style="background:#cc2f2a">C</span><div><b>特急 critical = ' + AL.critical + ' 条</b><span>由场景的 levelW.critical 权重决定，如「数据库主节点」权重最高（0.8）。</span></div></div>'
+      + '<div class="co"><span class="co-n" style="background:#a8620b">W</span><div><b>重要 warn = ' + AL.warn + ' 条</b><span>大多数场景的主要档位。</span></div></div>'
+      + '<div class="co"><span class="co-n" style="background:#8a95a5">N</span><div><b>一般 normal = ' + AL.normal + ' 条</b><span>为 0 的原因和「连锁为 0」同理：三档是按 <span class="mono">rng()</span> 落在哪个区间分的，两端的权重加起来就吃满了概率空间。</span></div></div>',
+    draw: h => docDonut(h, [
+      { value: AL.critical, color: '#cc2f2a' },
+      { value: AL.warn, color: '#a8620b' },
+      { value: AL.normal || 0, color: '#8a95a5' }
+    ], 200, AL.total, '告警总条数')
+  })}
+
+  ${fig('fA4', {
+    title: 'TOP 高频告警排行 ＋ 告警处置情况',
+    tags: b1 + '<span class="bdg bdg demo">演示数据</span>',
+    sub: '左：<span class="mono">topBy(recs, dim, 10)</span>，dim 可切「关键词 / 来源系统 / 根因分类 / 告警等级」。右：三色状态条。',
+    side: '<div class="side-t">口径</div>'
+      + '<div class="co"><span class="co-n">1</span><div><b>rank 只影响取哪一维</b><span>同一个 topBy，dim 换一个就是另一张排行——不重新统计，只换分组键。</span></div></div>'
+      + '<div class="co"><span class="co-n">2</span><div><b>每条还带 pct 与 recent</b><span>pct 是占全量比例，recent 是近 30 天次数，用于区分「历史上多」和「最近在冒头」。</span></div></div>'
+      + '<div class="co"><span class="co-n">3</span><div><b>闭环率 = 已闭环 ÷ 总数</b><span>实测 ' + AL.byStatus.closed + ' / ' + AL.total + ' = <b>' + AL.closedRate + '%</b>，同时出现在统计条和月报报告头。</span></div></div>',
+    draw: h => {
+      const L = document.createElement('div'), R = document.createElement('div');
+      L.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:22px';
+      R.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#8a95a5;margin-bottom:9px">告警处置情况</div><div id="sb"></div>';
+      h.appendChild(L); h.appendChild(R);
+      const c1 = document.createElement('div'), c2 = document.createElement('div');
+      c1.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#8a95a5;margin-bottom:9px">TOP 高频告警（按关键词）</div><div id="tb"></div>';
+      c2.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#8a95a5;margin-bottom:9px">按来源系统</div><div id="sb2"></div>';
+      L.appendChild(c1); L.appendChild(c2);
+      const pal = ['#1d4ed8', '#0b6a86', '#8b5cf6', '#a8620b', '#12805a', '#cc2f2a', '#0b8a5a', '#e0912a', '#5b6577', '#1b3fa8'];
+      docHBars(c1.querySelector('#tb'), AL.top10.map((t, i) => ({ label: t.label, value: t.value, color: pal[i % 10] })), '');
+      docHBars(c2.querySelector('#sb2'), AL.top10.slice(0, 6).map((t, i) => ({ label: '系统 ' + (i + 1), value: t.value, color: pal[(i + 3) % 10] })), '');
+      docHBars(R.querySelector('#sb'), [
+        { label: '已闭环', value: AL.byStatus.closed, color: '#12805a' },
+        { label: '处理中', value: AL.byStatus.doing, color: '#a8620b' },
+        { label: '待处理', value: AL.byStatus.pending, color: '#cc2f2a' }
+      ], ' 条');
+    },
+    foot: '<b>四个视图共用一份统计结果：</b>趋势图回答「什么时候多」，排行回答「什么最多」，甜甜圈回答「是偶发还是连锁」，聚类表回答「为什么、怎么处置」——它们是<b>同一口径的四个视角</b>，不是四份独立统计。'
+  })}
+
+  ${fig('fA5', {
+    title: '相似告警聚类表',
+    tags: b1 + '<span class="bdg bdg demo">演示数据</span>',
+    sub: '按「关键词 + 日期」分组后排序，给出根因研判与处置建议。当前共 ' + AL.clusterTotal + ' 簇，下表列出前 5 簇。',
+    side: null,
+    draw: h => {
+      let html = '<div style="overflow-x:auto"><table style="margin:0;min-width:700px"><thead><tr>'
+        + '<th>代表关键词</th><th>根因分类</th><th>关联系统</th><th class="n">同类数量</th><th>类型</th><th>根因研判</th></tr></thead><tbody>';
+      AL.clusters.slice(0, 5).forEach(c => {
+        html += '<tr><td><b>' + esc(c.kw) + '</b></td><td>' + esc(c.cat) + '</td><td>' + esc(c.sys) + '</td>'
+          + '<td class="n">' + c.n + '</td>'
+          + '<td>' + (c.type === 'chained' ? '<span class="bdg bdg danger">批量连锁</span>' : '<span class="bdg bdg gray">偶发</span>') + '</td>'
+          + '<td style="color:#4a5567">' + esc(c.suggestion || '—') + '</td></tr>';
+      });
+      h.innerHTML = html + '</tbody></table></div><div class="mini-cap">因为当前每簇只有 1 条，全部判定为「偶发」。<b>这正是「规则跑通了、但数据还不够密」的典型表现</b>——客户真实告警接入后这一列才会分化。</div>';
+    }
+  })}
+
+  <div class="sub-h" id="s34b">3.4 自动月报（monthly.html） <span class="bdg bdg gray">跨页复算</span></div>
+  <p><b>这是全站唯一一处「跨页面复算」</b>，目的就是保证「月报口径 ≡ 根因分析口径」。月报的趋势图与 TOP10 直接复用 <span class="mono">computeAlarmStats</span> 的同一个结果，只是高度改成 230。两图位于 <span class="mono">.print-area</span> 内，因此<b>导出 PDF 走 <span class="mono">window.print()</span>，图表会被一并打印</b>——这也是当初选 SVG 而不是 canvas 的原因之一。</p>
+  <div class="note"><b>可以自己验证：</b>打开 analytics.html 和 monthly.html，把粒度都切到「按月」，两边的曲线形状与 TOP10 数值必然完全一致。</div>
+
+  <div class="sub-h" id="s35">3.5 监控总览（index.html） <span class="bdg bdg warn">不接主干①</span></div>
+  <p>这一页的两张图用的是<b>页面内自带的演示数组</b>，<b>不接</b>运维告警主干——它演示的是「总览大屏」的形态，与 analytics / monthly 的统计口径<b>刻意解耦</b>。</p>
+
+  ${fig('fI1', {
+    title: '近 24 小时健康度趋势 ＋ 今日异常等级分布',
+    tags: '<span class="bdg bdg warn">页面自带演示数组</span>',
+    sub: '左图数据来自 <span class="mono">base[] / abase[]</span> 两个写死的 24 元素数组；右图来自 <span class="mono">levelDist</span>（2 / 5 / 16 / 9 = 32 条）。',
+    calls: [
+      { n: 1, x: 50, y: 12, title: '告警数 ×10 归一化才能同轴', text: '健康度是 0～100 分，告警数是 0～9 条。直接画会贴地，所以代码里做了 Math.min(100, v * 10)。' },
+      { n: 2, x: 12, y: 44, title: '固定 min 0 / max 100', text: '健康度图不用动态算 y 轴，方便跨天对比时视觉一致。' },
+      { n: 3, x: 50, y: 30, title: '蓝色带面积（fill: true）', text: '只给健康度加面积，告警数保持纯线，避免两层面积互相糊住。' },
+      { n: 4, x: 88, y: 62, title: '等级档位与 analytics 不完全相同', text: '这里多一档「提示 / Info」，色值也略有差异——因为它是独立演示数组，不受主干①的口径约束。' }
+    ],
+    foot: '<b>要不要统一？</b>如果你希望全站口径完全一致，可以把 index 页改成复用 <span class="mono">computeAlarmStats</span>。目前是<b>有意解耦</b>：总览页演示「形态」，分析页演示「口径」。',
+    draw: h => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start';
+      const L = document.createElement('div'); L.style.cssText = 'flex:1;min-width:320px';
+      const R = document.createElement('div'); R.style.cssText = 'flex:none';
+      h.appendChild(wrap); wrap.appendChild(L); wrap.appendChild(R);
+      const hours = [];
+      for (let i = 23; i >= 0; i--) hours.push(((new Date().getHours() - i + 24) % 24) + ':00');
+      docLine(L, {
+        series: [
+          { name: '综合健康度', color: '#1d4ed8', data: DATA.indexDemo.base, fill: true },
+          { name: '告警事件数 ×10', color: '#e0912a', data: DATA.indexDemo.abase.map(v => Math.min(100, v * 10)) }
+        ],
+        labels: hours, height: 240, min: 0, max: 100, yUnit: '', tipUnit: '', hover: false
+      });
+      R.innerHTML = '<div id="iDonut"></div>';
+      docDonut(R.querySelector('#iDonut'), DATA.indexDemo.levelDist, 200, 32, '今日事件总数');
+      R.insertAdjacentHTML('beforeend', '<div class="mini-cap" style="max-width:200px;text-align:center">'
+        + DATA.indexDemo.levelDist.map(l => '<span style="display:inline-flex;align-items:center;gap:5px;margin:2px 6px"><i style="width:9px;height:9px;border-radius:3px;background:' + l.color + '"></i>' + esc(l.label) + ' ' + l.value + '</span>').join('')
+        + '</div>');
+    }
+  })}
+
+  ${fig('fI2', {
+    title: '子系统实时状态表（每行一条进度条）',
+    tags: '<span class="bdg bdg warn">真实渲染（来自 SUBSYSTEMS）</span>',
+    sub: '条宽 = <span class="mono">health%</span>，条色 = 状态色。这是最简单的可视化：进度条。',
+    side: '<div class="side-t">逻辑</div>'
+      + '<div class="co"><span class="co-n">1</span><div><b>条宽 = health%</b><span>health 是 0～100 的整数，直接当宽度百分比用。</span></div></div>'
+      + '<div class="co"><span class="co-n">2</span><div><b>条色 = statusInfo(状态)</b><span>正常绿 / 预警橙 / 严重红 / 离线灰，全站共用同一套状态色。</span></div></div>'
+      + '<div class="co"><span class="co-n">3</span><div><b>KPI 卡上的「平均健康度」</b><span>是过滤掉 health = 0（离线）后的平均值，避免离线系统拉低分母。</span></div></div>',
+    draw: h => {
+      const list = DATA.indexDemo.subsystems.slice().sort((a, b) => a.health - b.health);
+      const col = s => s === 'offline' ? '#8a95a5' : s === 'critical' ? '#cc2f2a' : s === 'warn' ? '#a8620b' : '#12805a';
+      h.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px">'
+        + list.map(s => '<div style="border:1px solid var(--border);border-radius:9px;padding:9px 11px">'
+          + '<div style="display:flex;justify-content:space-between;font-size:12.6px;margin-bottom:6px"><b>' + esc(s.name) + '</b>'
+          + '<span style="color:' + col(s.status) + ';font-weight:700;font-variant-numeric:tabular-nums">' + s.health + '</span></div>'
+          + '<div style="height:7px;border-radius:4px;background:#eef2f8;overflow:hidden"><i style="display:block;height:100%;width:' + s.health + '%;background:' + col(s.status) + ';border-radius:4px"></i></div>'
+          + '</div>').join('') + '</div>'
+        + '<div class="mini-cap">按 health 升序排列，所以最上面就是最该关注的系统（当前最低是 ' + esc(list[0].name) + ' = ' + list[0].health + '）。</div>';
+    }
+  })}
+
+  <div class="sub-h" id="s36">3.6 其他页面的非图表可视化</div>
+  <table>
+    <tr><th style="width:150px">页面</th><th style="width:190px">元素</th><th>逻辑</th></tr>
+    <tr><td><span class="mono">systems.html</span></td><td>系统卡上的 <span class="mono">.progress</span> 条</td><td>条宽 = <span class="mono">progress%</span>（100% = 已交付），色 = 卡片强调色</td></tr>
+    <tr><td><span class="mono">users.html</span></td><td>角色卡 <span class="mono">.ri-bar</span></td><td>角色权限覆盖度色条</td></tr>
+    <tr><td><span class="mono">wall.html</span></td><td><span class="mono">.wallProg</span> 轮播进度条</td><td>宽度 = <span class="mono">100 − 剩余时间/间隔 × 100</span>，每秒 tick；到 0 切下一屏（共 8 屏）</td></tr>
+    <tr><td><span class="mono">ingest.html</span></td><td><span class="mono">#failBars</span> / <span class="mono">#slowBars</span></td><td>两条 hBars：异常调用分类计数 / 平均耗时 &gt; 400ms 的子系统 TOP5。数据来自实时调用日志，<b>每次刷新都不同</b>，属演示性数据</td></tr>
+    <tr><td><span class="mono">alerts.html</span></td><td>无图表</td><td>阈值 / 强制弹窗 / 语音告警配置项</td></tr>
+    <tr><td><span class="mono">archive.html</span> / <span class="mono">mail.html</span></td><td>无图表</td><td>列表与配置</td></tr>
+    <tr><td><span class="mono">op-config.html</span></td><td>阈值输入即时重算</td><td>详见 §4「改一处会牵动哪里」——它是全站唯一的配置源头</td></tr>
+  </table>
+</section>`;
+
+/* ---------- §4 联动关系 ---------- */
+const SEC4 = `
+<section class="sec" id="s4">
+  <div class="sec-h"><div class="sec-n">4</div><h2>逻辑关系总图：改一处会牵动哪里</h2></div>
+  <p class="sec-sub">这张图是交接时最值得讲的一张——它回答「客户说阈值要调一下，会影响哪些页面」。三条链路彼此独立，互不干扰。</p>
+
+  <svg class="flow-svg" viewBox="0 0 1000 520" style="margin:14px 0 4px">
+    <defs>
+      <marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#b9c8e4"/></marker>
+    </defs>
+
+    <text x="0" y="22" font-size="12.5" font-weight="800" fill="#12805a">链路一 · OP 产出</text>
+    <rect x="0" y="32" width="270" height="62" rx="10" fill="#e3f6ee" stroke="#c3ead9"/>
+    <text x="14" y="54" font-size="12.4" font-weight="800" fill="#0d6146">op-config.html ① PKG Type 维护</text>
+    <text x="14" y="73" font-size="11.2" fill="#4a5567">黄/红阈值 · 单价 · 默认周目标</text>
+    <text x="14" y="88" font-size="11.2" fill="#8a95a5">写入 OPTypeStore（localStorage）</text>
+
+    <path d="M135,94 L135,120" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+    <rect x="0" y="124" width="270" height="44" rx="10" fill="#f4f7fc" stroke="#d7dfec"/>
+    <text x="14" y="143" font-size="11.8" fill="#1b3fa8" font-family="monospace">opAlarmOf / opAlarmSum / opAlarmText</text>
+    <text x="14" y="159" font-size="11.8" fill="#1b3fa8" font-family="monospace">opPriceOf / opStatusOf / opEarnSeries</text>
+
+    <path d="M135,168 L135,192" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+    <rect x="0" y="196" width="270" height="34" rx="9" fill="#fff" stroke="#d7dfec"/>
+    <text x="14" y="217" font-size="11.6" fill="#16202e">output.html <tspan fill="#cc2f2a" font-weight="800">红柱 marks</tspan> ＋ 阈值 chip</text>
+    <rect x="0" y="238" width="270" height="34" rx="9" fill="#fff" stroke="#d7dfec"/>
+    <text x="14" y="259" font-size="11.6" fill="#16202e">op-table.html 单元格「超 / 警」＋ 阈值列</text>
+    <rect x="0" y="280" width="270" height="34" rx="9" fill="#fff" stroke="#d7dfec"/>
+    <text x="14" y="301" font-size="11.6" fill="#16202e">op-config ④ 只读阈值预览（同源复算）</text>
+    <rect x="0" y="322" width="270" height="34" rx="9" fill="#fff" stroke="#d7dfec"/>
+    <text x="14" y="343" font-size="11.6" fill="#16202e">output.html <tspan font-weight="800">fit()</tspan> 两图一屏自适应</text>
+    <path d="M270,213 Q310,213 320,213" stroke="#c9d2e0" fill="none" stroke-dasharray="4 4"/>
+    <text x="288" y="206" font-size="10.4" fill="#8a95a5">共用</text>
+    <text x="288" y="228" font-size="10.4" fill="#8a95a5">focusIdx</text>
+
+    <text x="0" y="388" font-size="12" fill="#8a95a5">↑ 这三处永远是同一个判定结果</text>
+
+    <text x="700" y="22" font-size="12.5" font-weight="800" fill="#0b6a86">链路二 · WIP 在制</text>
+    <rect x="700" y="32" width="300" height="46" rx="10" fill="#e2f3f9" stroke="#c2e4ef"/>
+    <text x="714" y="52" font-size="12.4" font-weight="800" fill="#0b5a72">wip-real-data.js</text>
+    <text x="714" y="69" font-size="11.2" fill="#4a5567">813 批 × 18 字段（客户报表抽取）</text>
+    <path d="M850,78 L850,100" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+    <rect x="700" y="104" width="300" height="150" rx="10" fill="#fff" stroke="#d7dfec"/>
+    <text x="714" y="124" font-size="11.6" fill="#16202e">· wip.html 5 项 KPI（countUp 滚动）</text>
+    <text x="714" y="144" font-size="11.6" fill="#16202e">· 热力矩阵（列归一化着色）</text>
+    <text x="714" y="164" font-size="11.6" fill="#16202e">· 排行堆叠条（前 12 ＋ 其余合并）</text>
+    <text x="714" y="184" font-size="11.6" fill="#16202e">· Hold 跑马灯（hold &gt; 0）</text>
+    <text x="714" y="204" font-size="11.6" fill="#16202e">· 5 个动效方案 A/B/C/D/E</text>
+    <text x="714" y="226" font-size="11.2" fill="#8a95a5">（同一份 ctx，五种视觉语法）</text>
+    <text x="714" y="245" font-size="11.2" fill="#8a95a5">口径 valOf 决定显示 K 还是 万元</text>
+
+    <rect x="700" y="268" width="300" height="44" rx="10" fill="#fdf1e0" stroke="#f0dcc0"/>
+    <text x="714" y="287" font-size="11.8" font-weight="700" fill="#a8620b">wip_alarm 阈值（抽屉内可配）</text>
+    <text x="714" y="303" font-size="11.2" fill="#4a5567">决定方案 C 的报警带位置 / C·D 的红圈与脉冲</text>
+    <path d="M850,268 L850,258" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+
+    <text x="350" y="22" font-size="12.5" font-weight="800" fill="#1b3fa8">链路三 · 运维告警</text>
+    <rect x="350" y="32" width="300" height="46" rx="10" fill="#e7eeff" stroke="#c9dcff"/>
+    <text x="364" y="52" font-size="12.4" font-weight="800" fill="#1b3fa8">analytics-core.js · ALARM_RECORDS</text>
+    <text x="364" y="69" font-size="11.2" fill="#4a5567">固定种子 20260923 · 180 天 · ${AL.total} 条</text>
+    <path d="M500,78 L500,100" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+    <rect x="350" y="104" width="300" height="62" rx="10" fill="#fff" stroke="#d7dfec"/>
+    <text x="364" y="124" font-size="11.6" fill="#16202e"><tspan font-weight="700">computeAlarmStats</tspan> → 趋势 / 构成 / 排行</text>
+    <text x="364" y="143" font-size="11.6" fill="#16202e">analytics.html 四视图 <tspan fill="#8a95a5">（同源）</tspan></text>
+    <text x="364" y="160" font-size="11.6" fill="#16202e">monthly.html 趋势 / TOP10 <tspan fill="#8a95a5">（跨页复算）</tspan></text>
+    <path d="M500,166 L500,186" stroke="#b9c8e4" stroke-width="1.6" marker-end="url(#ar2)"/>
+    <rect x="350" y="190" width="300" height="44" rx="10" fill="#fff" stroke="#d7dfec"/>
+    <text x="364" y="209" font-size="11.6" fill="#16202e"><tspan font-weight="700">classifyAlerts</tspan> → 偶发 / 连锁</text>
+    <text x="364" y="226" font-size="11.6" fill="#16202e">甜甜圈 ＋ 聚类表（根因与处置建议）</text>
+    <text x="350" y="264" font-size="11.2" fill="#8a95a5">index.html 的总览两张图<b>不在这条链路上</b></text>
+    <text x="350" y="282" font-size="11.2" fill="#8a95a5">（用页面自带演示数组，见 §3.5）</text>
+
+    <rect x="350" y="310" width="650" height="86" rx="11" fill="#f8fafd" stroke="#d7dfec" stroke-dasharray="5 4"/>
+    <text x="366" y="332" font-size="12" font-weight="800" fill="#16202e">三条链路互不影响</text>
+    <text x="366" y="353" font-size="11.4" fill="#4a5567">· 改 OP 阈值 → 只会动 output / op-table / op-config，不会影响 WIP 与告警页</text>
+    <text x="366" y="371" font-size="11.4" fill="#4a5567">· 改 wip_alarm → 只影响 WIP 的报警带与红圈，不影响 OP 的红灯日</text>
+    <text x="366" y="389" font-size="11.4" fill="#4a5567">· 换客户告警数据 → 只影响 analytics / monthly，index 仍是自带演示数组</text>
+  </svg>
+</section>`;
+
+/* ---------- §5 口径矩阵 ---------- */
+const SEC5 = `
+<section class="sec" id="s5">
+  <div class="sec-h"><div class="sec-n">5</div><h2>口径一致性矩阵</h2></div>
+  <p class="sec-sub">这张表的作用：当有人问「这两张图的数为什么一致」时，直接指过去。</p>
+  <table>
+    <tr><th style="width:230px">口径</th><th style="width:290px">唯一实现处</th><th>消费方</th></tr>
+    <tr><td>告警分桶趋势</td><td><span class="mono">bucketSeries()</span></td><td>analytics 趋势图、monthly 趋势图</td></tr>
+    <tr><td>偶发 / 批量连锁判定</td><td><span class="mono">classifyAlerts()</span>（≥3 次/天 或 跨 ≥2 系统）</td><td>analytics 甜甜圈、聚类表、统计条</td></tr>
+    <tr><td>高频排行</td><td><span class="mono">topBy()</span></td><td>analytics <span class="mono">#topBars</span>、monthly <span class="mono">#repTop</span>、导出 Excel</td></tr>
+    <tr><td>闭环率</td><td><span class="mono">computeAlarmStats().closedRate</span></td><td>analytics 统计条、monthly 报告头</td></tr>
+    <tr><td>OP 周目标均摊</td><td><span class="mono">genOpWeek()</span></td><td>output 双图、op-table 宽表</td></tr>
+    <tr><td>OP 状态三色</td><td><span class="mono">opStatusOf()</span></td><td>output 红柱 marks、op-table 着色与角标、op-config 行内状态</td></tr>
+    <tr><td>逐品类阈值</td><td><span class="mono">opAlarmOf()</span> / <span class="mono">opAlarmSum()</span></td><td>上列全部 ＋ 各处 chip 文案</td></tr>
+    <tr><td>Earn 金额折算</td><td><span class="mono">opEarnSeries()</span>（K × 单价 / 10）</td><td>output Earn 图、op-table Earn 两行、WIP 的 by-earn 口径</td></tr>
+    <tr><td>WIP 工序聚合</td><td><span class="mono">stepAgg()</span></td><td>热力矩阵、排行条、5 个可视化方案</td></tr>
+    <tr><td>WIP 全局汇总</td><td><span class="mono">globalAgg()</span></td><td>5 项 KPI</td></tr>
+    <tr><td>WIP 口径换算</td><td><span class="mono">valOf()</span></td><td>KPI、矩阵、方案 A/B/D/E</td></tr>
+  </table>
+  <div class="note ok"><b>结论：</b>跨页面出现同名指标时，它们必然走同一个函数，不存在「两处算法略有差异」的情况。这是本工程刻意保持的性质——也是交接时最容易被忽略、但评审时最容易救场的一条。</div>
+</section>`;
+
+/* ---------- §6 颜色 ---------- */
+const SEC6 = `
+<section class="sec" id="s6">
+  <div class="sec-h"><div class="sec-n">6</div><h2>颜色语义约定</h2></div>
+  <p class="sec-sub">颜色在这个工程里是<b>语义</b>，不是装饰。</p>
+  <table>
+    <tr><th style="width:120px">色块</th><th style="width:130px">语义</th><th style="width:190px">色值</th><th>出现位置</th></tr>
+    ${[
+    ['#1d4ed8', '目标线 / 主色', '蓝', '累计目标虚线、健康度、告警总量'],
+    ['#12805a', '实际达标 / 正向', '绿', '累计实际实线、PQFN 品类'],
+    ['#0b6a86', '实际（Earn）/ 偶发', '青', 'Earn 实际实线、QFN 品类、偶发告警'],
+    ['#8b5cf6', 'Earn 目标 / 品类', '紫', 'Earn 目标虚线、QFN 品类'],
+    ['#a8620b', '<b>临界 / 黄灯</b>', '橙', 'critical 状态、CT 黄线、FCCSP 品类'],
+    ['#cc2f2a', '<b>异常 / 超标 / 红灯</b>', '红', 'over 状态、红柱 marks、CT 红线、连锁告警、Hold / OTD'],
+    ['#8a95a5', '中性 / 无数据', '灰', 'none 状态、离线系统、空单元格']
+  ].map(r => '<tr><td><span style="display:inline-block;width:34px;height:16px;border-radius:4px;background:' + r[0] + ';vertical-align:middle"></span></td>'
+    + '<td>' + r[1] + '</td><td>' + r[2] + ' <span class="mono">' + r[0] + '</span></td><td>' + r[3] + '</td></tr>').join('')}
+  </table>
+  <div class="sub-h">品类色（全站统一的品类编码）</div>
+  <div style="display:flex;gap:11px;flex-wrap:wrap">
+    ${WIP.typeMap.map(t => '<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 13px;background:#fff">'
+      + '<span style="width:14px;height:14px;border-radius:4px;background:' + t.color + '"></span>'
+      + '<b>' + esc(t.id) + '</b><span style="color:#8a95a5;font-size:12.4px">' + nf(t.qtyK) + 'K</span></div>').join('')}
+  </div>
+  <div class="note danger" style="margin-top:16px"><b>⚠ 注意语义方向：</b>本工程的「红」表示<b>异常 / 未达标 / 超期</b>，「绿」表示<b>达标 / 正常</b>，是<b>状态语义</b>，与股票涨跌的「红涨绿跌」无关，不要混用。
+    <br>另外，<b>品类色与状态色会撞色</b>（QFN 是紫、FCCSP 是橙，而紫/橙又分别是 Earn 目标色和黄灯色）。判断状态请以 <b>badge / 角标 / 描边</b> 为准，不要只看填充色。</div>
+</section>`;
+
+/* ---------- §7 校验与边界 ---------- */
+const SEC7 = `
+<section class="sec" id="s7">
+  <div class="sec-h"><div class="sec-n">7</div><h2>图表怎么被校验，以及已知边界</h2></div>
+  <p class="sec-sub">本项目所有可视化变更都通过 CDP 无头浏览器实测，而不是「看着差不多」。</p>
+  <table>
+    <tr><th style="width:210px">脚本</th><th>用途</th></tr>
+    <tr><td><span class="mono">.checkall.js</span></td><td>遍历全部 <span class="mono">*.html</span>（跳过 2 个说明文档页，即 <b>14 个业务页面</b>），捕获 JS 异常，断言 <span class="mono">ALL_PAGES_OK</span></td></tr>
+    <tr><td><span class="mono">.shot.js</span></td><td>指定页 / 尺寸截图，支持 <span class="mono">hover / scroll / click</span>。<b>点击必须带 <span class="mono">button:'left'</span></b>，否则不触发</td></tr>
+    <tr><td><span class="mono">.measure.js</span></td><td>实测元素尺寸与位置（验证「两张图是否真在一屏内」这类问题）</td></tr>
+    <tr><td><span class="mono">.viz-test.js</span> / <span class="mono">.viz-probe.js</span></td><td>逐方案断言元素数量与几何（如方案 E 弧柱高度与角度）</td></tr>
+    <tr><td><span class="mono">.opcfg-test.js</span></td><td>配置页专项：表头结构、阈值实时重算、非法值提示</td></tr>
+    <tr><td><span class="mono">.docgen-probe.js</span></td><td><b>本文件的生成器</b>：在 node 里沙箱加载三条主干的引擎，把真实计算结果导出成数据，本文档所有图形都由它驱动</td></tr>
+  </table>
+  <div class="note warn"><b>⚠ 一个必须记住的坑：</b><span class="mono">.render.js</span> <b>不设置 <span class="mono">deviceMetrics</span></b>，所以涉及视口自适应的验证必须用 <span class="mono">.shot.js</span> 或 <span class="mono">.measure.js</span>，否则量出来的尺寸是错的。</div>
+
+  <div class="sub-h">已知边界与待确认</div>
+  <ol>
+    <li><span class="mono">barGroup()</span> 基元已实现但<b>全站未使用</b>，属保留能力。</li>
+    <li>主干①（运维告警）是<b>演示数据</b>，固定种子 <span class="mono">20260923</span>；主干② 为<b>真实 + 演示混合</b>（无真实数据的周回落 <span class="mono">OP_DEMO_PROFILE</span>，页面以 chip 标注）；主干③ 为<b>全真实</b>。</li>
+    <li>当前演示数据集偏稀疏，导致「批量连锁」与「一般等级」两档<b>实测为 0</b>——见 §1 与 §3.3 的说明，属数据形态而非缺陷。</li>
+    <li><span class="mono">op-real-data.js</span> 与 <span class="mono">wip-real-data.js</span> 含客户真实生产数据。<span class="mono">原始资料/</span> 与 <span class="mono">*.xls(x)</span> 已在 <span class="mono">.gitignore</span> 中排除，但<b>这两个派生的 JS 数据文件会入库</b>——对外分享前需评估脱敏。</li>
+    <li>WIP 的 <span class="mono">Hold_Reason</span> 字段在源文件中即为乱码（编码问题），页面已在卡片说明中标注。</li>
+    <li>「刷新频率 / 夏令时 / 比对模式（差额 vs 复合）」等口径仍为可配置的<b>待客户确认项</b>，见 <span class="mono">OP_DEFAULTS</span> 与《功能清单与待确认项》。</li>
+  </ol>
+
+  <div class="note" style="margin-top:20px">本文档由 <span class="mono">.docgen-probe.js</span> 从工程引擎中<b>真实计算</b>的数据驱动生成，与 <span class="mono">图表逻辑关系说明.md</span> 内容对应。
+    改动任一图表口径时，请一并更新这两份文档的第 3、5 节。</div>
+</section>`;
+
+/* ==========================================================================
+   6. 渲染
+   ========================================================================== */
+const TOC_ITEMS = [
+  ['s0', '0 · 三层结构 · 三条主干', 0],
+  ['s1', '1 · 三条数据主干', 0], ['s1a', '① 运维告警', 1], ['s1b', '② OP 产出', 1], ['s1c', '③ WIP 在制', 1],
+  ['s2', '2 · 四个绘制基元', 0], ['fP1', '2.1 lineChart', 1], ['fP2', '2.2 donut', 1], ['fP3', '2.3 hBars', 1], ['fP4', '2.4 barGroup', 1],
+  ['s3', '3 · 逐图表详解', 0],
+  ['s31', '3.1 Output 大屏', 1], ['fO1', '累计曲线（双图）', 2], ['fO2', '真实数据周', 2], ['fO3', 'fit() 一屏自适应', 2], ['fO4', '周维度报表', 2],
+  ['s32', '3.2 WIP 看板', 1], ['fW1', '5 项 KPI', 2], ['fW2', '热力矩阵', 2], ['fW3', '排行堆叠条', 2], ['fW4', 'Hold 跑马灯', 2],
+  ['s33', '3.2.1 五个动效方案', 2], ['fV1', 'A 环形仪表盘', 2], ['fV2', 'B 流向桑基', 2], ['fV3', 'C 气泡象限', 2], ['fV4', 'D 批次点阵', 2], ['fV5', 'E 极坐标弧', 2],
+  ['s34', '3.3 根因分析', 1], ['fA1', '频次趋势', 2], ['fA2', '偶发 vs 连锁', 2], ['fA3', '告警等级', 2], ['fA4', 'TOP 排行', 2], ['fA5', '聚类表', 2],
+  ['s34b', '3.4 自动月报', 1], ['s35', '3.5 监控总览', 1], ['fI1', '健康度趋势', 2], ['fI2', '子系统状态', 2],
+  ['s36', '3.6 其他可视化', 1],
+  ['s4', '4 · 改一处牵动哪里', 0],
+  ['s5', '5 · 口径一致性矩阵', 0],
+  ['s6', '6 · 颜色语义', 0],
+  ['s7', '7 · 校验与边界', 0]
+];
+
+function boot() {
+  $('#toc').innerHTML = '<div class="toc-t">目录</div>' + TOC_ITEMS.map(t =>
+    '<a href="#' + t[0] + '" class="' + (t[2] === 1 ? 'sub' : t[2] === 2 ? 'sub' : '') + '" style="' + (t[2] === 2 ? 'padding-left:34px;font-size:12.2px' : '') + '">' + t[1] + '</a>').join('');
+
+  $('#main').innerHTML = SEC0 + SEC1 + SEC2 + SEC3 + SEC3B + SEC4 + SEC5 + SEC6 + SEC7;
+  $('#statBadge').innerHTML = '三条主干已接入 · 15 张图为真实数据渲染';
+
+  let ok = 0, bad = [];
+  MOUNT.forEach(m => {
+    const el = document.getElementById(m.id);
+    if (!el) return;
+    try { m.fn(el); ok++; }
+    catch (e) { bad.push(m.id + ': ' + e.message); el.innerHTML = '<div class="note danger">渲染失败：' + esc(e.message) + '</div>'; console.error(e); }
+  });
+  $('#statBadge').innerHTML = bad.length ? ('渲染成功 ' + ok + ' / 失败 ' + bad.length) : ('三条主干已接入 · ' + ok + ' 张图真实渲染完成');
+  bindPins();
+
+  /* 顶栏：显示 / 隐藏图上标注 */
+  const bp = $('#btnPin');
+  bp.onclick = () => {
+    const off = document.body.classList.toggle('nopin');
+    bp.classList.toggle('on', !off);
+    bp.textContent = off ? '显示图上标注' : '隐藏图上标注';
+  };
+
+  /* 目录滚动高亮 */
+  const links = $$('#toc a');
+  const targets = links.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+  const onScroll = () => {
+    const y = window.scrollY + 96;
+    let cur = 0;
+    targets.forEach((t, i) => { if (t.offsetTop <= y) cur = i; });
+    links.forEach((a, i) => a.classList.toggle('on', targets[i] === targets[cur]));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  console.log('DOC_READY mounts=' + ok + (bad.length ? ' FAILED=' + bad.join(' | ') : ''));
+}
+boot();
+</script>
+</body>
+</html>

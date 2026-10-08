@@ -68,54 +68,6 @@
     return { qty, earn, lots, hold, otd };
   }
 
-  /* ---------------- 工序工艺顺序（按报表首次出现顺序，用于流向 / 极坐标方案） ---------------- */
-  const STEP_ORDER = (function () {
-    const o = [], seen = {};
-    rows.forEach(r => { if (!(r[0] in seen)) { seen[r[0]] = 1; o.push(r[0]); } });
-    return o;
-  })();
-  function stepsInOrder() {
-    const m = {};
-    stepAgg().forEach(s => { m[s.step] = s; });
-    return STEP_ORDER.map(k => m[k]).filter(Boolean);
-  }
-
-  /* ---------------- 动态可视化方案（备选，真实数据驱动） ---------------- */
-  const VIZ_LIST = (window.WipViz ? WipViz.ORDER : ['A']).map(k => Object.assign({ key: k }, WipViz.SCHEMES[k]));
-  let viz = store.get('wip_viz', 'A');
-  if (viz !== 'ALL' && VIZ_LIST.every(v => v.key !== viz)) viz = 'A';
-  const saveViz = () => store.set('wip_viz', viz);
-  let vizPatrol = null, vizSpot = 0;
-
-  function vizCtx(steps) {
-    const keep = selTypes();
-    return {
-      scheme: viz, rows: rows.filter(r => keep.includes(r[1])), steps, stepsOrder: stepsInOrder(),
-      types: keep, unitLabel, valOf, fmtVal, typeColor: TYPE_COLOR, typeName,
-      alarm: alarmCfg, openDrawer
-    };
-  }
-
-  function renderViz(steps) {
-    const host = document.getElementById('vizHost');
-    if (!host) return;
-    host.innerHTML = WipViz.html(vizCtx(steps));
-    WipViz.animate(host, vizCtx(steps));
-
-    /* 方案 A 的工序巡检高亮（与热力矩阵共用轮询节奏） */
-    if (vizPatrol) clearInterval(vizPatrol);
-    if (viz === 'A' || viz === 'ALL') {
-      vizPatrol = setInterval(() => {
-        if (drawerOpen || document.hidden) return;
-        const els = host.querySelectorAll('.vz-ring');
-        if (!els.length) return;
-        els.forEach(x => x.classList.remove('spot'));
-        vizSpot = (vizSpot + 1) % els.length;
-        els[vizSpot].classList.add('spot');
-      }, 3500);
-    }
-  }
-
   /* ---------------- 动效：数字滚动 ---------------- */
   function countUp(el, target, dec, suffix) {
     const t0 = performance.now(), dur = 950, from = 0;
@@ -174,21 +126,6 @@
         </div>
       </div>
 
-      <section class="card mt16 wip-viz">
-        <div class="card-head">
-          <div class="card-title">${icon('zap', 19)} 动态可视化 · 方案对比
-            <span class="card-sub">5 个备选展示方案，全部由客户真实明细驱动 · 切换查看，选定后可固化为看板默认图表</span></div>
-          <div class="vz-seg" id="vizSeg">
-            ${VIZ_LIST.map(v => `<button data-v="${v.key}" class="${viz === v.key ? 'on' : ''}">${icon(v.icon, 15)} 方案 ${v.key} · ${v.name}</button>`).join('')}
-            <button data-v="ALL" class="${viz === 'ALL' ? 'on' : ''}">${icon('grid', 15)} 全部平铺对比</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div id="vizHost" class="vz-host"></div>
-          <div class="vz-info" id="vzInfo">${icon('search', 14)} 把鼠标移到图表上查看明细 · 点击任意图形进入该工序的二级筛选。</div>
-        </div>
-      </section>
-
       <div class="grid g-23 mt16">
         <section class="card">
           <div class="card-head"><div class="card-title">${icon('grid', 19)} 工序 × PKG Type 热力矩阵
@@ -234,15 +171,8 @@
       };
     });
 
-    /* 动态可视化方案切换 */
-    const vseg = document.getElementById('vizSeg');
-    if (vseg) vseg.querySelectorAll('button').forEach(b => {
-      b.onclick = () => { viz = b.dataset.v; saveViz(); render(); };
-    });
-
     renderHeat(heatRows, steps);
     renderRank(steps);
-    renderViz(steps);
     startPatrol(steps);
   }
 

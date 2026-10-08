@@ -1,0 +1,21 @@
+const fs = require('fs');
+const url = 'file:///' + process.cwd().replace(/\\/g, '/') + '/wip.html';
+(async () => {
+  const r = await fetch(`http://127.0.0.1:9333/json/new?${encodeURIComponent(url)}`, { method: 'PUT' });
+  const t = await r.json();
+  const ws = new WebSocket(t.webSocketDebuggerUrl);
+  let id = 0; const pending = new Map();
+  const send = (m, p = {}) => new Promise(res => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method: m, params: p })); });
+  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result || {}); pending.delete(m.id); } };
+  await new Promise(res => { ws.onopen = res; });
+  await send('Emulation.setDeviceMetricsOverride', { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await send('Page.enable');
+  const ev = async expr => (await send('Runtime.evaluate', { expression: expr, returnByValue: true })).result?.value;
+  await new Promise(x => setTimeout(x, 3200));
+  await ev(`window.scrollTo(0,0)`);
+  await new Promise(x => setTimeout(x, 400));
+  const s = await send('Page.captureScreenshot', { format: 'png' });
+  fs.writeFileSync('shot-wip-noviz.png', Buffer.from(s.data, 'base64'));
+  console.log('ok');
+  ws.close();
+})().catch(e => console.error(e));

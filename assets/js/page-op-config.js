@@ -4,7 +4,11 @@
         · 报警阈值（黄灯 / 红灯，单位 K）挂在每个 PKG Type 上逐项维护
      ② 每周目标数量（按「年份 + 周别」逐 PKG Type 填写本周总目标 K）      → OPGoalStore
      ③ 部门可见范围（哪个部门可以看哪些 PKG Type）                        → OPDeptStore
-     ④ 报警比对口径 / 刷新机制 / 夏令时（口径待客户确认，预留入口）        → op_cfg
+     ④ 预警分口径 / 夏令时（口径待客户确认，预留入口）                    → op_cfg
+        · 预警逻辑分口径（10-08 客户修正）：数量口径沿用「周目标均摊」不变；
+          金额（Earn）口径可切换「递进式 ±5%」（周六看上周五实际、周日看周六实际，逐日递进），
+          并支持周二拿到准确出库数据后手动修正本周后续几天的 Earn 目标（按周保存）。
+        · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
    权限：需 Output（OP）模块「编辑」权限；否则整页只读。 */
 (function () {
   renderShell('opcfg');
@@ -12,11 +16,18 @@
   const canEdit = CurrentUser.can('output', 'edit');
   const cur = opCurrentWeek();
 
-  /* ---------------- 配置域 ④：报警 / 刷新 / 夏令时 ---------------- */
+  /* ---------------- 配置域 ④：报警分口径 / 夏令时 ---------------- */
   let cfg = Object.assign({}, OP_DEFAULTS, store.get('op_cfg', {}));
   cfg.alarm = Object.assign({}, OP_DEFAULTS.alarm, cfg.alarm || {});
-  cfg.refresh = Object.assign({}, OP_DEFAULTS.refresh, cfg.refresh || {});
+  cfg.goalMode = Object.assign({}, OP_DEFAULTS.goalMode, cfg.goalMode || {});
+  cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
+  cfg.earnProg.manual = Object.assign({}, cfg.earnProg.manual || {});
+  /* 夏令时改手动（10-08）：旧配置里的 auto 一律迁移为 summer */
+  if (cfg.dst !== 'summer' && cfg.dst !== 'winter') cfg.dst = OP_DEFAULTS.dst;
+  if (cfg.dstStartHour !== 6 && cfg.dstStartHour !== 7) cfg.dstStartHour = OP_DEFAULTS.dstStartHour;
   const saveCfg = () => store.set('op_cfg', cfg);
+  const curGoalMode = () => Object.assign({}, OP_DEFAULTS.goalMode, cfg.goalMode || {});
+  const curEarnProg = () => Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
 
   /* ---------------- 状态 ---------------- */
   let tab = 'types';                       // types | goals | dept | alarm
@@ -28,7 +39,7 @@
     { key: 'types', label: '① PKG Type 维护', icon: 'layers' },
     { key: 'goals', label: '② 每周目标数量', icon: 'target' },
     { key: 'dept', label: '③ 部门可见范围', icon: 'users' },
-    { key: 'alarm', label: '④ 比对口径 / 刷新 / 夏令时', icon: 'alert' }
+    { key: 'alarm', label: '④ 预警分口径 / 夏令时', icon: 'alert' }
   ];
 
   function render() {
@@ -36,7 +47,7 @@
       <div class="notice mt16" style="--nc:var(--primary)">
         ${icon('settings', 19)}
         <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>）、<strong>每周 PKG Type 目标数量</strong>、
-        <strong>部门可见范围（哪个部门可以看什么）</strong>、比对口径 / 刷新 / 夏令时均在此配置，保存后
+        <strong>部门可见范围（哪个部门可以看什么）</strong>、预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）均在此配置，保存后
         <a class="chip chip-link" href="output.html">Output（OP）大屏</a> 即时生效。
         ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无 Output（OP）「编辑」权限，仅可查看配置。'}</div>
       </div>
@@ -252,6 +263,17 @@
     return map;
   }
 
+  /* Earn 目标手动修正：7 天（万元），空 = null（按规则自动） */
+  function collectEarnManual() {
+    const arr = [null, null, null, null, null, null, null];
+    document.querySelectorAll('#tblEarnMan [data-em]').forEach(el => {
+      const i = Number(el.dataset.em);
+      const v = String(el.value || '').trim();
+      arr[i] = (v === '' || !isFinite(Number(v))) ? null : Math.max(0, Number(v));
+    });
+    return arr;
+  }
+
   /* =========================================================
      ③ 部门可见范围
      ========================================================= */
@@ -327,83 +349,122 @@
   }
 
   /* =========================================================
-     ④ 报警 / 刷新 / 夏令时
+     ④ 报警分口径 / 夏令时
      ========================================================= */
   function viewAlarm() {
-    const enabledIds = types.filter(t => t.enabled !== false).map(t => t.id);
-    const sum = opAlarmSum(enabledIds);
-    const rows = enabledIds.map(id => {
-      const a = opAlarmOf(id);
-      return `<tr>
-        <td><strong>${esc(id)}</strong></td>
-        <td class="center num">${a.yellowK}</td>
-        <td class="center num">${a.redK}</td>
-        <td class="center muted small">缺口 ≥ ${a.yellowK}K 黄 / ≥ ${a.redK}K 红</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="4" class="center muted">暂无启用的 PKG Type</td></tr>';
-
+    const gm = curGoalMode(), ep = curEarnProg();
     return `
       <div class="card">
         <div class="card-head">
-          <div class="card-title">${icon('alert', 19)} 比对口径 / 刷新机制 / 夏令时
-            <span class="card-sub">报警阈值已移至「① PKG Type 维护」逐品类维护 · 这里只留全局口径</span></div>
+          <div class="card-title">${icon('alert', 19)} 预警分口径 / 夏令时
+            <span class="card-sub">报警阈值已在「① PKG Type 维护」逐品类维护 · 这里只留预警分口径与 Earn 目标基准</span></div>
           <div class="flex acenter gap8">
             ${canEdit ? `<button class="btn btn-sm btn-primary" id="btnAlarmSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
           </div>
         </div>
         <div class="card-body">
-          <div class="field-label mb8" style="display:block">异常判定口径（全局）</div>
+          <div class="field-label mb8" style="display:block">预警逻辑分口径（10-08 修正）</div>
           <div class="cfg-row">
-            <div class="cfg-item"><label class="field-label">比对模式</label>
-              <div class="seg" id="cfgAlarmMode">
-                <button data-m="diff" class="${cfg.alarm.mode === 'diff' ? 'active' : ''}">差额比对</button>
-                <button data-m="composite" class="${cfg.alarm.mode === 'composite' ? 'active' : ''}">复合比对</button>
-              </div>
+            <div class="cfg-item">
+              <label class="field-label">数量口径 · 累计 goal vs total（K）</label>
+              <span class="chip">${icon('activity', 14)} 周目标均摊（沿用，逻辑不变）</span>
+              <div class="small muted mt8">周总目标均摊到每天 → 逐日<strong>累计</strong>展示 → 与实际累计值对比；判定阈值沿用各 PKG Type 的黄 / 红阈值（K）。此口径不随下面的切换改变。</div>
             </div>
-            <div class="cfg-item"><label class="field-label">阈值维护位置</label>
-              <span class="chip">${icon('layers', 14)} ① PKG Type 维护 · 逐品类</span></div>
-            <div class="cfg-item"><label class="field-label">全部品类汇总阈值</label>
-              <span class="chip">${icon('alert', 14)} 黄 ${sum.yellowK}K / 红 ${sum.redK}K（${enabledIds.length} 类合计）</span></div>
-          </div>
-          <table class="table mt12">
-            <thead><tr><th>PKG Type</th><th class="center" style="width:110px">黄灯阈值 [K]</th>
-              <th class="center" style="width:110px">红灯阈值 [K]</th><th class="center">判定口径</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <div class="cfg-note mt12">${icon('alert', 15)} 上表为当前生效阈值（只读预览）。修改请到
-            <a href="javascript:void(0)" id="lnkToTypes">① PKG Type 维护</a> 中逐项调整并保存；差额比对模式下的阈值口径仍待客户最终确认。</div>
-
-          <div class="field-label mt16 mb8" style="display:block">数据刷新机制（频率待 IT 确认）</div>
-          <div class="cfg-row">
-            <div class="cfg-item"><label class="field-label">刷新模式</label>
-              <div class="seg" id="cfgRefresh">
-                <button data-m="manual" class="${cfg.refresh.mode === 'manual' ? 'active' : ''}">手动</button>
-                <button data-m="auto" class="${cfg.refresh.mode === 'auto' ? 'active' : ''}">自动</button>
+            <div class="cfg-item">
+              <label class="field-label">金额口径 · 累计 Earn 目标 vs 实际（万元）</label>
+              <div class="seg" id="cfgEarnMode">
+                <button data-m="even" class="${gm.earn === 'even' ? 'active' : ''}">周目标均摊</button>
+                <button data-m="progressive" class="${gm.earn === 'progressive' ? 'active' : ''}">递进式 ±${ep.pct}%</button>
               </div>
+              <div class="small muted mt8">递进式：<strong>周六</strong>看<strong>上周五实际值</strong> ±${ep.pct}% 为正常区间；<strong>周日</strong>看<strong>周六实际值</strong> ±${ep.pct}%；逐日递进。解决周末数据滞后导致的监控盲区。</div>
             </div>
-            <div class="cfg-item"><label class="field-label">自动间隔（秒）</label>
-              <input class="input" type="number" id="cfgAutoSec" value="${cfg.refresh.autoSec}" min="60" step="60" style="width:100px" ${canEdit ? '' : 'readonly'}></div>
-            <div class="cfg-item"><label class="field-label">实际数据来源</label>
-              <span class="chip chip-real">${icon('database', 14)} ${esc(OP_DEFAULTS.source)}</span>
-              <span class="chip">库表 / 字段口径待客户确认</span></div>
           </div>
+          <div class="cfg-row mt8">
+            <div class="cfg-item"><label class="field-label">递进容差 ±%</label>
+              <input class="input" type="number" id="cfgEarnPct" value="${ep.pct}" min="0" max="50" step="0.5" style="width:96px" ${canEdit ? '' : 'readonly'}>
+              <div class="small muted mt8">当日实际超出基准 ±${ep.pct}% → 黄灯</div></div>
+            <div class="cfg-item"><label class="field-label">红灯倍数（× 容差）</label>
+              <input class="input" type="number" id="cfgEarnRedX" value="${ep.redX}" min="1" max="5" step="0.5" style="width:96px" ${canEdit ? '' : 'readonly'}>
+              <div class="small muted mt8">超出 ±${(ep.pct * ep.redX).toFixed(1)}% → 红灯</div></div>
+            <div class="cfg-item"><label class="field-label">递进基准</label>
+              <span class="chip">${icon('trend', 14)} 前一日当日实际（周六 = 上周五当日实际）</span>
+              <div class="small muted mt8">无前值可依时回落「周目标均摊」的当日增量，保证目标线不断。</div></div>
+          </div>
+          <div class="cfg-note mt12">${icon('alert', 15)} 两个口径<strong>互不影响</strong>：切换 Earn 口径只改金额目标基准，不动数量目标与黄 / 红阈值。
+            累计 Earn 目标线 = 各日递进基准的逐日累加（相当于实际线右移一天）；预警判定用<strong>当日</strong> Earn 与基准的偏差。</div>
 
-          <div class="field-label mt16 mb8" style="display:block">夏令时 / 冬令时（影响 IT 查询窗口）</div>
+          <div class="field-label mt16 mb8" style="display:block">Earn 目标手动修正（周二下午拿到准确出库数据后修正后续几天）</div>
+          <div class="flex acenter gap8 mb8">
+            <span class="chip">${icon('calendar', 14)} 修正周：${goalYear} 年第 ${goalWeek} 周（${fmtRange(goalYear, goalWeek)}）</span>
+            <span class="sub-note">周二下午拿到准确出库数据后，在此修正<strong>周三 ~ 周五</strong>的目标。留空 = 按上面规则自动递进；填写即覆盖该天目标（万元）。周别在「② 每周目标数量」切换。</span>
+          </div>
+          ${earnManualTable()}
+
+          <div class="field-label mt16 mb8" style="display:block">夏令时 / 冬令时（手动切换 · 影响 IT 查询窗口）</div>
           <div class="cfg-row">
             <div class="cfg-item"><label class="field-label">当前时段</label>
               <div class="seg" id="cfgDst">
-                <button data-m="auto" class="${cfg.dst === 'auto' ? 'active' : ''}">自动</button>
-                <button data-m="summer" class="${cfg.dst === 'summer' ? 'active' : ''}">夏令时</button>
+                <button data-m="summer" class="${cfg.dst === 'winter' ? '' : 'active'}">夏令时（默认）</button>
                 <button data-m="winter" class="${cfg.dst === 'winter' ? 'active' : ''}">冬令时</button>
               </div>
+              <div class="small muted mt8">10-08 修正：<strong>已取消自动切换</strong>，默认保持夏令时；切冬令时需在此手动点击（旧配置中的「自动」已迁移为夏令时）。</div>
+            </div>
+            <div class="cfg-item"><label class="field-label">查询窗口开始时间</label>
+              <div class="seg" id="cfgDstHour">
+                <button data-m="6" class="${cfg.dstStartHour === 7 ? '' : 'active'}">06:00</button>
+                <button data-m="7" class="${cfg.dstStartHour === 7 ? 'active' : ''}">07:00</button>
+              </div>
+              <div class="small muted mt8">手动指定开始时间（6 点 / 7 点）。</div>
             </div>
             <div class="cfg-item"><label class="field-label">查询窗口</label>
-              <span class="chip">${cfg.dst === 'winter' ? cfg.dstWindow.winter : cfg.dstWindow.summer}（待 IT 确认）</span></div>
+              <span class="chip">${opDstWindow(cfg).text}（待 IT 确认）</span></div>
             <div class="cfg-item"><label class="field-label">每周起始日</label>
               <span class="chip">周六（固定，第 1 周 = 该年首个周六所在周）</span></div>
           </div>
         </div>
       </div>`;
+  }
+
+  /* Earn 目标手动修正表（按周）：7 天各一个输入框（万元），并预览生效基准 / 正常区间 / 当日实际 / 判定 */
+  function earnManualTable() {
+    const key = opWeekKey(goalYear, goalWeek);
+    const ep = curEarnProg();
+    const man = (ep.manual && ep.manual[key]) || [];
+    const w = genOpWeek(goalYear, goalWeek);
+    const ids = types.filter(t => t.enabled !== false).map(t => t.id);
+    const ev = opEarnSeriesCfg(ids, w, types, cfg);
+    /* 未手动修正时的自动基准（用于对照） */
+    const autoCfg = Object.assign({}, cfg, { earnProg: Object.assign({}, ep, { manual: Object.assign({}, ep.manual, { [key]: [] }) }) });
+    const auto = opEarnSeriesCfg(ids, w, types, autoCfg);
+    const isProg = ev.mode === 'progressive';
+    /* 均摊口径下没有 base / band / prog，退化为「均摊当日增量」展示 */
+    const dailyOf = cum => { const o = []; let a = 0; for (let i = 0; i < 7; i++) { o.push(+(cum[i] - a).toFixed(1)); a = cum[i]; } return o; };
+    const baseOf = e => (e.base || dailyOf(e.goalCum));
+    const wd = ['六', '日', '一', '二', '三', '四', '五'];
+    const srcTxt = { manual: '手动修正', prevManual: '前一日修正值', prevDay: '前一日实际', prevWeekFri: '上周五实际', even: '均摊兜底' };
+    const idx = [0, 1, 2, 3, 4, 5, 6];
+    const row = (label, fn) => `<tr><td class="muted small" style="white-space:nowrap">${label}</td>${idx.map(i => `<td class="center small">${fn(i)}</td>`).join('')}</tr>`;
+    const badgeOf = p => {
+      if (!p || p.status === 'none') return '<span class="badge b-neutral">—</span>';
+      const i = opStatusInfo(p.status);
+      return `<span class="badge ${i.badge}">${i.label}${p.dev == null ? '' : ' ' + (p.dev >= 0 ? '+' : '') + p.dev + '%'}</span>`;
+    };
+    return `
+      <table class="table" id="tblEarnMan">
+        <thead><tr><th style="width:120px">日</th>${idx.map(i => `<th class="center">${wd[i]}${i >= 4 ? '<div class="small muted" style="font-weight:400">周二后可修正</div>' : ''}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${row('手动修正 [万]', i => `<input class="input num" type="number" step="0.1" min="0" data-em="${i}" value="${(man[i] == null || man[i] === '') ? '' : man[i]}" ${canEdit ? '' : 'readonly'} style="width:84px;text-align:center" placeholder="自动">`)}
+          ${row('生效基准 [万]', i => `${baseOf(ev)[i]}<div class="small muted">${isProg ? (srcTxt[ev.src[i]] || '') : '周目标均摊'}</div>`)}
+          ${row('正常区间 ±' + ep.pct + '%', i => (isProg ? `${ev.band[i][0]} ~ ${ev.band[i][1]}` : '<span class="muted">—</span>'))}
+          ${row('当日实际 [万]', i => (ev.dailyActual[i] == null ? '—' : ev.dailyActual[i]))}
+          ${row('判定', i => (isProg ? badgeOf(ev.prog[i]) : '<span class="muted">按差额阈值</span>'))}
+          ${row('自动基准（对照）', i => (isProg ? (auto.base[i] == null ? '—' : auto.base[i]) : baseOf(auto)[i]))}
+        </tbody>
+      </table>
+      <div class="cfg-note mt12">${icon('alert', 15)} ${isProg
+        ? `「生效基准」为当前配置下的实际取值：填了手动值即覆盖当天基准；<strong>且该修正值会顺着递进链往后传一天</strong>——下一天的基准直接沿用这个修正值（不再取前一日实际）。其余按递进规则（周六=上周五实际 / 次日=前一日实际）自动取，无前值时回落均摊增量。
+           判定用<strong>当日 Earn</strong> 与基准的偏差：±${ep.pct}% 内正常、超出 ${ep.pct}% → 黄灯、超出 ${(ep.pct * ep.redX).toFixed(1)}% → 红灯。`
+        : `当前 Earn 口径为<strong>周目标均摊</strong>，基准 = 周总目标 ÷ 7 的当日增量；手动修正与 ±${ep.pct}% 判定仅在「递进式」口径下生效（切到递进式后填写）。`}</div>`;
   }
 
   /* =========================================================
@@ -421,7 +482,10 @@
       store.set('op_cfg', {});
       cfg = Object.assign({}, OP_DEFAULTS, {});
       cfg.alarm = Object.assign({}, OP_DEFAULTS.alarm);
-      cfg.refresh = Object.assign({}, OP_DEFAULTS.refresh);
+      cfg.goalMode = Object.assign({}, OP_DEFAULTS.goalMode);
+      cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, { manual: {} });
+      cfg.dst = OP_DEFAULTS.dst;                 // 夏令时（手动，默认）
+      cfg.dstStartHour = OP_DEFAULTS.dstStartHour;
       types = OPTypeStore.all(); depts = OPDeptStore.all();
       toast('已恢复默认配置', 'success'); render();
     };
@@ -518,20 +582,29 @@
     });
     document.querySelectorAll('#tblDept [data-all]').forEach(b => b.onchange = () => { depts = collectDepts(); render(); });
 
-    /* ---- ④ 报警 / 刷新 / 夏令时 ---- */
-    const lk = document.getElementById('lnkToTypes');
-    if (lk) lk.onclick = () => { tab = 'types'; render(); toast('报警阈值请在此逐 PKG Type 维护', 'primary'); };
-
+    /* ---- ④ 报警分口径 / 夏令时 ---- */
     const bas = document.getElementById('btnAlarmSave');
     if (bas) bas.onclick = () => {
-      /* 黄灯 / 红灯阈值已下沉到「① PKG Type 维护」，此处只保存全局比对口径与刷新 / 夏令时 */
-      cfg.alarm.mode = document.querySelector('#cfgAlarmMode .active').dataset.m;
-      cfg.refresh.mode = document.querySelector('#cfgRefresh .active').dataset.m;
-      cfg.refresh.autoSec = Math.max(60, Number(getVal('cfgAutoSec')) || 600);
-      cfg.dst = document.querySelector('#cfgDst .active').dataset.m;
-      saveCfg(); toast('比对口径 / 刷新 / 夏令时配置已保存', 'success'); render();
+      /* 黄灯 / 红灯阈值与异常判定口径已下沉到「① PKG Type 维护」，此处只保存预警分口径与夏令时
+         （数据刷新机制、异常判定口径均按 2026-10-08 客户要求下线） */
+      /* 预警逻辑分口径（10-08）：数量口径固定均摊；金额口径可切递进式 */
+      cfg.goalMode = Object.assign({}, OP_DEFAULTS.goalMode, cfg.goalMode || {});
+      cfg.goalMode.qty = 'even';
+      cfg.goalMode.earn = document.querySelector('#cfgEarnMode .active').dataset.m;
+      cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
+      cfg.earnProg.manual = Object.assign({}, cfg.earnProg.manual || {});
+      const pctN = Number(getVal('cfgEarnPct')); const redN = Number(getVal('cfgEarnRedX'));
+      cfg.earnProg.pct = isFinite(pctN) ? Math.min(50, Math.max(0, pctN)) : OP_DEFAULTS.earnProg.pct;
+      cfg.earnProg.redX = isFinite(redN) ? Math.min(5, Math.max(1, redN)) : OP_DEFAULTS.earnProg.redX;
+      cfg.earnProg.anchor = 'prevDay';
+      cfg.earnProg.manual[opWeekKey(goalYear, goalWeek)] = collectEarnManual();
+      /* 夏令时改手动：只有 夏令时 / 冬令时，开始时间 6 或 7 点 */
+      cfg.dst = document.querySelector('#cfgDst .active').dataset.m === 'winter' ? 'winter' : 'summer';
+      cfg.dstManual = true;
+      cfg.dstStartHour = document.querySelector('#cfgDstHour .active').dataset.m === '7' ? 7 : 6;
+      saveCfg(); toast('预警分口径 / 夏令时配置已保存', 'success'); render();
     };
-    ['cfgAlarmMode', 'cfgRefresh', 'cfgDst'].forEach(id => {
+    ['cfgDst', 'cfgEarnMode', 'cfgDstHour'].forEach(id => {
       const box = document.getElementById(id); if (!box) return;
       box.querySelectorAll('button').forEach(b => b.onclick = () => {
         box.querySelectorAll('button').forEach(x => x.classList.remove('active'));

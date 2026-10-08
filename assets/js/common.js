@@ -64,7 +64,9 @@ const NAV_GROUPS = [
       { key: 'op', href: 'output.html', label: 'Output（OP）大屏', icon: 'activity', tag: 'P2', tagCls: 't-red' },
       { key: 'optable', href: 'op-table.html', label: '周维度累计表', icon: 'layers', tag: 'P2', tagCls: 't-red' },
       { key: 'opcfg', href: 'op-config.html', label: 'OP 目标与权限配置', icon: 'settings', tag: '配置', tagCls: 't-purple' },
-      { key: 'wip', href: 'wip.html', label: 'WIP 在制品看板', icon: 'layers', tag: 'P2', tagCls: 't-red' }
+      { key: 'wip', href: 'wip.html', label: 'WIP 在制品看板', icon: 'layers', tag: 'P2', tagCls: 't-red' },
+      { key: 'defect', href: 'defect.html', label: '次品管理 · 质量预警', icon: 'alert', tag: 'P2', tagCls: 't-red' },
+      { key: 'logs', href: 'logs.html', label: '日志管理 · 生产日志', icon: 'file', tag: '新增', tagCls: 't-purple' }
     ]
   },
   {
@@ -100,8 +102,10 @@ const PAGE_TITLES = {
   wall: ['监控室 · 多屏轮播', '带班桌多块大屏自动轮播 · 可配间隔 / 手动切换 / 大字号'],
   op: ['Output（OP）大屏', '周维度追踪 · 累计曲线对比 · 达标/临界/超标预警'],
   optable: ['周维度累计表', '各 PKG Type 逐日累计目标/实际 · 达标/临界/超标着色 · Excel 导出'],
-  opcfg: ['OP 目标与权限配置', 'PKG Type 维护 · 每周目标数量 · 部门可见范围 · 报警/刷新/夏令时'],
+  opcfg: ['OP 目标与权限配置', 'PKG Type 维护（含黄/红阈值）· 每周目标数量 · 部门可见范围 · 预警分口径/夏令时'],
   wip: ['WIP 在制品看板', '按 PKG Type × 工序呈现在制（数量 / Earn 口径）· 二级钻取筛选 · 指标报警配置'],
+  defect: ['次品管理 · 质量预警', '类别 PPM 趋势 → 机台树 → 机台×料号 / Package 明细（产量/次品数/PPM）· 红线 2000 PPM（良率 0.998）· 真实数据三级下钻'],
+  logs: ['日志管理 · 生产日志', '交接班生产日志 · LEAD / NON-LEAD 分部门查看 · 班次回看 · 只读静态展示'],
   systems: ['子系统接入与底座', '问卷 1.1 · 接入范围（Output / WIP）与接入方式'],
   ingest: ['采集调度与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],
   alerts: ['预警组件 · 多级报警', '每屏标配 · 阈值/周期/系数可配 · 屏幕变色 + 强制弹窗 + 语音'],
@@ -524,9 +528,11 @@ function lineChart(el, opts) {
          故视图单位到像素的缩放比 ≈ 容器宽 / vw；传更小的 vw 可让图内文字「相对更大」。
          内部以 k = 1000 / vw 同步放大字号与边距，保证任意 vw 下文字与图形比例一致。
      hover: 开启鼠标悬停浮层（竖线 + 放大圆点 + 数据明细浮层）。
-     tipUnit / tipTitle(i) / tipExtra(i)：浮层数值单位、标题、附加行（如差额）。 */
+     tipUnit / tipTitle(i) / tipExtra(i)：浮层数值单位、标题、附加行（如差额）。
+     onClick(i, e)：传入后整张图可直接点击（鼠标变手型），点击位置落在哪一列就回调哪个下标
+                    —— 2026-10-08 客户要求：下钻动作不再挂在浮窗上（浮窗太小、点不到）。 */
   const { series, labels, height = 240, min = 0, max = 100, yUnit = '', marks = [], endAt = -1, endUnit = '',
-    vw = 1000, hover = false, tipUnit = '', tipTitle = null, tipExtra = null } = opts;
+    vw = 1000, hover = false, tipUnit = '', tipTitle = null, tipExtra = null, onClick = null } = opts;
   const W = vw, H = height, k = 1000 / vw;
   const pl = Math.round(46 * k), pr = Math.round(18 * k), pt = Math.round(16 * k), pb = Math.round(30 * k);
   const iw = W - pl - pr, ih = H - pt - pb;
@@ -627,6 +633,7 @@ function lineChart(el, opts) {
     }).join('');
     tipEl.innerHTML = `<div class="lc-ttitle">${tipTitle ? tipTitle(i) : labels[i]}</div>${rows}${tipExtra ? tipExtra(i) : ''}`;
     tipEl.style.display = 'block';
+    hoverIdx = i;
     const ratio = r.width / W;
     const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
     let left = X(i) * ratio + 18;
@@ -640,11 +647,31 @@ function lineChart(el, opts) {
     tipEl.style.top = top.toFixed(1) + 'px';
   };
   const hide = () => { tipEl.style.display = 'none'; hl.style.display = 'none'; };
-  svg.addEventListener('mousemove', e => show(e.clientX, e.clientY));
-  svg.addEventListener('mouseleave', hide);
-  svg.addEventListener('touchstart', e => { const t = e.touches[0]; if (t) show(t.clientX, t.clientY); }, { passive: true });
-  svg.addEventListener('touchmove', e => { const t = e.touches[0]; if (t) show(t.clientX, t.clientY); }, { passive: true });
-  svg.addEventListener('touchend', hide);
+  let hoverIdx = -1;
+
+  /* 整张图直接可点（onClick）：把点击处的横坐标换算成最近的列下标后回调；
+     浮窗保持 pointer-events:none，不再承载点击动作（2026-10-08 客户要求）。 */
+  if (typeof onClick === 'function') {
+    svg.style.cursor = 'pointer';
+    const idxAt = clientX => {
+      const r = svg.getBoundingClientRect();
+      if (!r.width) return -1;
+      const vx = (clientX - r.left) / r.width * W;
+      let i = Math.round((vx - pl) / step);
+      return Math.max(0, Math.min(labels.length - 1, i));
+    };
+    svg.addEventListener('click', e => { const i = idxAt(e.clientX); if (i >= 0) onClick(i, e); });
+    svg.addEventListener('touchend', e => {
+      const t = e.changedTouches && e.changedTouches[0];
+      if (t) { const i = idxAt(t.clientX); if (i >= 0) onClick(i, e); }
+    });
+  }
+
+  svg.addEventListener('mousemove', e => { hoverIdx = -1; show(e.clientX, e.clientY); });
+  svg.addEventListener('mouseleave', () => { hide(); });
+  svg.addEventListener('touchstart', e => { const t = e.touches[0]; if (t) { hoverIdx = -1; show(t.clientX, t.clientY); } }, { passive: true });
+  svg.addEventListener('touchmove', e => { const t = e.touches[0]; if (t) { hoverIdx = -1; show(t.clientX, t.clientY); } }, { passive: true });
+  svg.addEventListener('touchend', () => { hide(); });
 }
 
 function barGroup(el, opts) {
