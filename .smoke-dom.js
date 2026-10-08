@@ -77,9 +77,10 @@ const ok = (c, m, extra) => { c ? console.log('PASS ' + m) : (fail++, console.lo
       ok(!/部门可见范围/.test(txt), '无「部门可见范围」文本');
       ok(!doc.getElementById('tblDept'), '无部门可见范围表格 #tblDept');
       const tabs = Array.from(doc.querySelectorAll('#segTab button')).map(b => b.textContent.trim());
-      ok(tabs.length === 3, '配置域页签为 3 个（' + tabs.length + '）', tabs.join(' | '));
+      ok(tabs.length === 4, '配置域页签为 4 个（' + tabs.length + '）', tabs.join(' | '));
       ok(/③ 预警分口径/.test(tabs.join('|')), '③ 标签为「预警分口径 / 夏令时」', tabs.join(' | '));
-      ok(/共 3 类/.test(txt), '卡副标题为「共 3 类」');
+      ok(/④ NON-LEAD · WIP 叠加/.test(tabs.join('|')), '④ 标签为「NON-LEAD · WIP 叠加」', tabs.join(' | '));
+      ok(/共 4 类/.test(txt), '卡副标题为「共 4 类」');
       /* 切到 ③ 页签，检查预警分口径 / 夏令时内容仍在 */
       const t3 = Array.from(doc.querySelectorAll('#segTab button')).find(b => b.dataset.t === 'alarm');
       if (t3) {

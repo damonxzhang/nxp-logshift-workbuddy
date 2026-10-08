@@ -168,8 +168,63 @@ const OP_DEFAULTS = {
     summer: '周六 06:00 - 周日 06:00',
     winter: '周六 07:00 - 周日 07:00'
   },
-  source: '客户 IT 导出《BE1 Output Report V5.xls》'   // 实际 total 数据来源（已接入真实导出报表）
+  source: '客户 IT 导出《BE1 Output Report V5.xls》',   // 实际 total 数据来源（已接入真实导出报表）
+
+  /* ---------------- NON-LEAD 图叠加 WIP（2026-10-08 客户要求） ----------------
+     只作用于【NON-LEAD · 累计 goal vs total 曲线对比（K）】这一张图：
+       第三条线 = 累计实际 total + 该工序当前在制 WIP（表示「已产出 + 在制」能否覆盖目标）。
+     WIP 取自客户《BE1 WIP Report-V26.xls》（wip-real-data.js）的**实时快照**——
+       报表里没有逐日历史，故**所有周都按最新快照画**（页面/图例已注明，避免误读为历史值）。
+       on: 是否启用；spec: WIP 工序（Specname，单选，如 BE_DT / BE_SAW）；
+       scope: 'filter' 跟随图表当前 PKG Type 筛选 / 'all' 该工序全部；
+       excludeHold: 是否剔除 Hold 批次。 */
+  wipOverlay: { on: true, spec: 'BE_DT', scope: 'filter', excludeHold: false }
 };
+
+/* WIP 报表的 PKG Type 与 OP 的 PKG Type 对齐：WIP 里 BGA / LGA 分开，OP 里合并为 BGA/LGA */
+const OP_WIP_TYPE_MAP = { BGA: 'BGA/LGA', LGA: 'BGA/LGA' };
+function opWipTypeOf(pkg) {
+  const p = String(pkg == null ? '' : pkg).trim().toUpperCase();
+  return OP_WIP_TYPE_MAP[p] || String(pkg == null ? '' : pkg).trim();
+}
+function opWipRows() {
+  const R = (typeof window !== 'undefined') ? window.WIP_REAL_DATA : null;   // wip-real-data.js
+  return (R && Array.isArray(R.rows)) ? R.rows : [];
+}
+/* 工序清单（按在制数量降序）：[{ spec, qty, lots }] —— 配置页下拉的数据源 */
+function opWipSpecs() {
+  const m = {};
+  opWipRows().forEach(r => {
+    const s = String(r[0] == null ? '' : r[0]).trim();
+    if (!s) return;
+    if (!m[s]) m[s] = { spec: s, qty: 0, lots: 0 };
+    m[s].qty += Number(r[7]) || 0;
+    m[s].lots += 1;
+  });
+  return Object.keys(m).map(k => m[k]).sort((a, b) => b.qty - a.qty);
+}
+/* 归一化配置：spec 失效（未选 / 报表里已无该工序）时自动回落到数量最大的工序 */
+function opWipCfg(cfg) {
+  const o = Object.assign({}, OP_DEFAULTS.wipOverlay, (cfg && cfg.wipOverlay) || {});
+  const list = opWipSpecs();
+  if (list.length && !list.some(s => s.spec === o.spec)) o.spec = list[0].spec;
+  return o;
+}
+/* 某工序的 WIP 数量（颗）。typeIds：scope='filter' 时只统计这些 OP PKG Type */
+function opWipQtyOf(spec, typeIds, cfg) {
+  const o = opWipCfg(cfg);
+  const sp = String(spec == null ? o.spec : spec).trim();
+  if (!sp) return 0;
+  const ids = o.scope === 'all' ? null : (typeIds || []).map(String);
+  let qty = 0;
+  opWipRows().forEach(r => {
+    if (String(r[0] == null ? '' : r[0]).trim() !== sp) return;
+    if (o.excludeHold && (Number(r[13]) || 0) > 0) return;      // r[13] = Hold 天数
+    if (ids && ids.indexOf(opWipTypeOf(r[1])) < 0) return;      // r[1] = PKG Type
+    qty += Number(r[7]) || 0;                                   // r[7] = 数量（颗）
+  });
+  return qty;
+}
 
 /* 夏令时查询窗口（改为手动后，窗口只由「开始时间」决定）：6 点 → 周六 06:00 - 周日 06:00 */
 function opDstWindow(cfg) {
