@@ -384,15 +384,46 @@
     return map;
   }
 
-  /* Earn 目标手动修正：7 天（万元），空 = null（按规则自动） */
-  function collectEarnManual() {
-    const arr = [null, null, null, null, null, null, null];
-    document.querySelectorAll('#tblEarnMan [data-em]').forEach(el => {
-      const i = Number(el.dataset.em);
-      const v = String(el.value || '').trim();
-      arr[i] = (v === '' || !isFinite(Number(v))) ? null : Math.max(0, Number(v));
-    });
+  /* Earn 目标手动修正：7 天（万元），空 = null（按规则自动）
+     10-08 客户要求：整表不再「填完点保存」一次收走 —— 改由每格右侧的「生效」按钮逐日写入，
+     点了哪天就哪天生效，后续日期的基准 / 区间 / 判定立即按递进链重算。 */
+  function earnManOf(key) {
+    cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
+    cfg.earnProg.manual = Object.assign({}, cfg.earnProg.manual || {});
+    const arr = (cfg.earnProg.manual[key] || []).slice();
+    while (arr.length < 7) arr.push(null);
     return arr;
+  }
+  /* 点「生效」：读该格输入 → 写入配置 → 落盘 → 整表重算 */
+  function applyEarnMan(i) {
+    if (!canEdit) return;
+    const el = document.querySelector('#tblEarnMan [data-em="' + i + '"]');
+    if (!el) return;
+    const v = String(el.value || '').trim();
+    const num = (v === '' || !isFinite(Number(v))) ? null : Math.max(0, Number(v));
+    const key = opWeekKey(goalYear, goalWeek);
+    const arr = earnManOf(key);
+    arr[i] = num;
+    cfg.earnProg.manual[key] = arr;
+    saveCfg();
+    const wdn = ['六', '日', '一', '二', '三', '四', '五'][i];
+    toast(num == null
+      ? `周${wdn} 已恢复自动（清除手动修正值），后续日期基准已重算`
+      : `周${wdn} 修正值 ${num} 万已生效，后续日期基准已按递进链重算`, 'success');
+    render();
+  }
+  /* 输入框改动后：把该日按钮从「已生效」切回高亮的「生效」，提示需要再点一次 */
+  function markEarnManDraft(el) {
+    const i = Number(el.dataset.em);
+    const btn = document.querySelector('#tblEarnMan [data-emok="' + i + '"]');
+    if (!btn || btn.disabled) return;
+    const v = String(el.value || '').trim();
+    const cur = (v === '' || !isFinite(Number(v))) ? null : Number(v);
+    const eff = Number(btn.dataset.eff === '' ? NaN : btn.dataset.eff);
+    const effV = isFinite(eff) ? eff : null;
+    const dirty = String(cur) !== String(effV);
+    btn.classList.toggle('btn-primary', dirty);
+    btn.textContent = dirty ? '生效' : (effV == null ? '生效' : '已生效');
   }
 
   /* =========================================================
@@ -494,6 +525,13 @@
     const srcTxt = { manual: '手动修正', prevManual: '前一日修正值', prevDay: '前一日实际', prevWeekFri: '上周五实际', even: '均摊兜底' };
     const idx = [0, 1, 2, 3, 4, 5, 6];
     const row = (label, fn) => `<tr><td class="muted small" style="white-space:nowrap">${label}</td>${idx.map(i => `<td class="center small">${fn(i)}</td>`).join('')}</tr>`;
+    /* 「生效」按钮（10-08 客户要求）：点当日按钮才把该日修正值写进配置，
+       后面日期的「生效基准 / 正常区间 / 判定」即时按递进链重算；
+       已过去的日期（早于今天）不可再修正 → 按钮禁用；均摊口径下 manual 不生效 → 一并禁用。 */
+    const effOf = i => { const v = man[i]; return (v == null || v === '' || !isFinite(Number(v))) ? null : Number(v); };
+    const pastOf = i => !w.days[i].isFuture && !w.days[i].isToday;      // 已过去 = 早于今天
+    const okDisabled = i => !canEdit || !isProg || pastOf(i);
+    const dayTag = i => w.days[i].isToday ? '今天' : (w.days[i].isFuture ? '未来' : '已过去');
     const badgeOf = p => {
       if (!p || p.status === 'none') return '<span class="badge b-neutral">—</span>';
       const i = opStatusInfo(p.status);
@@ -501,9 +539,12 @@
     };
     return `
       <table class="table" id="tblEarnMan">
-        <thead><tr><th style="width:120px">日</th>${idx.map(i => `<th class="center">${wd[i]}${i >= 4 ? '<div class="small muted" style="font-weight:400">周二后可修正</div>' : ''}</th>`).join('')}</tr></thead>
+        <thead><tr><th style="width:120px">日</th>${idx.map(i => `<th class="center">${wd[i]}<div class="small muted" style="font-weight:400">${w.days[i].label} · ${dayTag(i)}</div></th>`).join('')}</tr></thead>
         <tbody>
-          ${row('手动修正 [万]', i => `<input class="input num" type="number" step="0.1" min="0" data-em="${i}" value="${(man[i] == null || man[i] === '') ? '' : man[i]}" ${canEdit ? '' : 'readonly'} style="width:84px;text-align:center" placeholder="自动">`)}
+          ${row('手动修正 [万]', i => `<div class="em-cell">
+              <input class="input num" type="number" step="0.1" min="0" data-em="${i}" value="${effOf(i) == null ? '' : effOf(i)}" ${(canEdit && !okDisabled(i)) ? '' : 'readonly'} style="width:78px;text-align:center" placeholder="自动">
+              <button class="btn btn-sm em-ok ${effOf(i) == null ? 'btn-primary' : 'btn-green'}" data-emok="${i}" data-eff="${effOf(i) == null ? '' : effOf(i)}" ${okDisabled(i) ? 'disabled' : ''} title="${pastOf(i) ? '该日已过去，不可再修正' : (isProg ? '点此让该日修正值生效，后续日期基准随之重算' : '仅「递进式」口径下可修正')}">${effOf(i) == null ? '生效' : '已生效'}</button>
+            </div>`)}
           ${row('生效基准 [万]', i => `${baseOf(ev)[i]}<div class="small muted">${isProg ? (srcTxt[ev.src[i]] || '') : '周目标均摊'}</div>`)}
           ${row('正常区间 ±' + ep.pct + '%', i => (isProg ? `${ev.band[i][0]} ~ ${ev.band[i][1]}` : '<span class="muted">—</span>'))}
           ${row('当日实际 [万]', i => (ev.dailyActual[i] == null ? '—' : ev.dailyActual[i]))}
@@ -514,7 +555,11 @@
       <div class="cfg-note mt12">${icon('alert', 15)} ${isProg
         ? `「生效基准」为当前配置下的实际取值：填了手动值即覆盖当天基准；<strong>且该修正值会顺着递进链往后传一天</strong>——下一天的基准直接沿用这个修正值（不再取前一日实际）。其余按递进规则（周六=上周五实际 / 次日=前一日实际）自动取，无前值时回落均摊增量。
            判定用<strong>当日 Earn</strong> 与基准的偏差：±${ep.pct}% 内正常、超出 ${ep.pct}% → 黄灯、超出 ${(ep.pct * ep.redX).toFixed(1)}% → 红灯。`
-        : `当前 Earn 口径为<strong>周目标均摊</strong>，基准 = 周总目标 ÷ 7 的当日增量；手动修正与 ±${ep.pct}% 判定仅在「递进式」口径下生效（切到递进式后填写）。`}</div>`;
+        : `当前 Earn 口径为<strong>周目标均摊</strong>，基准 = 周总目标 ÷ 7 的当日增量；手动修正与 ±${ep.pct}% 判定仅在「递进式」口径下生效（切到递进式后填写）。`}</div>
+      <div class="cfg-note mt8">${icon('check', 15)} <strong>修正值需点当日「生效」按钮才写入</strong>（10-08 客户要求）：
+        填完数值 → 点「生效」→ 该日修正值立即入库，<strong>后续日期的「生效基准 / 正常区间 / 判定」随之重算</strong>（递进链：下一天基准直接沿用该修正值，再往后回到前一日实际）；
+        按钮显示「已生效」表示该日已有修正值，改动后按钮转为高亮的「生效」待点击。
+        <strong>已过去的日期（早于今天）按钮禁用</strong>，历史周整周不可修正；周二下午拿到准确出库数据后修正周三 ~ 周五。</div>`;
   }
 
   /* =========================================================
@@ -737,7 +782,9 @@
       cfg.earnProg.pct = isFinite(pctN) ? Math.min(50, Math.max(0, pctN)) : OP_DEFAULTS.earnProg.pct;
       cfg.earnProg.redX = isFinite(redN) ? Math.min(5, Math.max(1, redN)) : OP_DEFAULTS.earnProg.redX;
       cfg.earnProg.anchor = 'prevDay';
-      cfg.earnProg.manual[opWeekKey(goalYear, goalWeek)] = collectEarnManual();
+      /* 手动修正值不再由「保存」整表收走（10-08 客户要求）：
+         逐日点「生效」按钮时才写入，故这里保留已生效的 manual 不动 */
+      cfg.earnProg.manual = Object.assign({}, cfg.earnProg.manual || {});
       /* 夏令时改手动：只有 夏令时 / 冬令时，开始时间 6 或 7 点 */
       cfg.dst = document.querySelector('#cfgDst .active').dataset.m === 'winter' ? 'winter' : 'summer';
       cfg.dstManual = true;
@@ -750,6 +797,15 @@
         box.querySelectorAll('button').forEach(x => x.classList.remove('active'));
         b.classList.add('active');
       });
+    });
+
+    /* ---- ③ Earn 手动修正：逐日「生效」按钮 ---- */
+    document.querySelectorAll('#tblEarnMan [data-emok]').forEach(b => {
+      b.onclick = () => applyEarnMan(Number(b.dataset.emok));
+    });
+    document.querySelectorAll('#tblEarnMan [data-em]').forEach(el => {
+      el.oninput = () => markEarnManDraft(el);
+      el.onchange = () => markEarnManDraft(el);
     });
 
     /* ---- ④ NON-LEAD · WIP 叠加 ----

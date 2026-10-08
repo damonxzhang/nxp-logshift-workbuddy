@@ -1299,3 +1299,8 @@ table.wdt td .ct-badge.r1 { background: #fff3e0; color: var(--warn); }
 .wd-page button { border: 1px solid var(--border); background: var(--surface); border-radius: 7px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
 .wd-page button:disabled { opacity: .45; cursor: default; }
 .wd-page button.on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+
+/* ---- OP 配置页：Earn 手动修正「逐日生效」按钮（10-08） ---- */
+.em-cell { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.em-cell .btn-sm { padding: 3px 9px; min-height: 28px; font-size: 13px; border-radius: 7px; }
+.em-cell .btn-sm.btn-green { font-weight: 700; }
