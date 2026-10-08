@@ -91,11 +91,12 @@
     return `<span class="badge ${info.badge}">${info.label}</span>`;
   }
 
-  /* 本周红灯 / 黄灯统计（用于图表标记与筛选标签告警） */
-  function redDaysOf(ids) {
+  /* 本周红灯 / 黄灯统计（用于图表标记与筛选标签告警）
+     wipK：WIP 抵扣量（K）—— 判定口径为 (累计实际 + WIP) vs 累计目标 */
+  function redDaysOf(ids, wipK) {
     const marks = [];
     for (let i = 0; i <= lastIdx; i++) {
-      const st = opAggStatus(ids, i, week);
+      const st = opAggStatus(ids, i, week, null, wipK);
       if (st.status === 'over') marks.push(i);
     }
     return marks;
@@ -123,28 +124,23 @@
     function makePanel(d, kind) {
       const pids = isDual ? idsForDept(d) : ids;
       const srs = kind === 'goal' ? goalSeries(pids) : earnSeries(pids);
-      /* WIP 叠加（10-08 客户要求）：只给【NON-LEAD · 累计 goal vs total（K）】这一张图
-         追加第三条线「累计实际 + 在制 WIP」，用于看「已产出 + 在制」能否覆盖周目标。
-         WIP 是实时快照（报表无逐日历史），所有周都按最新快照画，故 7 天同一值。 */
+      /* WIP（10-08 客户口径修正）：**不画进图表** —— WIP 是实时快照、没有逐日历史，
+         画成曲线会被误读成按天数据。它只在**报警判定**时算进去：
+         数量口径判定 = (累计实际 total + WIP) vs 累计目标 goal。
+         这里只把抵扣量取出来传给 opAggStatus / opTypeAlarm，图里保持两条线。 */
       let wip = null;
       const wo = opWipCfg(cfg);
       if (kind === 'goal' && d === 'NON-LEAD' && wo.on && wo.spec) {
-        const k = +(opWipQtyOf(wo.spec, pids, cfg) / 1000).toFixed(1);
-        if (k > 0) {
-          wip = { spec: wo.spec, k: k, scope: wo.scope, excludeHold: wo.excludeHold };
-          const base = srs[1].data;
-          srs.push({
-            name: `累计实际 + WIP（${wo.spec}）`,
-            color: '#a8620b', dash: '3 4', width: 2.2,
-            data: base.map(v => (v == null ? null : +(v + k).toFixed(1)))
-          });
-        }
+        const k = opWipDeductK(pids, cfg, wo);
+        if (k > 0) wip = { spec: wo.spec, k: k, scope: wo.scope, excludeHold: wo.excludeHold };
       }
+      const wipK = (kind === 'goal' && wip) ? wip.k : 0;
       return {
         key: kind + '-' + d, dept: d, kind, ids: pids, series: srs,
-        redDays: redDaysOf(pids),
-        st: opAggStatus(pids, focusIdx, week),
+        redDays: redDaysOf(pids, wipK),
+        st: opAggStatus(pids, focusIdx, week, null, wipK),
         gap: gapAt(srs, focusIdx),
+        gapWithWip: wipK ? gapAt(srs, focusIdx, wipK) : null,
         em: earnMeta(pids),
         wip
       };
@@ -169,18 +165,20 @@
       const earnTag = (!isG && p.em.mode === 'progressive')
         ? ` · 递进式 ±${p.em.pct}%${overN ? ` · <span class="red-inline">超差 ${overN} 天</span>` : ''}`
         : '';
-      /* WIP 叠加提示：明确标注工序、数量与「实时快照」口径（报表无逐日历史） */
+      /* WIP（10-08 修正）：**图里不画**，只在报警判定时把「已产出 + 在制」合起来跟目标比。
+         这里用一行浅色提示说明判定口径，明确标注工序与「实时快照」。 */
       const wipTag = p.wip
-        ? ` · WIP 叠加 <strong>${esc(p.wip.spec)} ${p.wip.k}K</strong>（${p.wip.scope === 'all' ? '该工序全部' : '跟随筛选'}·实时快照）`
+        ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} 报警判定已计入 WIP 抵扣：<strong>${esc(p.wip.spec)} ${p.wip.k}K</strong>
+            （${p.wip.scope === 'all' ? '该工序全部' : '跟随筛选'} · 实时快照，不参与绘图）—— 判定口径 = (累计实际 + 在制) vs 累计目标</div>`
         : '';
       return `<div class="card op-chart-card">
           <div class="card-head">
             <div class="card-title">${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K）' : '累计 Earn 目标 vs 实际（万元）'}
-              <span class="card-sub">${deptTag}目标（虚线）vs 实际（实线）· 悬停看当日明细 · 点击图表查看「周维度累计表」 · ${badge(p.st.status)}${gapTxt}${redTxt}${earnTag}${wipTag}</span></div>
+              <span class="card-sub">${deptTag}目标（虚线）vs 实际（实线）· 悬停看当日明细 · 点击图表查看「周维度累计表」 · ${badge(p.st.status)}${gapTxt}${redTxt}${earnTag}</span></div>
             <div class="legend">${p.series.map(legendItem).join('')}
               ${p.redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
           </div>
-          <div class="card-body"><div id="pc_${esc(p.key)}"></div></div>
+          <div class="card-body">${wipTag}<div id="pc_${esc(p.key)}"></div></div>
         </div>`;
     };
 
@@ -252,14 +250,16 @@
     bindCommon();
     setTimeout(() => {
       const stack = document.getElementById('chartStack');
-      /* 悬停浮层附加行：当日差额 + 状态（未来日显示占位说明）；
-         含 WIP 叠加的面板再补一行「WIP（工序）x K · 产出+在制 y K」 */
+      /* 悬停浮层附加行：当日差额 + 状态（未来日显示占位说明）
+         WIP（10-08 修正）：**不上图**，只在报警判定时计入。
+         浮层这里给一行只读提示（说明该图判定已含 WIP 抵扣）与「产出 + 在制 = 判定口径值」，
+         不改变图内折线本身。 */
       const tipGap = p => i => {
         const srs = p.series, unit = p.kind === 'goal' ? 'K' : '万';
         const wip = p.wip;
         const g0 = srs[0].data[i], t0 = srs[1].data[i];
         const wipLine = wip
-          ? `<div class="lc-tgap flat">WIP（${esc(wip.spec)}） <strong>${wip.k.toLocaleString('en-US')}K</strong>${t0 == null ? '' : ` · 产出+在制 <strong>${(t0 + wip.k).toFixed(1).replace(/\.0$/, '')}K</strong>`}<div class="small muted">实时快照${wip.scope === 'all' ? ' · 该工序全部' : ' · 跟随当前 PKG Type 筛选'}${wip.excludeHold ? ' · 已剔除 Hold' : ''}</div></div>`
+          ? `<div class="lc-tgap flat lc-tgap-wip">报警判定含 WIP 抵扣 <strong>${esc(wip.spec)} ${wip.k.toLocaleString('en-US')}K</strong>${t0 == null ? '' : ` · 产出+在制 <strong>${(t0 + wip.k).toFixed(1).replace(/\.0$/, '')}K</strong>`}（实时快照 · 不绘图）</div>`
           : '';
         if (g0 == null) return wipLine;
         if (t0 == null) {
@@ -268,7 +268,8 @@
             : `<div class="lc-tgap flat">该日无产出记录（数据未覆盖）</div>`) + wipLine;
         }
         const d = +(t0 - g0).toFixed(1);
-        return `<div class="lc-tgap ${d < 0 ? '' : 'ok'}">差额(实际-目标) <strong>${d >= 0 ? '+' : ''}${d.toLocaleString('en-US')}${unit}</strong></div>` + wipLine;
+        const dEff = wip ? +(t0 + wip.k - g0).toFixed(1) : d;
+        return `<div class="lc-tgap ${d < 0 ? '' : 'ok'}">差额(实际-目标) <strong>${d >= 0 ? '+' : ''}${d.toLocaleString('en-US')}${unit}</strong>${wip && dEff !== d ? ` · 计入 WIP 后 <strong class="${dEff < 0 ? 'red-inline' : 'green-inline'}">${dEff >= 0 ? '+' : ''}${dEff}${unit}</strong>` : ''}</div>` + wipLine;
       };
       const tipTitle = i => `${days[i].label} · 周六起第 ${i + 1} 天${days[i].isToday ? '（今天）' : ''}`;
 
@@ -374,10 +375,11 @@
     ];
   }
   /* 截至基准日的差额（实际-目标），用于图表副标题，明确「两条线差多少」 */
-  function gapAt(series, i) {
+  function gapAt(series, i, wipK) {
     const g = series[0].data[i], t = series[1].data[i];
     if (g == null || t == null) return null;
-    return +(t - g).toFixed(1);
+    /* wipK：报警判定口径下把在制 WIP 计入可补的量（10-08 客户修正，WIP 不上图、只进判定） */
+    return +(t + (Number(wipK) || 0) - g).toFixed(1);
   }
   /* 图例条目：目标线画成虚线段，实际线画成实心色块，视觉上与图内两条线一致 */
   function legendItem(s) {

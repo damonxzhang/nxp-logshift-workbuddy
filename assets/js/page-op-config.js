@@ -11,10 +11,11 @@
           金额（Earn）口径可切换「递进式 ±5%」（周六看上周五实际、周日看周六实际，逐日递进），
           并支持周二拿到准确出库数据后手动修正本周后续几天的 Earn 目标（按周保存）。
         · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
-     ④ NON-LEAD · WIP 叠加（10-08 客户追加）：只作用于【NON-LEAD · 累计 goal vs total（K）】图，
-        追加第三条线「累计实际 + 所选 WIP 工序的在制量」；工序单选（BE_DT / BE_SAW …），
-        PKG Type 口径可「跟随图表筛选 / 该工序全部」，Hold 批次可计入或剔除。
-        WIP 是《BE1 WIP Report-V26.xls》的实时快照（无逐日历史）→ 所有周都按最新快照画。
+     ④ WIP 参与报警判定（10-08 客户口径修正）：WIP **不画进图表**（实时快照、无逐日历史），
+        只在**报警判定**时计入 —— 判定口径 = (累计实际 + 在制 WIP) vs 累计目标；
+        全站统一生效（大屏四图徽标 / 红灯天数 / 图内红灯标记、累计表达标列与红灯统计）。
+        工序单选（BE_DT / BE_SAW …），PKG Type 口径可「跟随部门可见范围 / 该工序全部」，
+        Hold 批次可计入或剔除。
    权限：需 Output（OP）模块「编辑」权限；否则整页只读。 */
 (function () {
   renderShell('opcfg');
@@ -44,7 +45,7 @@
     { key: 'types', label: '① PKG Type 维护', icon: 'layers' },
     { key: 'goals', label: '② 每周目标数量', icon: 'target' },
     { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' },
-    { key: 'wip', label: '④ NON-LEAD · WIP 叠加', icon: 'database' }
+    { key: 'wip', label: '④ WIP 报警判定', icon: 'database' }
   ];
 
   function render() {
@@ -52,7 +53,7 @@
       <div class="notice mt16" style="--nc:var(--primary)">
         ${icon('settings', 19)}
         <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>与<strong>小分类（封装料号）单价</strong>）、<strong>每周 PKG Type 目标数量</strong>、
-        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）、<strong>NON-LEAD 数量图的 WIP 叠加</strong>均在此配置，保存后
+        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）、<strong>WIP 参与报警判定（不上图）</strong>均在此配置，保存后
         <a class="chip chip-link" href="output.html">Output（OP）大屏</a> 即时生效。
         ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无 Output（OP）「编辑」权限，仅可查看配置。'}</div>
       </div>
@@ -563,12 +564,13 @@
   }
 
   /* =========================================================
-     ④ NON-LEAD · WIP 叠加（2026-10-08 客户要求）
-     只作用于【NON-LEAD · 累计 goal vs total 曲线对比（K）】这一张图：
-       追加第三条线「累计实际 total + 所选工序的在制 WIP」，
-       用来看「已产出 + 在制」能不能覆盖周目标；浮窗同步显示 WIP 数量与合计。
-     WIP 是《BE1 WIP Report-V26.xls》的实时快照（无逐日历史），
-       客户口径：所有周都按最新快照画（页面已注明，避免误读成历史值）。
+     ④ WIP 参与报警判定（2026-10-08 客户口径修正）
+     口径修正：WIP **不画进图表** —— 它是实时快照（《BE1 WIP Report-V26.xls》，无逐日历史），
+       画成曲线会被误读成按天数据。
+     改为：只在**报警判定**时计入 —— 数量口径判定 = (累计实际 total + WIP) vs 累计目标 goal，
+       即「已产出 + 在制」能否覆盖目标；全站统一（大屏四图徽标 / 红灯天数 / 图内红灯标记、
+       累计表达标列与红灯统计）。
+     可配：启用 / 工序单选（BE_DT、BE_SAW …）/ PKG Type 口径（跟随筛选 · 该工序全部）/ Hold 计入·剔除。
      ========================================================= */
   function viewWip() {
     cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay, cfg.wipOverlay || {});
@@ -587,11 +589,22 @@
     const K = v => (v / 1000).toFixed(1) + 'K';
     const cur = specs.find(s => s.spec === o.spec) || null;
 
+    /* 判定口径预览：拿本周 NON-LEAD 的基准日，看「纯实际」与「实际 + WIP」两种判定结果 */
+    const w = genOpWeek(goalYear, goalWeek);
+    const lastI = opLastActualIdx(w);
+    const baseIdx = lastI >= 0 ? lastI : 0;
+    const wipK = o.on ? +(qUse / 1000).toFixed(1) : 0;
+    const stPure = opAggStatus(nlIds, baseIdx, w, null, 0);
+    const stWip = opAggStatus(nlIds, baseIdx, w, null, wipK);
+    const dOf = st => (st.diff == null ? '—' : (st.diff >= 0 ? '+' : '') + st.diff + 'K');
+    const nOf = st => opStatusInfo(st.status).label;
+    const dayLbl = w.days[baseIdx] ? w.days[baseIdx].label : '—';
+
     return `
       <div class="card">
         <div class="card-head">
-          <div class="card-title">${icon('layers', 19)} NON-LEAD · WIP 叠加
-            <span class="card-sub">只作用于【NON-LEAD · 累计 goal vs total 曲线对比（K）】· 第三条线 = 累计实际 + 在制 WIP</span></div>
+          <div class="card-title">${icon('database', 19)} WIP 参与报警判定
+            <span class="card-sub">WIP 不上图 · 只进判定：判定口径 = (累计实际 + 在制) vs 累计目标 · 全站统一生效</span></div>
           <div class="flex acenter gap8">
             ${canEdit ? `<button class="btn btn-sm btn-primary" id="btnWipSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
           </div>
@@ -599,16 +612,17 @@
         <div class="card-body">
           <div class="cfg-note mb12">${icon('database', 15)} WIP 数据来自客户《${esc(meta.source || 'BE1 WIP Report-V26.xls')}》
             （${meta.lots || 0} 批 · ${K(meta.totalQty || 0)} · ${specs.length} 个工序，抽取于 ${esc(meta.extractedAt || '—')}），
-            是<strong>实时在制快照</strong>——报表里没有逐日历史，因此<strong>所有周都按最新快照画</strong>（7 天同一值）。
-            图内第三条线表示「已产出 + 在制」，浮窗会单列 WIP 数量与合计。</div>
+            是<strong>实时在制快照</strong>——报表里没有逐日历史，故<strong>不能画成按天的曲线</strong>（会被误读）。
+            按 10-08 客户口径，它只在<strong>报警判定</strong>时算进去：把「已产出 + 在制」合起来跟目标比，
+            在制可补的量抵扣缺口；<strong>图表里仍然只有目标 / 实际两条线</strong>。</div>
 
           <div class="cfg-row">
-            <div class="cfg-item"><label class="field-label">启用 WIP 叠加</label>
+            <div class="cfg-item"><label class="field-label">启用 WIP 参与判定</label>
               <div class="seg" id="cfgWipOn">
                 <button data-m="on" class="${o.on ? 'active' : ''}">启用</button>
                 <button data-m="off" class="${o.on ? '' : 'active'}">停用</button>
               </div>
-              <div class="small muted mt8">停用后 NON-LEAD 数量图回到原来的两条线（累计目标 / 累计实际）。</div>
+              <div class="small muted mt8">停用后判定回到原来的「纯累计实际 vs 累计目标」，WIP 完全不计入。</div>
             </div>
             <div class="cfg-item"><label class="field-label">WIP 工序（单选）</label>
               <select class="input" id="selWipSpec" style="width:300px" ${canEdit ? '' : 'disabled'}>
@@ -622,10 +636,11 @@
           <div class="cfg-row mt8">
             <div class="cfg-item"><label class="field-label">PKG Type 口径</label>
               <div class="seg" id="cfgWipScope">
-                <button data-m="filter" class="${o.scope === 'filter' ? 'active' : ''}">跟随图表筛选</button>
+                <button data-m="filter" class="${o.scope === 'filter' ? 'active' : ''}">跟随部门可见范围</button>
                 <button data-m="all" class="${o.scope === 'all' ? 'active' : ''}">该工序全部</button>
               </div>
-              <div class="small muted mt8">「跟随图表筛选」= 只统计 NON-LEAD 当前可见 / 已勾选的 PKG Type（${nlIds.map(esc).join(' / ')}），与图里另外两条线同口径；「该工序全部」= 不看 PKG Type，取该工序在制总量。</div>
+              <div class="small muted mt8">「跟随部门可见范围」= 只统计 NON-LEAD 可见的 PKG Type（${nlIds.map(esc).join(' / ')}），与判定用的品类集合同口径；
+                「该工序全部」= 不看 PKG Type，取该工序在制总量。</div>
             </div>
             <div class="cfg-item"><label class="field-label">Hold 批次</label>
               <div class="seg" id="cfgWipHold">
@@ -637,17 +652,30 @@
           </div>
 
           <div class="cfg-row mt12">
-            <div class="cfg-item"><label class="field-label">当前配置下的叠加量（预览）</label>
+            <div class="cfg-item"><label class="field-label">当前配置下的判定抵扣量（预览）</label>
               <div class="flex acenter gap8 flex-wrap mt6">
                 <span class="chip">${esc(o.spec)} · 该工序全部 <strong>${K(qAll)}</strong></span>
                 <span class="chip">NON-LEAD 可见品类 <strong>${K(qFilter)}</strong></span>
                 <span class="chip">再剔除 Hold <strong>${K(qFilterNoHold)}</strong></span>
-                <span class="chip chip-real">${icon('check', 14)} 图内实际取用 <strong>${K(qUse)}</strong></span>
+                <span class="chip chip-real">${icon('check', 14)} 判定实际取用 <strong>${K(o.on ? qUse : 0)}</strong></span>
               </div>
-              <div class="small muted mt8">叠加线 = 当日累计实际 + ${K(qUse)}（实时快照，固定值）。${cur ? `该工序共 ${cur.lots} 批。` : ''}</div>
+              <div class="small muted mt8">判定时把 <strong>${K(o.on ? qUse : 0)}</strong> 加到「累计实际」上再跟目标比（实时快照，当天固定值）。${cur ? `该工序共 ${cur.lots} 批。` : ''}</div>
             </div>
           </div>
-          <div class="cfg-note mt12">${icon('alert', 15)} 叠加线只是<strong>参考线</strong>，不参与达标 / 临界 / 超标的判定——判定仍然只看「累计实际 vs 累计目标」的差额与黄 / 红阈值。</div>
+
+          <div class="cfg-row mt12">
+            <div class="cfg-item"><label class="field-label">判定口径预览（${goalYear} 年第 ${goalWeek} 周 · NON-LEAD · 截至 ${dayLbl}）</label>
+              <div class="flex acenter gap8 flex-wrap mt6">
+                <span class="chip">纯累计实际：差额 <strong>${dOf(stPure)}</strong> · ${nOf(stPure)}</span>
+                <span class="chip chip-real">${icon('database', 14)} 计入 WIP ${wipK}K：差额 <strong>${dOf(stWip)}</strong> · ${nOf(stWip)}</span>
+              </div>
+              <div class="small muted mt8">左边是原来的判定结果，右边是本次口径下的结果；阈值与差额都按 NON-LEAD 可见品类汇总（黄 / 红阈值同类求和）。</div>
+            </div>
+          </div>
+          <div class="cfg-note mt12">${icon('alert', 15)} <strong>WIP 不参与绘图，只参与判定</strong>：
+            图表里仍是「累计目标（虚线）vs 累计实际（实线）」两条线；判定（大屏达标徽标、红灯天数、图内红灯标记、累计表达标列与红灯统计）
+            都按 <strong>(累计实际 + WIP) vs 累计目标</strong> 计算。注意 WIP 是<strong>当下</strong>的在制量 —— 对「本周」是有意义的抵扣，
+            翻看<strong>历史周</strong>时它并不是那一周的在制量（报表无历史），界面会标注「实时快照」。</div>
         </div>
       </div>
 
@@ -665,7 +693,7 @@
                 <td class="center">${K(s.qty)}</td>
                 <td class="center">${s.lots}</td>
                 <td class="center">${(meta.totalQty ? (s.qty / meta.totalQty * 100).toFixed(1) : '0.0')}%</td>
-                <td class="center">${canEdit ? `<button class="btn btn-sm" data-ws="${esc(s.spec)}" ${s.spec === o.spec ? 'disabled' : ''}>选为叠加工序</button>` : ''}</td>
+                <td class="center">${canEdit ? `<button class="btn btn-sm" data-ws="${esc(s.spec)}" ${s.spec === o.spec ? 'disabled' : ''}>选为判定工序</button>` : ''}</td>
               </tr>`).join('') || '<tr><td colspan="5" class="center muted">未加载到 WIP 数据（请确认 wip-real-data.js 已引入）</td></tr>'}
             </tbody>
           </table>
@@ -692,7 +720,7 @@
       cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, { manual: {} });
       cfg.dst = OP_DEFAULTS.dst;                 // 夏令时（手动，默认）
       cfg.dstStartHour = OP_DEFAULTS.dstStartHour;
-      cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay);   // NON-LEAD 图 WIP 叠加
+      cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay);   // WIP 参与报警判定
       types = OPTypeStore.all();
       toast('已恢复默认配置', 'success'); render();
     };
@@ -808,8 +836,8 @@
       el.onchange = () => markEarnManDraft(el);
     });
 
-    /* ---- ④ NON-LEAD · WIP 叠加 ----
-       UI 操作先写进工作副本 cfg.wipOverlay 并就地重渲染（刷新预览），点「保存」才落盘 */
+    /* ---- ④ WIP 参与报警判定 ----
+       UI 操作先写进工作副本 cfg.wipOverlay 并就地重渲染（刷新判定口径预览），点「保存」才落盘 */
     const wo = () => (cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay, cfg.wipOverlay || {}));
     [['cfgWipOn', 'on', v => v === 'on'], ['cfgWipScope', 'scope', v => v], ['cfgWipHold', 'excludeHold', v => v === 'exclude']]
       .forEach(([id, key, conv]) => {
@@ -828,7 +856,7 @@
     if (bws) bws.onclick = () => {
       const o = wo();
       saveCfg();
-      toast('WIP 叠加已保存（' + (o.on ? o.spec + ' 已启用' : '已停用') + '）', 'success');
+      toast('WIP 报警判定已保存（' + (o.on ? o.spec + ' 参与判定' : '已停用') + '）', 'success');
       render();
     };
   }

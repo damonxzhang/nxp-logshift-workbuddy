@@ -33,6 +33,8 @@
   applyDeptScope();
 
   const allIds = () => pkgTypes.map(t => t.id);
+  /* 某品类是否在当前视角部门的可见范围内 —— WIP 逐项抵扣要用同一口径 */
+  const inScope = id => deptScope.indexOf(id) >= 0;
   let filter = (cfg.filter && cfg.filter.length) ? cfg.filter.slice() : allIds();
   const selIds = () => {
     const ok = filter.filter(id => allIds().indexOf(id) >= 0);
@@ -74,11 +76,17 @@
     const ids = selIds();
     const agg6 = aggAt(ids, 6);
     const aggNow = aggAt(ids, focusIdx);
-    const aggSt = opAggStatus(ids, focusIdx, week);
+    /* WIP 参与报警判定（10-08 客户口径修正）：WIP 不上图，只把「累计在制」计入判定。
+       · 聚合口径（顶部汇总 / 汇总行）用「参与汇总品类」的 WIP 合计；
+       · 单品类逐格判定用「该品类可见范围内」的 WIP —— 配置页可按 PKG Type 维护可见范围，
+         两者口径才一致（逐格判定要有意义）。 */
+    const wipAggK = opWipDeductK(ids, cfg);
+    const wipKOf = id => (inScope(id) ? opWipDeductK([id], cfg) : 0);
+    const aggSt = opAggStatus(ids, focusIdx, week, null, wipAggK);
     const earn = opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
-    const redTypes = ids.filter(id => opTypeAlarm(id, week).red > 0);
-    const warnTypes = ids.filter(id => opTypeAlarm(id, week).red === 0 && opTypeAlarm(id, week).yellow > 0);
-    const overCells = countOverCells(ids);
+    const redTypes = ids.filter(id => opTypeAlarm(id, week, null, wipKOf(id)).red > 0);
+    const warnTypes = ids.filter(id => opTypeAlarm(id, week, null, wipKOf(id)).red === 0 && opTypeAlarm(id, week, null, wipKOf(id)).yellow > 0);
+    const overCells = countOverCells(ids, wipKOf);
 
     document.getElementById('content').innerHTML = `
 
@@ -137,13 +145,13 @@
       <div class="card mt16">
         <div class="card-head">
           <div class="card-title">${icon('layers', 19)} 周维度累计表
-            <span class="card-sub">${year} 年第 ${weekNo} 周 · PKG Type ×（Output 目标 + 六[K]~五[K]）；goal / total / FE total 三行 + 底部 Earn 两行</span></div>
+            <span class="card-sub">${year} 年第 ${weekNo} 周 · PKG Type ×（Output 目标 + 六[K]~五[K]）；goal / total / FE total 三行 + 底部 Earn 两行${wipAggK ? ` · <strong>报警判定已计入 WIP 抵扣 ${wipAggK}K</strong>（单元格仍显示纯实际）` : ''}</span></div>
           <div class="flex acenter gap8">
             <span class="chip">${icon('alert', 14)} 达标 / 临界 / 超标 实时着色</span>
           </div>
         </div>
         <div class="card-body">
-          ${renderWeekTable(ids)}
+          ${renderWeekTable(ids, wipKOf)}
           <div class="wk-legend mt12">
             <span class="lg"><i style="background:#1d4ed8"></i>目标(累计) goal</span>
             <span class="lg"><i style="background:#12805a"></i>实际(累计) total</span>
@@ -163,7 +171,7 @@
           ${redTypes.length ? `<span class="chip chip-danger">${icon('alert', 14)} ${redTypes.length} 类红灯</span>` : (warnTypes.length ? `<span class="chip">${icon('alert', 14)} ${warnTypes.length} 类黄灯</span>` : '<span class="chip">本周无报警</span>')}
         </div>
         <div class="card-body" style="max-height:360px;overflow:auto">
-          ${renderAlarmTable(ids)}
+          ${renderAlarmTable(ids, wipKOf)}
         </div>
       </div>
 
@@ -174,7 +182,8 @@
           <ul class="small muted" style="margin:0;padding-left:20px;line-height:1.9">
             <li><strong>目标(累计)</strong>：每周第一天填「一周总目标」，系统均摊到每天并以<strong>累计值</strong>逐日展示（示例 3,680 → 526、1,051、1,577…3,680）。</li>
             <li><strong>实际(累计)</strong>：由 IT 数据库定时获取（当前为确定性演示样例，库表 / 刷新频率待 IT 确认）。</li>
-            <li><strong>异常判定</strong>：每日 goal vs total 差额，阈值<strong>逐个 PKG Type 独立配置</strong>（当前 ${opAlarmText(ids)}），在 <a href="op-config.html">OP 配置页 · ① PKG Type 维护</a> 中逐项维护。</li>
+            <li><strong>异常判定</strong>：每日 <strong>(累计实际 + 在制 WIP)</strong> vs 累计目标的差额，阈值<strong>逐个 PKG Type 独立配置</strong>（当前 ${opAlarmText(ids)}），在 <a href="op-config.html">OP 配置页 · ① PKG Type 维护</a> 中逐项维护。</li>
+            <li><strong>WIP 抵扣（10-08 客户口径）</strong>：在制 WIP 是<strong>实时快照</strong>（《BE1 WIP Report-V26.xls》，无逐日历史），<strong>不画进图表</strong>，只在报警判定时计入 —— 判定口径 = (累计实际 + WIP) vs 累计目标，即「已产出 + 在制」能否覆盖目标。工序、PKG Type 口径与是否剔除 Hold 在 <a href="op-config.html">OP 配置页 · ④ 报警判定 WIP</a> 配置${wipAggK ? `；当前视角下抵扣 <strong>${wipAggK}K</strong>` : '；当前未启用或未选中工序，抵扣 0'}。表格单元格仍显示<strong>纯累计实际</strong>（对账用），WIP 只影响红/黄着色与「超 / 警」角标。</li>
             <li><strong>FE 实际(累计)</strong>：预留扩展行，口径待定；<strong>Earn</strong> 由单价 × 累计实际换算（万元）。</li>
             <li>周目标、价格、报警阈值、刷新频率、夏令时等均可在 <a href="op-config.html">OP 配置页</a> 调整。</li>
           </ul>
@@ -201,18 +210,21 @@
     return out.join('');
   }
 
-  /* 超标单元格计数（用于摘要 chip） */
-  function countOverCells(ids) {
+  /* 超标单元格计数（用于摘要 chip）；wipKOf(id) 提供该品类的 WIP 抵扣量（已计入报警判定） */
+  function countOverCells(ids, wipKOf) {
     let n = 0;
     ids.forEach(id => {
       const t = week.byType[id]; if (!t) return;
-      for (let i = 0; i <= lastIdx; i++) { if (t.totalCum[i] != null && opStatus(id, i, week).status === 'over') n++; }
+      const wk = wipKOf ? wipKOf(id) : 0;
+      for (let i = 0; i <= lastIdx; i++) { if (t.totalCum[i] != null && opStatus(id, i, week, null, wk).status === 'over') n++; }
     });
     return n;
   }
 
-  /* ---------------- 周维度累计表 ---------------- */
-  function renderWeekTable(ids) {
+  /* ---------------- 周维度累计表 ----------------
+     wipKOf(id)：该品类参与报警判定的 WIP 抵扣量（10-08 客户口径：WIP 不上图、只进判定）。
+     注意：单元格里展示的仍是**纯累计实际**（表要对账），WIP 只影响红/黄底色与「超/警」角标。 */
+  function renderWeekTable(ids, wipKOf) {
     const focusCls = i => (i === focusDay ? ' is-focus' : '');
     const head = `<thead><tr>
       <th class="lbl">PKG Type</th>
@@ -223,8 +235,9 @@
     const body = ids.map(id => {
       const t = week.byType[id]; if (!t) return '';
       const info = pkgTypes.find(p => p.id === id) || {};
-      const stNow = opStatus(id, focusIdx, week);
-      const meta = `<div class="small muted" style="margin-top:2px">${focusLabel}：差额 ${stNow.diff == null ? '—' : (stNow.diff >= 0 ? '+' : '') + stNow.diff + 'K'} · ${opStatusInfo(stNow.status).label}</div>`;
+      const wk = wipKOf ? wipKOf(id) : 0;
+      const stNow = opStatus(id, focusIdx, week, null, wk);
+      const meta = `<div class="small muted" style="margin-top:2px">${focusLabel}：差额 ${stNow.diff == null ? '—' : (stNow.diff >= 0 ? '+' : '') + stNow.diff + 'K'}${wk ? `（含 WIP ${wk}K）` : ''} · ${opStatusInfo(stNow.status).label}</div>`;
       const goalCells = t.goalCum.map((v, i) => `<td class="${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}</td>`).join('');
       const totalCells = t.totalCum.map((v, i) => {
         if (v == null) {
@@ -232,7 +245,7 @@
           const cls = days[i].isFuture ? 'cell-future' : 'cell-nodata';
           return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">—</td>`;
         }
-        const st = opStatus(id, i, week);
+        const st = opStatus(id, i, week, null, wk);
         const cls = st.status === 'over' ? 'cell-bad' : (st.status === 'critical' ? 'cell-warn' : '');
         const flag = st.status === 'met' ? '' : `<span class="cell-flag ${st.status === 'over' ? 'flag-bad' : 'flag-warn'}">${st.status === 'over' ? '超' : '警'}</span>`;
         return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}${flag}</td>`;
@@ -269,16 +282,20 @@
     return `<div class="wk-scroll"><table class="wk">${head}<tbody>${body}${foot}</tbody></table></div>`;
   }
 
-  /* ---------------- 异常报警表（周维度，截至基准日累计） ---------------- */
-  function renderAlarmTable(ids) {
+  /* ---------------- 异常报警表（周维度，截至基准日累计） ----------------
+     wipKOf(id)：该品类的 WIP 抵扣量 —— 「周实际(累计)」列仍显示纯实际，另加一列「含 WIP 抵扣」，
+     判定与红灯天数都按 (实际 + WIP) vs 目标 算（10-08 客户口径修正）。 */
+  function renderAlarmTable(ids, wipKOf) {
     const rows = ids.map(id => {
       const t = week.byType[id]; if (!t) return '';
-      const st = opStatus(id, focusIdx, week);
-      const a = opTypeAlarm(id, week);
+      const wk = wipKOf ? wipKOf(id) : 0;
+      const st = opStatus(id, focusIdx, week, null, wk);
+      const a = opTypeAlarm(id, week, null, wk);
       const th = opAlarmOf(id);
       return `<tr><td><span class="pt-dot" style="background:${(pkgTypes.find(p => p.id === id) || {}).color || '#1d4ed8'}"></span> <strong>${esc(id)}</strong></td>
         <td class="center num">${t.goalCum[focusIdx].toLocaleString()}</td>
         <td class="center num">${t.totalCum[focusIdx] == null ? '—' : t.totalCum[focusIdx].toLocaleString()}</td>
+        <td class="center num">${wk ? '+' + wk + 'K' : '—'}</td>
         <td class="center num" style="color:${st.diff != null && st.diff < 0 ? 'var(--danger)' : 'var(--success)'}">${st.diff == null ? '—' : (st.diff >= 0 ? '+' : '') + st.diff + 'K'}</td>
         <td class="center num">${st.rate == null ? '—' : st.rate + '%'}</td>
         <td class="center">${badge(st.status)}</td>
@@ -287,11 +304,11 @@
         <td class="center num">${a.maxGap ? a.maxGap + 'K' : '—'}</td></tr>`;
     }).join('');
     return `<table class="table"><thead><tr>
-      <th>PKG Type</th><th class="center">周目标(累计)</th><th class="center">周实际(累计)</th>
-      <th class="center">差额(实际-目标)</th><th class="center">达成率</th><th class="center">状态</th>
+      <th>PKG Type</th><th class="center">周目标(累计)</th><th class="center">周实际(累计)</th><th class="center">含 WIP 抵扣</th>
+      <th class="center">差额(实际+WIP-目标)</th><th class="center">达成率</th><th class="center">状态</th>
       <th class="center">报警阈值</th>
       <th class="center">本周报警天数</th><th class="center">最大缺口</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="center muted">无数据（当前视角部门下无可见 PKG Type，请切换视角部门或在 OP 配置页启用品类）</td></tr>'}</tbody></table>`;
+      <tbody>${rows || '<tr><td colspan="10" class="center muted">无数据（当前视角部门下无可见 PKG Type，请切换视角部门或在 OP 配置页启用品类）</td></tr>'}</tbody></table>`;
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -342,14 +359,15 @@
     if (be) be.onclick = () => {
       if (!canExport) { toast('当前角色无「Output（OP）」导出权限', 'warn'); return; }
       const ids = selIds();
-      const headers = ['PKG Type', '行类型', 'Output目标[K]', '六[K]', '日[K]', '一[K]', '二[K]', '三[K]', '四[K]', '五[K]', '差额(基准日)[K]', '状态'];
+      const headers = ['PKG Type', '行类型', 'Output目标[K]', '六[K]', '日[K]', '一[K]', '二[K]', '三[K]', '四[K]', '五[K]', '差额(实际+WIP-目标)[K]', 'WIP抵扣[K]', '状态'];
       const rows = [];
       ids.forEach(id => {
         const t = week.byType[id]; if (!t) return;
-        const st = opStatus(id, focusIdx, week);
-        rows.push([id, '目标(累计)', t.weekGoal, ...t.goalCum, '', '—']);
-        rows.push([id, '实际(累计)', '', ...t.totalCum.map(v => v == null ? '—' : v), st.diff == null ? '—' : st.diff, opStatusInfo(st.status).label]);
-        rows.push([id, 'FE 实际(累计)', '—', ...Array(7).fill('—'), '—', '预留']);
+        const wk = inScope(id) ? opWipDeductK([id], cfg) : 0;
+        const st = opStatus(id, focusIdx, week, null, wk);
+        rows.push([id, '目标(累计)', t.weekGoal, ...t.goalCum, '', '', '—']);
+        rows.push([id, '实际(累计)', '', ...t.totalCum.map(v => v == null ? '—' : v), st.diff == null ? '—' : st.diff, wk || 0, opStatusInfo(st.status).label]);
+        rows.push([id, 'FE 实际(累计)', '—', ...Array(7).fill('—'), '—', '', '预留']);
       });
       const earn = opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
       rows.push(['Earn', '目标(累计) 万', '', ...earn.goalCum, '', '—']);

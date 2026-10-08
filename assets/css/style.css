@@ -1136,6 +1136,9 @@ table.table input.input.num.t-th.input-bad {
 .lc-tgap strong { font-variant-numeric: tabular-nums; font-size: 13.5px; }
 .lc-tgap.ok { color: var(--success); }
 .lc-tgap.flat { color: var(--text-3); }
+/* WIP 判定说明行（10-08）：文案较长，允许换行（否则 nowrap 会溢出浮窗） */
+.lc-tgap.lc-tgap-wip { white-space: normal; line-height: 1.5; max-width: 280px; }
+.lc-tgap.lc-tgap-wip strong { font-weight: 700; color: var(--text); }
 
 /* ================= WIP 在制品看板（浅色卡片风 + 动态效果） =================
    设计说明：刻意区别于客户现有深蓝科技风（环形仪表 + 横条），

@@ -170,14 +170,16 @@ const OP_DEFAULTS = {
   },
   source: '客户 IT 导出《BE1 Output Report V5.xls》',   // 实际 total 数据来源（已接入真实导出报表）
 
-  /* ---------------- NON-LEAD 图叠加 WIP（2026-10-08 客户要求） ----------------
-     只作用于【NON-LEAD · 累计 goal vs total 曲线对比（K）】这一张图：
-       第三条线 = 累计实际 total + 该工序当前在制 WIP（表示「已产出 + 在制」能否覆盖目标）。
-     WIP 取自客户《BE1 WIP Report-V26.xls》（wip-real-data.js）的**实时快照**——
-       报表里没有逐日历史，故**所有周都按最新快照画**（页面/图例已注明，避免误读为历史值）。
-       on: 是否启用；spec: WIP 工序（Specname，单选，如 BE_DT / BE_SAW）；
-       scope: 'filter' 跟随图表当前 PKG Type 筛选 / 'all' 该工序全部；
-       excludeHold: 是否剔除 Hold 批次。 */
+  /* ---------------- WIP 参与报警判定（2026-10-08 客户修正） ----------------
+     口径修正：WIP **不画进图表**（它是实时快照、没有逐日历史，画成曲线会被误读成按天数据），
+       只在**报警判定**时算进去 —— 数量口径判定改为 (累计实际 total + WIP) vs 累计目标 goal，
+       即「已产出 + 在制」能否覆盖目标；WIP 作为可补的量抵扣缺口。
+     适用范围：**全站统一** —— 大屏四图的达标徽标 / 红灯天数 / 图内红灯标记、
+       以及周维度累计表的达标列与红灯统计，都走这个口径。
+     仍然可配三项（配置页 ④）：on 启用；spec WIP 工序（Specname，单选，如 BE_DT / BE_SAW）；
+       scope 'filter' 跟随当前 PKG Type 筛选 / 'all' 该工序全部；excludeHold 是否剔除 Hold 批次。
+     注意：WIP 是**当下**的在制量，对「本周」是有意义的抵扣；翻看历史周时它并不是那一周的在制量
+       （报表无历史），页面会标注「实时快照」。 */
   wipOverlay: { on: true, spec: 'BE_DT', scope: 'filter', excludeHold: false }
 };
 
@@ -503,7 +505,11 @@ function genOpWeek(year, weekNo) {
 
 /* =========================================================================
    四、达标状态判定（达标 / 临界 / 超标）
-   差额 diff = total - goal（K，可负）。阈值逐个 PKG Type 配置（单位 K，见 opAlarmOf）：
+   差额 diff = (total + wipK) - goal（K，可负）。
+     · total = 累计实际产出；wipK = 参与判定的 WIP 在制量（实时快照，见 opWipCfg / opWipQtyOf）。
+       WIP **不画进图表**，只在这里把「已产出 + 在制」合起来跟目标比 —— 在制可补的量抵扣缺口。
+     · 传 0 / 不传 wipK 即退回原来的「纯累计实际 vs 累计目标」口径。
+   阈值逐个 PKG Type 配置（单位 K，见 opAlarmOf）：
      单品类判定用该品类自身阈值；多品类聚合判定用「各品类阈值之和」（见 opAlarmSum）。
      diff ≥ 0                      → 达标（green）
      0 < 缺口 < yellowK            → 达标（容差内，绿）
@@ -561,49 +567,54 @@ function opAlarmText(typeIds) {
   return '黄 ' + s.yellowK + 'K / 红 ' + s.redK + 'K（' + ids.length + ' 类合计）';
 }
 
-function opStatusOf(goal, total, cfg) {
+function opStatusOf(goal, total, cfg, wipK) {
   const c = cfg || OP_DEFAULTS.alarm;
-  if (total == null) return { diff: null, level: 'none', status: 'none', rate: null, goal, total: null };
-  const diff = +(total - goal).toFixed(1);   // K
-  const s = -diff;                            // 缺口绝对值
+  if (total == null) return { diff: null, level: 'none', status: 'none', rate: null, goal, total: null, wipK: 0, eff: null };
+  const k = Number(wipK) || 0;                 // WIP 抵扣量（K）；0 = 不参与判定
+  const eff = +(total + k).toFixed(1);         // 参与判定的「累计实际 + 在制」
+  const diff = +(eff - goal).toFixed(1);       // K
+  const s = -diff;                             // 缺口绝对值
   let level, status;
   if (diff >= 0) { level = 'green'; status = 'met'; }
   else if (s < c.yellowK) { level = 'green'; status = 'met'; }
   else if (s < c.redK) { level = 'yellow'; status = 'critical'; }
   else { level = 'red'; status = 'over'; }
-  const rate = goal > 0 ? (total / goal * 100) : 100;
-  return { diff, level, status, rate: +rate.toFixed(1), goal, total };
+  const rate = goal > 0 ? (eff / goal * 100) : 100;
+  return { diff, level, status, rate: +rate.toFixed(1), goal, total, wipK: +k.toFixed(1), eff };
 }
 
 /* 单品类每日状态：阈值默认取该 PKG Type 自身配置，cfg 传入时按传入值覆盖
-   （配置页在未保存时就地预览某个品类的阈值变化）。 */
-function opStatus(typeId, dayIdx, week, cfg) {
+   （配置页在未保存时就地预览某个品类的阈值变化）。
+   wipK：参与判定的 WIP 在制量（K）—— 判定口径为 (total + wipK) vs goal。 */
+function opStatus(typeId, dayIdx, week, cfg, wipK) {
   const t = week && week.byType[typeId];
-  if (!t) return { diff: null, level: 'none', status: 'none', rate: null, goal: 0, total: null };
-  return opStatusOf(t.goalCum[dayIdx], t.totalCum[dayIdx], cfg || opAlarmOf(typeId));
+  if (!t) return { diff: null, level: 'none', status: 'none', rate: null, goal: 0, total: null, wipK: 0, eff: null };
+  return opStatusOf(t.goalCum[dayIdx], t.totalCum[dayIdx], cfg || opAlarmOf(typeId), wipK);
 }
 
 /* 多 PKG Type 聚合状态（用于图表/底部汇总标注）。未来日不参与聚合。
-   阈值 = 参与聚合各品类阈值之和；cfg 传入时按传入值覆盖。 */
-function opAggStatus(typeIds, dayIdx, week, cfg) {
+   阈值 = 参与聚合各品类阈值之和；cfg 传入时按传入值覆盖。
+   wipK：参与判定的 WIP 在制量（K）—— 判定口径为 (聚合 total + wipK) vs 聚合 goal。 */
+function opAggStatus(typeIds, dayIdx, week, cfg, wipK) {
   let goal = 0, total = 0, any = false;
   typeIds.forEach(id => {
     const t = week.byType[id]; if (!t) return;
     goal += t.goalCum[dayIdx];
     if (t.totalCum[dayIdx] != null) { total += t.totalCum[dayIdx]; any = true; }
   });
-  if (!any) return { diff: null, level: 'none', status: 'none', rate: null, goal, total: null };
-  return opStatusOf(goal, total, cfg || opAlarmSum(typeIds));
+  if (!any) return { diff: null, level: 'none', status: 'none', rate: null, goal, total: null, wipK: 0, eff: null };
+  return opStatusOf(goal, total, cfg || opAlarmSum(typeIds), wipK);
 }
 
-/* 某 PKG Type 本周是否出现过红灯 / 黄灯（用于筛选标签告警）。阈值取该品类自身配置。 */
-function opTypeAlarm(typeId, week, cfg) {
+/* 某 PKG Type 本周是否出现过红灯 / 黄灯（用于筛选标签告警）。阈值取该品类自身配置。
+   wipK：参与判定的 WIP 在制量（K）—— 判定口径为 (total + wipK) vs goal。 */
+function opTypeAlarm(typeId, week, cfg, wipK) {
   const t = week && week.byType[typeId];
-  const res = { red: 0, yellow: 0, worst: 'none', worstDay: -1, maxGap: 0 };
+  const res = { red: 0, yellow: 0, worst: 'none', worstDay: -1, maxGap: 0, wipK: +(Number(wipK) || 0).toFixed(1) };
   if (!t) return res;
   const ac = cfg || opAlarmOf(typeId);
   for (let i = 0; i < 7; i++) {
-    const st = opStatusOf(t.goalCum[i], t.totalCum[i], ac);
+    const st = opStatusOf(t.goalCum[i], t.totalCum[i], ac, wipK);
     if (st.status === 'over') { res.red++; if (res.worst !== 'over') { res.worst = 'over'; res.worstDay = i; } }
     else if (st.status === 'critical') { res.yellow++; if (res.worst === 'none' || res.worst === 'met') { res.worst = 'critical'; res.worstDay = i; } }
     const gap = st.diff == null ? 0 : -st.diff;
@@ -611,6 +622,15 @@ function opTypeAlarm(typeId, week, cfg) {
   }
   if (res.red && res.worst !== 'over') res.worst = 'over';
   return res;
+}
+
+/* 聚合口径下参与判定的 WIP 抵扣量（K）：与 opWipQtyOf 同源，供大屏 / 累计表统一取用。
+   cfgo 可传 { on, spec, scope, excludeHold }；关闭或未选工序时返回 0。 */
+function opWipDeductK(typeIds, cfg, cfgo) {
+  const o = cfgo ? Object.assign({}, opWipCfg(cfg), cfgo) : opWipCfg(cfg);
+  if (!o.on || !o.spec) return 0;
+  const tids = o.scope === 'all' ? [] : (typeIds || []);
+  return +(opWipQtyOf(o.spec, tids, cfg) / 1000).toFixed(1);
 }
 
 /* =========================================================================

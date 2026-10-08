@@ -79,7 +79,7 @@ const ok = (c, m, extra) => { c ? console.log('PASS ' + m) : (fail++, console.lo
       const tabs = Array.from(doc.querySelectorAll('#segTab button')).map(b => b.textContent.trim());
       ok(tabs.length === 4, '配置域页签为 4 个（' + tabs.length + '）', tabs.join(' | '));
       ok(/③ 预警分口径/.test(tabs.join('|')), '③ 标签为「预警分口径 / 夏令时」', tabs.join(' | '));
-      ok(/④ NON-LEAD · WIP 叠加/.test(tabs.join('|')), '④ 标签为「NON-LEAD · WIP 叠加」', tabs.join(' | '));
+      ok(/④ WIP 报警判定/.test(tabs.join('|')), '④ 标签为「WIP 报警判定」', tabs.join(' | '));
       ok(/共 4 类/.test(txt), '卡副标题为「共 4 类」');
       /* 切到 ③ 页签，检查预警分口径 / 夏令时内容仍在 */
       const t3 = Array.from(doc.querySelectorAll('#segTab button')).find(b => b.dataset.t === 'alarm');
