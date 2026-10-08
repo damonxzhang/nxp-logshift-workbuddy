@@ -2,6 +2,8 @@
    四个配置域，全部写入 localStorage，与大屏 output.html 共用同一份数据：
      ① PKG Type 维护（增删改：名称 / 单价 / 默认周目标 / 报警阈值 / 启用）  → OPTypeStore
         · 报警阈值（黄灯 / 红灯，单位 K）挂在每个 PKG Type 上逐项维护
+        · 10-08 客户口径：PKG Type = 大分类，其下还有「小分类 = 封装料号（PackageOutline）」，
+          单价细分到料号（types[].subs[].price）；大分类 price 保留为「兜底价」，料号未配价时沿用。
      ② 每周目标数量（按「年份 + 周别」逐 PKG Type 填写本周总目标 K）      → OPGoalStore
      ③ 部门可见范围（哪个部门可以看哪些 PKG Type）                        → OPDeptStore
      ④ 预警分口径 / 夏令时（口径待客户确认，预留入口）                    → op_cfg
@@ -85,8 +87,8 @@
     return `
       <div class="card">
         <div class="card-head">
-          <div class="card-title">${icon('layers', 19)} PKG Type 维护
-            <span class="card-sub">客户后台可增删改 · 默认周目标用于未单独配置周别的场景 · <strong>报警阈值逐品类维护</strong></span></div>
+            <div class="card-title">${icon('layers', 19)} PKG Type 维护（大分类）
+              <span class="card-sub">客户后台可增删改 · 默认周目标用于未单独配置周别的场景 · <strong>报警阈值逐品类维护</strong> · <strong>单价可细分到小分类（封装料号）</strong></span></div>
           <div class="flex acenter gap8">
             ${canEdit ? `<button class="btn btn-sm" id="btnTypeAdd">${icon('plus', 16)} 新增 PKG Type</button>
             <button class="btn btn-sm btn-primary" id="btnTypeSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
@@ -95,8 +97,10 @@
         <div class="card-body">
           <table class="table" id="tblTypes">
             <thead><tr>
-              <th>PKG Type（唯一标识）</th><th>显示名</th>
-              <th class="center">单价（元/粒）</th><th class="center">默认周目标 [K]</th>
+              <th>PKG Type（唯一标识）<div class="small muted" style="font-weight:400">大分类</div></th><th>显示名</th>
+              <th class="center">小分类（封装料号）<div class="small muted" style="font-weight:400">各自单价 · 点「管理」维护</div></th>
+              <th class="center">兜底单价（元/粒）<div class="small muted" style="font-weight:400">料号未配价时沿用</div></th>
+              <th class="center">默认周目标 [K]</th>
               <th class="center" style="width:120px">黄灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
               <th class="center" style="width:120px">红灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
               <th class="center">启用</th><th class="center">本周状态</th>${canEdit ? '<th class="center">操作</th>' : ''}
@@ -107,6 +111,11 @@
             阈值为<strong>每个 PKG Type 独立配置</strong>（单位 K，与实际产出同量纲）：当日「目标累计 − 实际累计」缺口 ≥ 黄灯阈值 → 黄灯，≥ 红灯阈值 → 红灯，要求红灯阈值 ≥ 黄灯阈值。
             大屏在「全部品类」汇总视图下，判定阈值为参与汇总各品类阈值<strong>之和</strong>（当前启用品类合计 黄 ${al.yellowK}K / 红 ${al.redK}K）。</div>
           <div class="cfg-note mt12">${icon('alert', 15)} PKG Type 名称需与 IT 库口径一致；单价用于 Earn 金额折算（万元 = 累计K × 单价 / 10）。删除后该品类的历史周目标配置会一并失效。</div>
+          <div class="cfg-note mt12">${icon('layers', 15)}
+            <strong>大分类 / 小分类两级单价：</strong>PKG Type 是<strong>大分类</strong>，其下的<strong>小分类 = 封装料号</strong>（客户报表 <code>PackageOutline</code> 列，如 98ASA00855D）
+            <strong>各自有自己的单价</strong>，Earn 金额按料号粒度折算。料号清单来自「配置页手工维护」与「真实产出数据中出现的料号」的并集，
+            客户更新报表重跑 <code>.extract-op.py</code> 后新料号会自动带入。
+            <strong>料号未填单价时，自动沿用本行「兜底单价」</strong>（当前大分类价），因此未维护料号价时金额不会失真。</div>
         </div>
       </div>`;
   }
@@ -122,9 +131,21 @@
       const y = t.yellowK == null ? OP_DEFAULTS.alarm.yellowK : Number(t.yellowK);
       const r = t.redK == null ? OP_DEFAULTS.alarm.redK : Number(t.redK);
       const a = opTypeAlarm(t.id, w, { yellowK: y, redK: r, mode: 'diff' });
+      const sl = opSubsOf(t.id, types);
+      const priced = sl.filter(s => s.price != null).length;
       return `<tr data-i="${i}">
         <td><input class="input" data-k="id" value="${esc(t.id)}" ${canEdit ? '' : 'readonly'} style="min-width:110px"></td>
         <td><input class="input" data-k="name" value="${esc(t.name || t.id)}" ${canEdit ? '' : 'readonly'} style="min-width:110px"></td>
+        <td class="center">
+          ${sl.length
+            ? `<div class="flex acenter gap6" style="justify-content:center">
+                 <span class="chip">${sl.length} 个料号</span>
+                 <span class="small ${priced ? 'ok' : 'muted'}">已配价 ${priced}</span>
+               </div>
+               ${canEdit ? `<button class="btn btn-sm mt6" data-sub="${i}">${icon('settings', 14)} 管理单价</button>` : ''}`
+            : `<span class="small muted">—</span>
+               ${canEdit ? `<button class="btn btn-sm mt6" data-sub="${i}">${icon('plus', 14)} 添加料号</button>` : ''}`}
+        </td>
         <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="price" value="${t.price == null ? '' : t.price}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center"></td>
         <td class="center"><input class="input num" type="number" step="50" min="0" data-k="goal" value="${t.goal == null ? 0 : t.goal}" ${canEdit ? '' : 'readonly'} style="width:110px;text-align:center"></td>
         <td class="center"><input class="input num t-th${thCls(y, r)}" type="number" step="0.5" min="0" data-k="yellowK" value="${y}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center" title="缺口 ≥ ${y}K 时黄灯报警"></td>
@@ -133,7 +154,103 @@
         <td class="center" data-role="alarm">${alarmBadge(a)}</td>
         ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-rm="${i}">${icon('trash', 14)}</button></td>` : ''}
       </tr>`;
-    }).join('') || `<tr><td colspan="${canEdit ? 9 : 8}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
+    }).join('') || `<tr><td colspan="${canEdit ? 10 : 9}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
+  }
+
+  /* =========================================================
+     ① 补 小分类（封装料号）单价维护弹窗 · 2026-10-08
+     料号清单 = 配置页手工维护 ∪ 真实产出数据中出现过的料号（opSubsOf 已合并）。
+     单价留空 = 沿用大分类兜底价；Earn 金额按料号粒度折算。
+     ========================================================= */
+  function openSubDlg(i) {
+    const t = types[i]; if (!t) return;
+    const list = opSubsOf(t.id, types);
+    const mix = opRealSubMix(t.id);
+    const totMix = Object.keys(mix).reduce((a, k) => a + (Number(mix[k]) || 0), 0);
+    const base = t.price == null || t.price === '' ? '' : Number(t.price);
+
+    const rowHtml = s => {
+      const share = (mix[s.id] != null && totMix > 0) ? (Number(mix[s.id]) / totMix * 100) : null;
+      return `<tr data-s="${esc(s.id)}">
+        <td><input class="input" data-k="sid" value="${esc(s.id)}" style="min-width:140px"></td>
+        <td class="center">${share == null ? '<span class="small muted">—</span>' : '<span class="small">' + share.toFixed(1) + '%</span>'}</td>
+        <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="sprice"
+             value="${s.price == null ? '' : s.price}" placeholder="留空=${base}" style="width:110px;text-align:center"></td>
+        <td class="center"><span class="small ${s.price == null ? 'muted' : 'ok'}">${s.price == null ? '兜底 ' + base : '料号价 ' + s.price}</span></td>
+        <td class="center"><button class="btn btn-sm btn-danger" data-srm="${esc(s.id)}">${icon('trash', 14)}</button></td>
+      </tr>`;
+    };
+
+    openDialog({
+      title: '小分类（封装料号）单价 · ' + esc(t.name || t.id),
+      sub: 'PKG Type「' + esc(t.id) + '」为<strong>大分类</strong>（兜底单价 ' + base + ' 元/粒）；下面每个<strong>封装料号</strong>可配各自的单价，留空则沿用兜底价',
+      width: 720,
+      okText: '确定',
+      body: `
+        <div class="cfg-note mb12">${icon('alert', 15)}
+          料号来自客户报表 <code>PackageOutline</code> 列。「占比」为该料号在真实产出数据中的数量占比，仅作参考；
+          <strong>未维护料号单价时，Earn 金额按大分类兜底价折算，数值不会失真。</strong></div>
+        <table class="table" id="tblSubs">
+          <thead><tr>
+            <th>封装料号（小分类）</th><th class="center">产出占比<div class="small muted" style="font-weight:400">真实数据</div></th>
+            <th class="center">单价（元/粒）</th><th class="center">生效价</th><th class="center">操作</th>
+          </tr></thead>
+          <tbody>${list.map(rowHtml).join('') ||
+            '<tr><td colspan="5" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'}</tbody>
+        </table>
+        <div class="flex acenter gap8 mt12">
+          <button class="btn btn-sm" id="btnSubAdd">${icon('plus', 16)} 新增料号</button>
+          <button class="btn btn-sm" id="btnSubFill">${icon('refresh', 16)} 全部填充为兜底价 ${base}</button>
+          <button class="btn btn-sm" id="btnSubClear">${icon('close', 16)} 清空单价（全部回落兜底）</button>
+        </div>`,
+      onOk: () => {
+        const rows = document.querySelectorAll('#tblSubs tbody tr[data-s]');
+        const out = [], seen = {};
+        rows.forEach(r => {
+          const idEl = r.querySelector('[data-k="sid"]'), pEl = r.querySelector('[data-k="sprice"]');
+          const id = String((idEl && idEl.value) || '').trim();
+          if (!id || seen[id]) return;
+          seen[id] = 1;
+          const raw = pEl ? String(pEl.value).trim() : '';
+          const n = Number(raw);
+          out.push({ id, price: (raw === '' || !isFinite(n)) ? null : n });
+        });
+        t.subs = out;
+        render();
+        toast('已保存 ' + out.length + ' 个料号（' + out.filter(s => s.price != null).length + ' 个已配单价）', 'success');
+      }
+    });
+
+    /* 弹窗内交互 */
+    const tb = () => document.querySelector('#tblSubs tbody');
+    const bindRow = tr => {
+      const rm = tr.querySelector('[data-srm]');
+      if (rm) rm.onclick = () => { tr.remove(); const b = tb(); if (b && !b.querySelector('tr[data-s]')) b.innerHTML = '<tr><td colspan="5" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'; };
+    };
+    document.querySelectorAll('#tblSubs tbody tr[data-s]').forEach(bindRow);
+    const bAdd = document.getElementById('btnSubAdd');
+    if (bAdd) bAdd.onclick = () => {
+      const b = tb(); if (!b) return;
+      const empty = b.querySelector('tr:not([data-s])'); if (empty) empty.remove();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-s', '');
+      tr.innerHTML = `<td><input class="input" data-k="sid" value="" placeholder="如 98ASA00855D" style="min-width:140px"></td>
+        <td class="center"><span class="small muted">—</span></td>
+        <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="sprice" value="" placeholder="留空=${base}" style="width:110px;text-align:center"></td>
+        <td class="center"><span class="small muted">—</span></td>
+        <td class="center"><button class="btn btn-sm btn-danger" data-srm="">${icon('trash', 14)}</button></td>`;
+      b.appendChild(tr); bindRow(tr); tr.querySelector('[data-k="sid"]').focus();
+    };
+    const bFill = document.getElementById('btnSubFill');
+    if (bFill) bFill.onclick = () => {
+      document.querySelectorAll('#tblSubs [data-k="sprice"]').forEach(el => { el.value = base; });
+      toast('已全部填充为兜底价 ' + base + '，可再逐个修改', 'primary');
+    };
+    const bClear = document.getElementById('btnSubClear');
+    if (bClear) bClear.onclick = () => {
+      document.querySelectorAll('#tblSubs [data-k="sprice"]').forEach(el => { el.value = ''; });
+      toast('已清空料号单价，全部回落大分类兜底价', 'primary');
+    };
   }
 
   function alarmBadge(a) {
@@ -172,6 +289,7 @@
         id,
         name: String(get('name') || id).trim(),
         color: prev.color || '#1d4ed8',
+        subs: Array.isArray(prev.subs) ? prev.subs.map(s => ({ id: s.id, price: s.price == null ? null : Number(s.price) })) : [],   // 小分类（料号）单价
         price: Number(get('price')) || 0,
         goal: Math.max(0, Number(get('goal')) || 0),
         yellowK: num(get('yellowK'), OP_DEFAULTS.alarm.yellowK),
@@ -498,6 +616,7 @@
       types.push({
         id: 'NEWTYPE' + (n + 1), name: '新类型' + (n + 1),
         color: ['#1d4ed8', '#0b6a86', '#8b5cf6', '#a8620b', '#0b8a5a', '#b3261e'][n % 6],
+        subs: [],
         price: 1, goal: 500,
         yellowK: OP_DEFAULTS.alarm.yellowK, redK: OP_DEFAULTS.alarm.redK,
         enabled: true
@@ -527,6 +646,11 @@
       types = collectTypes();
       types.splice(Number(b.dataset.rm), 1);
       render();
+    });
+    /* 小分类（封装料号）单价维护：先把表格当前值收进工作副本，再开弹窗 */
+    document.querySelectorAll('#tblTypes [data-sub]').forEach(b => b.onclick = () => {
+      types = collectTypes();
+      openSubDlg(Number(b.dataset.sub));
     });
 
     /* ---- ② 每周目标 ---- */

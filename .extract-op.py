@@ -8,6 +8,12 @@
     周起始 = 周六；第 1 周 = 该年第一个周六所在的那一周；列序 六→五。
     产出日 = MoveOutTime 的日期；数量 = Qty（颗）；单位换算 K = 颗 / 1000。
     PKG Type 映射：BGA + LGA 合并为 BGA/LGA（大屏口径），其余按原值。
+
+10-08 新增「小分类（封装料号 PackageOutline）」维度：
+    源表第 1 列 PackageOutline 即料号，本次一并抽出料号级产出数量
+    —— 用于「单价细分到具体料号」的 Earn 金额折算（每个料号可配各自的单价）。
+    subs[周键][PKG Type][料号] = [六~五] 当日颗数；
+    subMix[PKG Type][料号] = 全表颗数合计（供「无真实数据的演示周」按料号结构占比拆分）。
 """
 import sys, json, datetime
 import xlrd
@@ -44,6 +50,8 @@ def main():
     idx = {h: i for i, h in enumerate(hdr)}
 
     byweek = {}        # '2026-W39' -> { typeId: [7 天颗数] }
+    bysub = {}         # '2026-W39' -> { typeId: { 料号: [7 天颗数] } }
+    sub_mix = {}       # typeId -> { 料号: 全表颗数合计 }（演示周按此占比拆分）
     meta = {}          # '2026-W39' -> { rows, lots, dates, types(原始) }
     days_seen = {}
     lots = set()
@@ -63,6 +71,13 @@ def main():
         tid = PKG_MAP.get(pkg, pkg)
         row = byweek.setdefault(key, {}).setdefault(tid, [None] * 7)
         row[di] = (row[di] or 0) + q
+        # 小分类（封装料号）维度：单价细分到具体料号
+        sub = str(sh.cell_value(r, idx['PackageOutline'])).strip() if 'PackageOutline' in idx else ''
+        if sub:
+            srow = bysub.setdefault(key, {}).setdefault(tid, {}).setdefault(sub, [None] * 7)
+            srow[di] = (srow[di] or 0) + q
+            mix = sub_mix.setdefault(tid, {})
+            mix[sub] = mix.get(sub, 0) + q
         m = meta.setdefault(key, {'rows': 0, 'lots': [], 'days': [], 'rawTypes': {}})
         m['rows'] += 1
         m['lots'].append(lot)
@@ -84,7 +99,9 @@ def main():
         'lots': len(lots),
         'days': src_date,
         'rawTypes': raw_types,
-        'weeks': byweek
+        'weeks': byweek,
+        'subs': bysub,          # 料号级产出数量（真实）
+        'subMix': sub_mix       # 料号结构占比（供演示周拆分）
     }
 
     js = []
@@ -93,7 +110,9 @@ def main():
     js.append('   口径：产出日 = MoveOutTime 的日期；数量 = Qty（颗）→ K = 颗 / 1000；')
     js.append('        周起始 = 周六，第 1 周 = 该年第一个周六所在的那一周（与大屏一致）；')
     js.append('        PKG Type：BGA + LGA 合并为 BGA/LGA，其余按原值。')
-    js.append('   weeks[周键][PKG Type] = [六, 日, 一, 二, 三, 四, 五] 当日的「颗数」，null = 该日无数据。 */')
+    js.append('   weeks[周键][PKG Type] = [六, 日, 一, 二, 三, 四, 五] 当日的「颗数」，null = 该日无数据。')
+    js.append('   subs[周键][PKG Type][封装料号] = 同上形状的料号级颗数（用于「单价细分到料号」的 Earn 折算）；')
+    js.append('   subMix[PKG Type][封装料号] = 全表颗数合计，供「无真实数据的演示周」按料号结构占比拆分。 */')
     js.append('const OP_REAL_DATA = ' + json.dumps(body, ensure_ascii=False, indent=2) + ';')
     js.append('')
     with open(OUT, 'w', encoding='utf-8') as f:

@@ -6,7 +6,9 @@
    样式刻意区别于客户现有深蓝科技风（环形仪表 + 横条）：浅色卡片 + 热力矩阵 + 排行条 + Hold 跑马灯，
    动效：数字滚动 / 条形生长 / 热力格渐入 / 巡检高亮 / 跑马灯 / 抽屉滑入。
    数据：客户 IT 导出《BE1 WIP Report-V26.xls》（真实数据，见 wip-real-data.js），
-   金额按 OP 配置单价（opPriceOf，LGA 复用 BGA/LGA 价）折算 Earn。 */
+   金额按 OP 配置单价折算 Earn（LGA 复用 BGA/LGA 价）；
+   10-08 起支持「小分类 = 封装料号」级单价：WIP 明细行自带料号（PackageOutline），
+   逐个料号取价（opSubPriceOf），料号未配价时自动回落大分类兜底价。 */
 (function () {
   renderShell('wip');
 
@@ -22,11 +24,13 @@
   const typeName = t => (t === 'LGA' ? 'BGA/LGA' : t);
   /* 单价口径：OP 配置里 BGA / LGA 合为「BGA/LGA」一类，两原始品类共用同一单价 */
   const PRICE_KEY = { BGA: 'BGA/LGA', LGA: 'BGA/LGA' };
-  const priceOf = t => opPriceOf(PRICE_KEY[t] || t);           // 元/粒
+  const priceOf = t => opPriceOf(PRICE_KEY[t] || t);           // 元/粒（大分类兜底价）
+  /* 小分类（封装料号）单价：料号价 → 大分类兜底价。行内无料号时退回大分类价 */
+  const priceOfSub = (t, sub) => (sub ? opSubPriceOf(PRICE_KEY[t] || t, String(sub).trim()) : priceOf(t));
 
-  /* 数量→口径值：unit='K' 千颗 | '万' Earn 万元（按品类单价折算，逐行乘单价后求和） */
+  /* 数量→口径值：unit='K' 千颗 | '万' Earn 万元（按料号单价折算，逐行乘单价后求和） */
   let unit = store.get('wip_unit', 'K');
-  const valOf = (qty, type) => unit === 'K' ? qty / 1000 : qty * priceOf(type) / 10000;
+  const valOf = (qty, type, sub) => unit === 'K' ? qty / 1000 : qty * priceOfSub(type, sub) / 10000;
   const unitLabel = () => unit === 'K' ? 'K' : '万';
   const fmtVal = v => v == null ? '—' : (v >= 1000 ? Math.round(v).toLocaleString('en-US') : v.toFixed(1));
 
@@ -46,7 +50,7 @@
     rows.forEach(r => {
       if (!types.includes(r[1])) return;
       const s = m[r[0]] || (m[r[0]] = { step: r[0], qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} });
-      s.qty += r[7]; s.val += valOf(r[7], r[1]); s.lots++;
+      s.qty += r[7]; s.val += valOf(r[7], r[1], r[3]); s.lots++;
       s.byType[r[1]] = (s.byType[r[1]] || 0) + r[7];
       if (r[13] > 0) s.hold++;
       if (r[12] != null && r[12] < 0) s.otd++;
@@ -61,7 +65,7 @@
     let qty = 0, earn = 0, lots = 0, hold = 0, otd = 0;
     rows.forEach(r => {
       if (!types.includes(r[1])) return;
-      qty += r[7]; earn += r[7] * priceOf(r[1]) / 10000; lots++;
+      qty += r[7]; earn += r[7] * priceOfSub(r[1], r[3]) / 10000; lots++;
       if (r[13] > 0) hold++;
       if (r[12] != null && r[12] < 0) otd++;
     });
@@ -211,10 +215,13 @@
       const cell = e.target.closest('.wh-cell[data-qty]');
       if (cell) {
         const step = cell.dataset.step, t = cell.dataset.type, q = +cell.dataset.qty;
-        const lotN = rows.filter(r => r[0] === step && r[1] === t).length;
-        const holdN = rows.filter(r => r[0] === step && r[1] === t && r[13] > 0).length;
+        const sub = rows.filter(r => r[0] === step && r[1] === t);
+        const lotN = sub.length;
+        const holdN = sub.filter(r => r[13] > 0).length;
+        /* Earn 按格子内各料号的实际数量 × 各自单价汇总（不整体乘一个品类价） */
+        const cellEarn = sub.reduce((a, r) => a + r[7] * priceOfSub(r[1], r[3]) / 10000, 0);
         info.innerHTML = `<strong>${esc(step)}</strong> × <strong>${esc(typeName(t))}</strong>：在制
-          <strong>${fmtVal(q / 1000)}K</strong>（Earn ${fmtVal(q * priceOf(t) / 10000)} 万）· ${lotN} 批 · Hold ${holdN} 批 — 点击进入二级筛选`;
+          <strong>${fmtVal(q / 1000)}K</strong>（Earn ${fmtVal(cellEarn)} 万 · 按料号单价折算）· ${lotN} 批 · Hold ${holdN} 批 — 点击进入二级筛选`;
       }
     };
     grid.onclick = e => {
@@ -327,7 +334,7 @@
     const sizes = uniq(all, 2), outlines = uniq(all, 3), locs = uniq(all, 9), banks = uniq(all, 15);
     const list = drRows();
     const qty = list.reduce((a, r) => a + r[7], 0);
-    const earn = list.reduce((a, r) => a + r[7] * priceOf(r[1]) / 10000, 0);
+    const earn = list.reduce((a, r) => a + r[7] * priceOfSub(r[1], r[3]) / 10000, 0);
     const hold = list.filter(r => r[13] > 0).length;
     const otd = list.filter(r => r[12] != null && r[12] < 0).length;
     const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));

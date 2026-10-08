@@ -27,7 +27,9 @@ function mulberry32OP(a) {
 /* ---------------- 维度定义：PKG Type（客户后台可增删改，此处为演示样例） ----------------
    单位：goal 为「周总目标 [K]」；price 为单价（元/粒）；color 用于图表与筛选高亮（不再在配置页维护）。
    报警阈值 yellowK / redK 为「每个 PKG Type 独立配置」（单位 K，差额比对）：
-     缺口 ≥ yellowK → 黄灯；缺口 ≥ redK → 红灯。在「OP 目标与权限配置 · ① PKG Type 维护」逐项维护。 */
+     缺口 ≥ yellowK → 黄灯；缺口 ≥ redK → 红灯。在「OP 目标与权限配置 · ① PKG Type 维护」逐项维护。
+   10-08 客户口径：PKG Type 是「大分类」，其下还有「小分类 = 封装料号（PackageOutline）」，
+     **单价细分到料号**（subs[].price）；大分类的 price 保留为「兜底价」——料号未配价时沿用。 */
 const OP_PKG_TYPES = [
   { id: 'BGA/LGA', name: 'BGA/LGA', color: '#1d4ed8', goal: 3680, price: 1.85, yellowK: 1, redK: 10, enabled: true },
   { id: 'PQFN', name: 'PQFN', color: '#0b6a86', goal: 200, price: 0.92, yellowK: 1, redK: 10, enabled: true },
@@ -42,6 +44,71 @@ function opPriceOf(id, types) {
   const t = list.find(x => x.id === id);
   if (t && t.price != null && t.price !== '') return Number(t.price) || 0;
   return OP_EARN_PRICE[id] != null ? OP_EARN_PRICE[id] : 1.0;
+}
+
+/* =========================================================================
+   一·补 小分类（封装料号 PackageOutline）· 2026-10-08 新增
+   客户口径：「PKG Type 是大分类，还有小分类，每个小分类对应有各自的单价」。
+     · 小分类 = 封装料号（客户报表 PackageOutline 列，如 98ASA00855D）
+     · 料号清单两个来源：① 配置页手工维护 types[].subs；② 真实产出数据里出现过的料号
+       （OP_REAL_DATA.subMix，客户更新报表重跑 .extract-op.py 即自动带上）。两者取并集。
+     · 生效单价：料号价 → 大分类兜底价 → 兜底表 → 1.0（未配价一律回落，数值不会失真）。
+     · Earn 折算按料号粒度进行；无料号级数量的演示周按「料号结构占比」把大分类数量拆开。
+   ========================================================================= */
+
+/* 真实产出数据里出现过的料号及其颗数合计（用于占比与自动带出料号清单） */
+function opRealSubMix(typeId) {
+  if (typeof OP_REAL_DATA === 'undefined' || !OP_REAL_DATA || !OP_REAL_DATA.subMix) return {};
+  return OP_REAL_DATA.subMix[typeId] || {};
+}
+
+/* 料号清单（并集）：配置页维护的在前、保持顺序，真实数据里新增的料号补在后面 */
+function opSubsOf(typeId, types) {
+  const list = types || OPTypeStore.all();
+  const t = list.find(x => x.id === typeId);
+  const out = [], seen = {};
+  (t && Array.isArray(t.subs) ? t.subs : []).forEach(s => {
+    const id = String((s && s.id) || '').trim();
+    if (!id || seen[id]) return;
+    seen[id] = 1;
+    const p = (s.price == null || s.price === '') ? null : Number(s.price);
+    out.push({ id, price: (p != null && isFinite(p)) ? p : null });
+  });
+  Object.keys(opRealSubMix(typeId)).forEach(id => {
+    if (!id || seen[id]) return;
+    seen[id] = 1;
+    out.push({ id, price: null });
+  });
+  return out;
+}
+
+/* 单个料号的生效单价（元/粒）：料号价 → 大分类兜底价 → 兜底表 → 1.0 */
+function opSubPriceOf(typeId, subId, types) {
+  const s = opSubsOf(typeId, types).find(x => x.id === subId);
+  if (s && s.price != null) return Number(s.price) || 0;
+  return opPriceOf(typeId, types);
+}
+
+/* 料号结构占比：真实数据各料号颗数占比（用于把无料号级数量的演示周拆到料号） */
+function opSubRatios(typeId, types) {
+  const subs = opSubsOf(typeId, types);
+  if (!subs.length) return {};
+  if (subs.length === 1) { const m = {}; m[subs[0].id] = 1; return m; }
+  const mix = opRealSubMix(typeId);
+  let tot = 0;
+  Object.keys(mix).forEach(k => { tot += Number(mix[k]) || 0; });
+  const m = {};
+  if (tot > 0) {
+    let s = 0;
+    subs.forEach(x => { const r = (Number(mix[x.id]) || 0) / tot; m[x.id] = r; s += r; });
+    if (s > 0) {                                   // 归一化：手工新增的料号在真实数据里没有量，占比按 0 计入
+      subs.forEach(x => { m[x.id] = m[x.id] / s; });
+      return m;
+    }
+  }
+  const even = 1 / subs.length;
+  subs.forEach(x => { m[x.id] = even; });           // 无任何真实料号量：等分
+  return m;
 }
 
 /* ---------------- 演示剖面（仅在「该周没有真实数据」时作为回落） ----------------
@@ -346,7 +413,26 @@ function genOpWeek(year, weekNo) {
       totalCum.push(Math.max(0, Math.round(tExact)));
     }
     goalCum[6] = weekGoal;            // 确保累计末值精确等于周总目标
-    byType[t.id] = { goalCum, totalCum, weekGoal };
+
+    /* 小分类（料号）级累计数量 [K]：
+       真实周 → 直接用客户报表的料号级数量（OP_REAL_DATA.subs）；
+       演示周 → 按料号结构占比（opSubRatios）把大分类累计拆到各料号。 */
+    const ratios = opSubRatios(t.id, types);
+    const realSubs = (typeof OP_REAL_DATA !== 'undefined' && OP_REAL_DATA && OP_REAL_DATA.subs)
+      ? ((OP_REAL_DATA.subs[opWeekKey(year, weekNo)] || {})[t.id] || null) : null;
+    const subCum = {};
+    Object.keys(ratios).forEach(sid => {
+      const arr = [];
+      let acc = 0;
+      for (let i = 0; i < 7; i++) {
+        const q = realSubs && realSubs[sid] ? realSubs[sid][i] : null;
+        if (q != null) { acc += Number(q) / 1000; arr.push(acc); }
+        else arr.push(totalCum[i] == null ? null : totalCum[i] * ratios[sid]);
+      }
+      subCum[sid] = arr;
+    });
+
+    byType[t.id] = { goalCum, totalCum, weekGoal, subCum };
   });
   return {
     year, week: weekNo, key: opWeekKey(year, weekNo), start, days, byType, types,
@@ -475,13 +561,30 @@ function opTypeAlarm(typeId, week, cfg) {
 function opEarnSeries(typeIds, week, typeList) {
   const goalCum = [0, 0, 0, 0, 0, 0, 0], totalCum = [null, null, null, null, null, null, null];
   let started = false;
+  const list = typeList || OPTypeStore.all();
   typeIds.forEach(id => {
     const t = week.byType[id]; if (!t) return;
-    const p = opPriceOf(id, typeList) / 10;   // K → 万元 折算系数
-    for (let i = 0; i < 7; i++) {
-      goalCum[i] += t.goalCum[i] * p;
-      if (t.totalCum[i] != null) { totalCum[i] = (totalCum[i] || 0) + t.totalCum[i] * p; started = true; }
+    const subs = opSubsOf(id, list);
+    /* 没有料号维度（品类未挂料号 / 老数据）时，退回原「大分类数量 × 大分类单价」口径 */
+    if (!subs.length || !t.subCum) {
+      const p = opPriceOf(id, list) / 10;   // K → 万元 折算系数
+      for (let i = 0; i < 7; i++) {
+        goalCum[i] += t.goalCum[i] * p;
+        if (t.totalCum[i] != null) { totalCum[i] = (totalCum[i] || 0) + t.totalCum[i] * p; started = true; }
+      }
+      return;
     }
+    const ratios = opSubRatios(id, list);
+    subs.forEach(s => {
+      const p = opSubPriceOf(id, s.id, list) / 10;          // 料号自己的单价
+      const sc = t.subCum[s.id] || [];
+      for (let i = 0; i < 7; i++) {
+        // 目标：按「当日该料号的实际占比」分摊大分类目标累计；无实际值时用结构占比
+        const r = (t.totalCum[i] != null && sc[i] != null && t.totalCum[i] > 0) ? sc[i] / t.totalCum[i] : (ratios[s.id] || 0);
+        goalCum[i] += t.goalCum[i] * r * p;
+        if (sc[i] != null) { totalCum[i] = (totalCum[i] || 0) + sc[i] * p; started = true; }
+      }
+    });
   });
   return {
     goalCum: goalCum.map(v => +v.toFixed(1)),
