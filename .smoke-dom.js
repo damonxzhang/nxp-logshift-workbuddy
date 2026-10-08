@@ -61,6 +61,16 @@ const ok = (c, m, extra) => { c ? console.log('PASS ' + m) : (fail++, console.lo
       ok(!!svg, 'SVG 已绘制');
       ok(svg && svg.style.cursor === 'pointer', 'SVG cursor=pointer（整图可点）', svg && svg.style.cursor);
       ok(!/lc-tcta/.test(html), '浮窗无 CTA 行');
+      /* 10-08：图内不再标注两条线的具体取值（如 5,511K / 5,052K），只留参考线与该日刻度 */
+      const SERIES_FILL = ['#1d4ed8', '#12805a', '#8b5cf6', '#0b6a86'];
+      const valTexts = Array.from(doc.querySelectorAll('.op-chart-card .card-body svg text'))
+        .filter(t => SERIES_FILL.includes(t.getAttribute('fill')))
+        .map(t => t.textContent.trim())
+        .filter(s => /\d/.test(s));
+      ok(valTexts.length === 0, '图内无线条取值数值标注', valTexts.slice(0, 4).join(' / '));
+      const endLab = Array.from(doc.querySelectorAll('.op-chart-card .card-body svg text'))
+        .filter(t => t.getAttribute('fill') === '#5b6577').map(t => t.textContent.trim());
+      ok(endLab.length >= 1, '基准日刻度标签仍在（' + endLab.slice(0, 2).join(',') + '）');
     }
     dom.window.close();
   }

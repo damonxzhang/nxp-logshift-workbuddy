@@ -531,7 +531,7 @@ function lineChart(el, opts) {
      tipUnit / tipTitle(i) / tipExtra(i)：浮层数值单位、标题、附加行（如差额）。
      onClick(i, e)：传入后整张图可直接点击（鼠标变手型），点击位置落在哪一列就回调哪个下标
                     —— 2026-10-08 客户要求：下钻动作不再挂在浮窗上（浮窗太小、点不到）。 */
-  const { series, labels, height = 240, min = 0, max = 100, yUnit = '', marks = [], endAt = -1, endUnit = '',
+  const { series, labels, height = 240, min = 0, max = 100, yUnit = '', marks = [], endAt = -1,
     vw = 1000, hover = false, tipUnit = '', tipTitle = null, tipExtra = null, onClick = null } = opts;
   const W = vw, H = height, k = 1000 / vw;
   const pl = Math.round(46 * k), pr = Math.round(18 * k), pt = Math.round(16 * k), pb = Math.round(30 * k);
@@ -585,18 +585,14 @@ function lineChart(el, opts) {
     mk += `<circle class="op-pulse-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${F(6)}" fill="none" stroke="${c}" stroke-width="${F(2.2)}"/>`;
     if (m.text) mk += `<text x="${x.toFixed(1)}" y="${(y - 13 * k).toFixed(1)}" text-anchor="middle" font-size="${F(12.5)}" font-weight="800" fill="${c}">${m.text}</text>`;
   });
-  // 截至基准日：竖直参考线 + 两条线各自的取值标注（让「两条线差多少」有确切数字）
+  // 截至基准日：仅保留竖直参考线 + 该日刻度高亮
+  /* 10-08 客户要求：参考线右侧原本还标注了两条线各自的具体取值（如 5,511K / 5,052K），
+     图内数字过密、喧宾夺主，已下线；需要确切数值时鼠标悬停该日即可在浮窗里看到。
+     注：endUnit 选项随之移除（此前仅 OP 大屏使用）。 */
   let ends = '';
   if (endAt >= 0 && endAt < labels.length) {
     ends += `<line x1="${X(endAt).toFixed(1)}" y1="${pt}" x2="${X(endAt).toFixed(1)}" y2="${pt + ih}" stroke="#c9d2e0" stroke-width="1" stroke-dasharray="${F(4)} ${F(4)}"/>`;
     ends += `<text x="${X(endAt).toFixed(1)}" y="${(H - 8 * k).toFixed(1)}" text-anchor="middle" font-size="${F(12)}" font-weight="700" fill="#5b6577">${labels[endAt]}</text>`;
-    series.forEach((s, si) => {
-      const v = s.data[endAt];
-      if (v == null || !isFinite(v)) return;
-      const x = X(endAt), y = Y(v);
-      const dy = si === 0 ? -11 * k : 17 * k;              // 目标线标注在上，实际线标注在下，互不遮挡
-      ends += `<text x="${(x + 15 * k).toFixed(1)}" y="${(y + dy).toFixed(1)}" font-size="${F(12.5)}" font-weight="800" fill="${s.color}">${Math.round(v).toLocaleString('en-US')}${endUnit}</text>`;
-    });
   }
 
   // 悬停浮层：竖线 + 放大圆点 + 数据明细（hover 模式）

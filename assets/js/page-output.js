@@ -261,7 +261,7 @@
             hover: true, tipUnit: unit, tipTitle, tipExtra: tipGap(p.series, unit),
             min: 0, max: maxByKind[p.kind] * 1.08, yUnit: ' ' + unit,
             marks: p.redDays.map(i => ({ i, v: p.series[1].data[i], color: '#cc2f2a', text: '超标' })),
-            endAt: focusIdx, endUnit: unit,
+            endAt: focusIdx,
             /* 图表直接可点（2026-10-08 客户要求：不再挂在浮窗上）：
                点击图内任意位置 → 取该处所在的「日」→ 跳转周维度累计表并定位到该列 */
             onClick: i => {
