@@ -1,12 +1,12 @@
 /* ============ Output（OP）独立配置页 ============
-   四个配置域，全部写入 localStorage，与大屏 output.html 共用同一份数据：
+   三个配置域（原「部门可见范围」已下线），全部写入 localStorage，与大屏 output.html 共用同一份数据：
      ① PKG Type 维护（增删改：名称 / 单价 / 默认周目标 / 报警阈值 / 启用）  → OPTypeStore
         · 报警阈值（黄灯 / 红灯，单位 K）挂在每个 PKG Type 上逐项维护
         · 10-08 客户口径：PKG Type = 大分类，其下还有「小分类 = 封装料号（PackageOutline）」，
           单价细分到料号（types[].subs[].price）；大分类 price 保留为「兜底价」，料号未配价时沿用。
      ② 每周目标数量（按「年份 + 周别」逐 PKG Type 填写本周总目标 K）      → OPGoalStore
-     ③ 部门可见范围（哪个部门可以看哪些 PKG Type）                        → OPDeptStore
-     ④ 预警分口径 / 夏令时（口径待客户确认，预留入口）                    → op_cfg
+     ③ 预警分口径 / 夏令时（口径待客户确认，预留入口）                    → op_cfg
+        （原「③ 部门可见范围 → OPDeptStore」已于 2026-10-08 按客户要求整块下线）
         · 预警逻辑分口径（10-08 客户修正）：数量口径沿用「周目标均摊」不变；
           金额（Earn）口径可切换「递进式 ±5%」（周六看上周五实际、周日看周六实际，逐日递进），
           并支持周二拿到准确出库数据后手动修正本周后续几天的 Earn 目标（按周保存）。
@@ -18,7 +18,7 @@
   const canEdit = CurrentUser.can('output', 'edit');
   const cur = opCurrentWeek();
 
-  /* ---------------- 配置域 ④：报警分口径 / 夏令时 ---------------- */
+  /* ---------------- 配置域 ③：预警分口径 / 夏令时 ---------------- */
   let cfg = Object.assign({}, OP_DEFAULTS, store.get('op_cfg', {}));
   cfg.alarm = Object.assign({}, OP_DEFAULTS.alarm, cfg.alarm || {});
   cfg.goalMode = Object.assign({}, OP_DEFAULTS.goalMode, cfg.goalMode || {});
@@ -32,24 +32,22 @@
   const curEarnProg = () => Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
 
   /* ---------------- 状态 ---------------- */
-  let tab = 'types';                       // types | goals | dept | alarm
+  let tab = 'types';                       // types | goals | alarm
   let types = OPTypeStore.all();           // 工作副本
   let goalYear = cur.year, goalWeek = cur.week;
-  let depts = OPDeptStore.all();           // 工作副本
 
   const TABS = [
     { key: 'types', label: '① PKG Type 维护', icon: 'layers' },
     { key: 'goals', label: '② 每周目标数量', icon: 'target' },
-    { key: 'dept', label: '③ 部门可见范围', icon: 'users' },
-    { key: 'alarm', label: '④ 预警分口径 / 夏令时', icon: 'alert' }
+    { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' }
   ];
 
   function render() {
     document.getElementById('content').innerHTML = `
       <div class="notice mt16" style="--nc:var(--primary)">
         ${icon('settings', 19)}
-        <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>）、<strong>每周 PKG Type 目标数量</strong>、
-        <strong>部门可见范围（哪个部门可以看什么）</strong>、预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）均在此配置，保存后
+        <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>与<strong>小分类（封装料号）单价</strong>）、<strong>每周 PKG Type 目标数量</strong>、
+        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）均在此配置，保存后
         <a class="chip chip-link" href="output.html">Output（OP）大屏</a> 即时生效。
         ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无 Output（OP）「编辑」权限，仅可查看配置。'}</div>
       </div>
@@ -57,7 +55,7 @@
       <div class="card mt16 no-print">
         <div class="card-head">
           <div class="card-title">${icon('settings', 19)} 配置域
-            <span class="card-sub">共 4 类 · 保存后立即写入本地配置仓库</span></div>
+            <span class="card-sub">共 3 类 · 保存后立即写入本地配置仓库</span></div>
           <div class="flex acenter gap8">
             <div class="seg" id="segTab">
               ${TABS.map(t => `<button data-t="${t.key}" class="${tab === t.key ? 'active' : ''}">${icon(t.icon, 15)} ${t.label}</button>`).join('')}
@@ -75,7 +73,6 @@
   function tabBody() {
     if (tab === 'types') return viewTypes();
     if (tab === 'goals') return viewGoals();
-    if (tab === 'dept') return viewDept();
     return viewAlarm();
   }
 
@@ -393,81 +390,10 @@
   }
 
   /* =========================================================
-     ③ 部门可见范围
-     ========================================================= */
-  function viewDept() {
-    const allIds = types.map(t => t.id);
-    const rows = depts.map((d, i) => {
-      const isAll = (d.types || []).indexOf('*') >= 0;
-      const boxes = allIds.map(id => {
-        const on = isAll || (d.types || []).indexOf(id) >= 0;
-        const t = types.find(x => x.id === id) || {};
-        return `<label class="db"><input type="checkbox" data-d="${i}" data-v="${esc(id)}" ${on ? 'checked' : ''} ${(canEdit && !isAll) ? '' : 'disabled'}>
-          <span class="pt-dot" style="background:${esc(t.color || '#1d4ed8')}"></span>${esc(id)}</label>`;
-      }).join('');
-      return `<tr>
-        <td><strong>${esc(d.dept)}</strong>${d.note ? `<div class="small muted">${esc(d.note)}</div>` : ''}</td>
-        <td class="center">
-          <label class="db allbox"><input type="checkbox" data-all="${i}" ${isAll ? 'checked' : ''} ${canEdit ? '' : 'disabled'}><strong>全部可见</strong></label>
-        </td>
-        <td>${boxes || '<span class="muted">—</span>'}</td>
-        ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-drm="${i}">${icon('trash', 14)}</button></td>` : ''}
-      </tr>`;
-    }).join('') || `<tr><td colspan="${canEdit ? 4 : 3}" class="center muted">暂无部门配置</td></tr>`;
-
-    /* 固定三部门中尚未出现在配置里的（一般为被删除的行） */
-    const rest = OP_DEPARTMENTS.filter(x => !depts.some(d => d.dept === x));
-    const legacy = depts.filter(d => OP_DEPARTMENTS.indexOf(d.dept) < 0);
-    const pv = OPDeptStore.previewDept();
-
-    return `
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('users', 19)} 部门可见范围
-            <span class="card-sub">部门固定为 LEAD / NON-LEAD / PLATING · 逐部门勾选可见的 PKG Type</span></div>
-          <div class="flex acenter gap8">
-            ${canEdit ? `${rest.length ? `<select class="input" id="selDeptAdd" style="width:170px"><option value="">补齐部门…</option>${rest.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select>
-            <button class="btn btn-sm" id="btnDeptAdd">${icon('plus', 16)} 补齐</button>` : ''}
-            <button class="btn btn-sm" id="btnDeptReset">${icon('refresh', 16)} 重置为默认</button>
-            <button class="btn btn-sm btn-primary" id="btnDeptSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="cfg-row mb12">
-            <div class="cfg-item">
-              <label class="field-label">当前视角部门（大屏按其过滤）</label>
-              <select class="input" id="selDeptPreview" style="width:170px">${OP_DEPARTMENTS.map(d => `<option value="${esc(d)}" ${d === pv ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
-            </div>
-            <div class="cfg-item">
-              <label class="field-label">该部门可见品类</label>
-              <div class="cfg-val">${(OPDeptStore.visibleTypes(pv, types.map(t => t.id)) || []).map(id => `<span class="chip">${esc(id)}</span>`).join(' ') || '<span class="muted">—</span>'}</div>
-            </div>
-          </div>
-          <table class="table" id="tblDept">
-            <thead><tr><th style="width:180px">部门</th><th class="center" style="width:110px">全部</th>
-              <th>可见 PKG Type</th>${canEdit ? '<th class="center" style="width:80px">操作</th>' : ''}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-          ${legacy.length ? `<div class="cfg-note mt12">${icon('alert', 15)} 检测到历史遗留部门（${legacy.map(d => esc(d.dept)).join('、')}），建议删除；大屏仅按 LEAD / NON-LEAD / PLATING 判定。</div>` : ''}
-          <div class="cfg-note mt12">${icon('alert', 15)} 真实环境由<strong>当前登录用户所属部门</strong>自动判定（当前登录：${esc((CurrentUser.get() || {}).name || '—')} · ${esc(CurrentUser.dept() || '—')}，不在三部门内时默认按 LEAD 全量可见）；
-            此处「视角部门」仅用于演示验证配置效果，保存后回到大屏即可看到过滤结果。</div>
-        </div>
-      </div>`;
-  }
-
-  function collectDepts() {
-    const out = depts.map((d, i) => {
-      const allEl = document.querySelector(`#tblDept [data-all="${i}"]`);
-      if (allEl && allEl.checked) return { dept: d.dept, types: ['*'], note: d.note || '' };
-      const arr = [];
-      document.querySelectorAll(`#tblDept [data-d="${i}"]`).forEach(el => { if (el.checked) arr.push(el.dataset.v); });
-      return { dept: d.dept, types: arr, note: d.note || '' };
-    });
-    return out;
-  }
-
-  /* =========================================================
-     ④ 报警分口径 / 夏令时
+     ③ 预警分口径 / 夏令时
+     （原「③ 部门可见范围」已按 2026-10-08 客户要求整块下线：
+       部门固定为 LEAD / NON-LEAD / PLATING，可见范围沿用引擎内置默认，
+       大屏的「视角部门」下拉仅用于切换统计视角，不再提供配置入口。）
      ========================================================= */
   function viewAlarm() {
     const gm = curGoalMode(), ep = curEarnProg();
@@ -596,7 +522,7 @@
     if (bra) bra.onclick = () => {
       OPTypeStore.reset();
       store.set('op_week_goals', {});
-      store.set('op_dept_scope', OP_DEPT_SCOPE_DEFAULT.map(d => Object.assign({}, d)));
+      OPDeptStore.reset();          // 部门可见范围无配置入口了，恢复默认时一并清掉历史残留
       store.set('op_cfg', {});
       cfg = Object.assign({}, OP_DEFAULTS, {});
       cfg.alarm = Object.assign({}, OP_DEFAULTS.alarm);
@@ -604,7 +530,7 @@
       cfg.earnProg = Object.assign({}, OP_DEFAULTS.earnProg, { manual: {} });
       cfg.dst = OP_DEFAULTS.dst;                 // 夏令时（手动，默认）
       cfg.dstStartHour = OP_DEFAULTS.dstStartHour;
-      types = OPTypeStore.all(); depts = OPDeptStore.all();
+      types = OPTypeStore.all();
       toast('已恢复默认配置', 'success'); render();
     };
 
@@ -678,35 +604,7 @@
       toast('已清除该周配置，将沿用默认周目标', 'success'); render();
     };
 
-    /* ---- ③ 部门 ---- */
-    const sdp = document.getElementById('selDeptPreview');
-    if (sdp) sdp.onchange = () => { OPDeptStore.setPreviewDept(sdp.value); render(); toast('视角部门已切换：' + sdp.value, 'success'); };
-    const bda = document.getElementById('btnDeptAdd');
-    if (bda) bda.onclick = () => {
-      const el = document.getElementById('selDeptAdd');
-      const v = (el && el.value || '').trim();
-      if (!v) { toast('请先选择要补齐的部门', 'warn'); return; }
-      if (depts.some(d => d.dept === v)) { toast('该部门已存在', 'warn'); return; }
-      depts = collectDepts();
-      depts.push({ dept: v, types: ['*'], note: '' });
-      render(); toast('已补齐部门：' + v, 'success');
-    };
-    const bdr = document.getElementById('btnDeptReset');
-    if (bdr) bdr.onclick = () => {
-      OPDeptStore.reset(); depts = OPDeptStore.all();
-      toast('已重置为默认三部门（LEAD / NON-LEAD / PLATING）', 'success'); render();
-    };
-    const bds = document.getElementById('btnDeptSave');
-    if (bds) bds.onclick = () => {
-      depts = collectDepts(); OPDeptStore.save(depts);
-      toast('部门可见范围已保存', 'success'); render();
-    };
-    document.querySelectorAll('#tblDept [data-drm]').forEach(b => b.onclick = () => {
-      depts = collectDepts(); depts.splice(Number(b.dataset.drm), 1); render();
-    });
-    document.querySelectorAll('#tblDept [data-all]').forEach(b => b.onchange = () => { depts = collectDepts(); render(); });
-
-    /* ---- ④ 报警分口径 / 夏令时 ---- */
+    /* ---- ③ 预警分口径 / 夏令时 ---- */
     const bas = document.getElementById('btnAlarmSave');
     if (bas) bas.onclick = () => {
       /* 黄灯 / 红灯阈值与异常判定口径已下沉到「① PKG Type 维护」，此处只保存预警分口径与夏令时

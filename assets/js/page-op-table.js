@@ -291,7 +291,7 @@
       <th class="center">差额(实际-目标)</th><th class="center">达成率</th><th class="center">状态</th>
       <th class="center">报警阈值</th>
       <th class="center">本周报警天数</th><th class="center">最大缺口</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="center muted">无数据（当前部门可见范围为空，请在 OP 配置页调整）</td></tr>'}</tbody></table>`;
+      <tbody>${rows || '<tr><td colspan="9" class="center muted">无数据（当前视角部门下无可见 PKG Type，请切换视角部门或在 OP 配置页启用品类）</td></tr>'}</tbody></table>`;
   }
 
   /* ---------------- 事件绑定 ---------------- */

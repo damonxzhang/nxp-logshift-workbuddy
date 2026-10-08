@@ -7,8 +7,10 @@
      示例：周总目标 3,680 → 526、1,051、1,577、2,103、2,629、3,154、3,680。
    异常检测：每天 goal vs total 差额；差额 ≥ 黄灯阈值 报警（黄），≥ 红灯阈值 报警（红）。
    周维度检索：支持按「年份 + 周别」切换；第 1 周 = 该年第一个星期六所在的那一周。
-   配置外置：PKG Type 维护 / 每周目标数量 / 部门可见范围 均由独立配置页 op-config.html 维护，
-     写入 localStorage（OPTypeStore / OPGoalStore / OPDeptStore），大屏与配置页共用同一份数据。
+   配置外置：PKG Type 维护 / 每周目标数量 / 预警分口径 由独立配置页 op-config.html 维护，
+     写入 localStorage（OPTypeStore / OPGoalStore），大屏与配置页共用同一份数据。
+     （「部门可见范围」原为第三个配置域，已于 2026-10-08 按客户要求下线：部门固定
+       LEAD / NON-LEAD / PLATING，可见范围沿用 OP_DEPT_SCOPE_DEFAULT 内置默认。）
    凡标注「待客户确认 / 演示样例」的口径一律做成配置入口 OP_DEFAULTS，页面不写死，便于对接真实数据源。
    真实产出：客户 IT 导出的《BE1 Output Report V5.xls》已接入（见 assets/js/op-real-data.js，
      由 .extract-op.py 抽取）；有真实数据的周直接用真实值，其余周回落演示剖面。 */
@@ -204,7 +206,10 @@ const OPGoalStore = {
 };
 
 /* 3) 部门可见范围：哪个部门可以看哪些 PKG Type（types 含 '*' 表示全部可见）
-      客户口径（2026-09-30）：部门固定为 LEAD / NON-LEAD / PLATING 三个。 */
+      客户口径（2026-09-30）：部门固定为 LEAD / NON-LEAD / PLATING 三个。
+      10-08 变更：该域的**配置入口已下线**（op-config.html 不再提供维护页签），
+      但引擎侧保留 OPDeptStore —— 大屏「视角部门」下拉仍靠它算出可见 PKG Type，
+      可见范围一律用下面的内置默认值（恢复默认配置时会清掉历史残留）。 */
 const OP_DEPARTMENTS = ['LEAD', 'NON-LEAD', 'PLATING'];
 const OP_DEPT_SCOPE_DEFAULT = [
   { dept: 'LEAD', types: ['*'], note: '管理视角，可见全部 PKG Type' },

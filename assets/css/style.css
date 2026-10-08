@@ -1081,9 +1081,6 @@ table.table input.input.num.t-th.input-bad {
   box-shadow: 0 0 0 3px rgba(179, 38, 30, .12);
 }
 
-/* ---- OP 配置页：部门可见范围 ---- */
-.cfg-val { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 34px; }
-.cfg-val .chip { margin: 0; }
 
 /* ================= 折线图：放大卡片标题 + 悬停数据浮层 ================= */
 .op-chart-card .card-head { padding-bottom: 12px; }

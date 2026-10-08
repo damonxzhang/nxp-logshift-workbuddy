@@ -72,6 +72,31 @@ const ok = (c, m, extra) => { c ? console.log('PASS ' + m) : (fail++, console.lo
         .filter(t => t.getAttribute('fill') === '#5b6577').map(t => t.textContent.trim());
       ok(endLab.length >= 1, '基准日刻度标签仍在（' + endLab.slice(0, 2).join(',') + '）');
     }
+    if (/op-config\.html/.test(f)) {
+      /* 10-08：③ 部门可见范围整块下线，配置域收敛为 3 类 */
+      ok(!/部门可见范围/.test(txt), '无「部门可见范围」文本');
+      ok(!doc.getElementById('tblDept'), '无部门可见范围表格 #tblDept');
+      const tabs = Array.from(doc.querySelectorAll('#segTab button')).map(b => b.textContent.trim());
+      ok(tabs.length === 3, '配置域页签为 3 个（' + tabs.length + '）', tabs.join(' | '));
+      ok(/③ 预警分口径/.test(tabs.join('|')), '③ 标签为「预警分口径 / 夏令时」', tabs.join(' | '));
+      ok(/共 3 类/.test(txt), '卡副标题为「共 3 类」');
+      /* 切到 ③ 页签，检查预警分口径 / 夏令时内容仍在 */
+      const t3 = Array.from(doc.querySelectorAll('#segTab button')).find(b => b.dataset.t === 'alarm');
+      if (t3) {
+        t3.click();
+        await new Promise(r => setTimeout(r, 300));
+        const t2 = (doc.getElementById('content') || doc.body).textContent || '';
+        ok(/预警分口径 \/ 夏令时/.test(t2), '③ 页签可正常渲染');
+        ok(/Earn 手动修正/.test(t2) || /手动修正/.test(t2), '③ 含 Earn 手动修正表');
+      } else ok(false, '找到 ③ 页签按钮');
+      /* 切回 ①，检查小分类（封装料号）入口仍在 */
+      const t1 = Array.from(doc.querySelectorAll('#segTab button')).find(b => b.dataset.t === 'types');
+      if (t1) {
+        t1.click();
+        await new Promise(r => setTimeout(r, 300));
+        ok(doc.querySelectorAll('#tblTypes [data-sub]').length > 0, '① 含小分类（封装料号）「管理单价」入口');
+      } else ok(false, '找到 ① 页签按钮');
+    }
     dom.window.close();
   }
   console.log('\nTOTAL_FAIL=' + fail);
