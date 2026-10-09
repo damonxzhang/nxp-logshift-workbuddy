@@ -1,6 +1,6 @@
 /* ============ Output（OP）独立配置页 ============
-   四个配置域（原「部门可见范围」已下线），全部写入 localStorage，与大屏 output.html 共用同一份数据：
-     ① PKG Type 维护（增删改：名称 / 单价 / 默认周目标 / 报警阈值 / 启用）  → OPTypeStore
+   三个配置域（原「部门可见范围」与「④ WIP 报警判定配置」均已下线），全部写入 localStorage，与大屏 output.html 共用同一份数据：
+     ① PKG Type 维护（增删改：名称 / 小分类单价 / 默认周目标 / 报警阈值 / 启用）  → OPTypeStore
         · 报警阈值（黄灯 / 红灯，单位 K）挂在每个 PKG Type 上逐项维护
         · 10-08 客户口径：PKG Type = 大分类，其下还有「小分类 = 封装料号（PackageOutline）」，
           单价细分到料号（types[].subs[].price）；大分类 price 保留为「兜底价」，料号未配价时沿用。
@@ -10,12 +10,7 @@
         · 预警逻辑分口径（10-08 客户修正）：数量口径沿用「周目标均摊」不变；
           金额（Earn）口径可切换「递进式 ±5%」（周六看上周五实际、周日看周六实际，逐日递进），
           并支持周二拿到准确出库数据后手动修正本周后续几天的 Earn 目标（按周保存）。
-        · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
-     ④ WIP 参与报警判定（10-08 客户口径修正）：WIP **不画进图表**（实时快照、无逐日历史），
-        只在**报警判定**时计入 —— 判定口径 = (累计实际 + 在制 WIP) vs 累计目标；
-        全站统一生效（大屏四图徽标 / 红灯天数 / 图内红灯标记、累计表达标列与红灯统计）。
-        工序单选（BE_DT / BE_SAW …），PKG Type 口径可「跟随部门可见范围 / 该工序全部」，
-        Hold 批次可计入或剔除。
+     · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
    权限：需 Output（OP）模块「编辑」权限；否则整页只读。 */
 (function () {
   renderShell('opcfg');
@@ -44,8 +39,7 @@
   const TABS = [
     { key: 'types', label: '① PKG Type 维护', icon: 'layers' },
     { key: 'goals', label: '② 每周目标数量', icon: 'target' },
-    { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' },
-    { key: 'wip', label: '④ WIP 报警判定', icon: 'database' }
+    { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' }
   ];
 
   function render() {
@@ -53,7 +47,7 @@
       <div class="notice mt16" style="--nc:var(--primary)">
         ${icon('settings', 19)}
         <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>与<strong>小分类（封装料号）单价</strong>）、<strong>每周 PKG Type 目标数量</strong>、
-        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）、<strong>WIP 参与报警判定（不上图）</strong>均在此配置，保存后
+        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）均在此配置，保存后
         <a class="chip chip-link" href="output.html">Output（OP）大屏</a> 即时生效。
         ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无 Output（OP）「编辑」权限，仅可查看配置。'}</div>
       </div>
@@ -61,7 +55,7 @@
       <div class="card mt16 no-print">
         <div class="card-head">
           <div class="card-title">${icon('settings', 19)} 配置域
-            <span class="card-sub">共 4 类 · 保存后立即写入本地配置仓库</span></div>
+            <span class="card-sub">共 3 类 · 保存后立即写入本地配置仓库</span></div>
           <div class="flex acenter gap8">
             <div class="seg" id="segTab">
               ${TABS.map(t => `<button data-t="${t.key}" class="${tab === t.key ? 'active' : ''}">${icon(t.icon, 15)} ${t.label}</button>`).join('')}
@@ -79,7 +73,6 @@
   function tabBody() {
     if (tab === 'types') return viewTypes();
     if (tab === 'goals') return viewGoals();
-    if (tab === 'wip') return viewWip();
     return viewAlarm();
   }
 
@@ -87,7 +80,6 @@
      ① PKG Type 维护
      ========================================================= */
   function viewTypes() {
-    const al = opAlarmSum(types.filter(t => t.enabled !== false).map(t => t.id));
     return `
       <div class="card">
         <div class="card-head">
@@ -103,7 +95,6 @@
             <thead><tr>
               <th>PKG Type（唯一标识）<div class="small muted" style="font-weight:400">大分类</div></th><th>显示名</th>
               <th class="center">小分类（封装料号）<div class="small muted" style="font-weight:400">各自单价 · 点「管理」维护</div></th>
-              <th class="center">兜底单价（元/粒）<div class="small muted" style="font-weight:400">料号未配价时沿用</div></th>
               <th class="center">默认周目标 [K]</th>
               <th class="center" style="width:120px">黄灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
               <th class="center" style="width:120px">红灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
@@ -111,15 +102,6 @@
             </tr></thead>
             <tbody>${typeRows()}</tbody>
           </table>
-          <div class="cfg-note mt12">${icon('alert', 15)}
-            阈值为<strong>每个 PKG Type 独立配置</strong>（单位 K，与实际产出同量纲）：当日「目标累计 − 实际累计」缺口 ≥ 黄灯阈值 → 黄灯，≥ 红灯阈值 → 红灯，要求红灯阈值 ≥ 黄灯阈值。
-            大屏在「全部品类」汇总视图下，判定阈值为参与汇总各品类阈值<strong>之和</strong>（当前启用品类合计 黄 ${al.yellowK}K / 红 ${al.redK}K）。</div>
-          <div class="cfg-note mt12">${icon('alert', 15)} PKG Type 名称需与 IT 库口径一致；单价用于 Earn 金额折算（万元 = 累计K × 单价 / 10）。删除后该品类的历史周目标配置会一并失效。</div>
-          <div class="cfg-note mt12">${icon('layers', 15)}
-            <strong>大分类 / 小分类两级单价：</strong>PKG Type 是<strong>大分类</strong>，其下的<strong>小分类 = 封装料号</strong>（客户报表 <code>PackageOutline</code> 列，如 98ASA00855D）
-            <strong>各自有自己的单价</strong>，Earn 金额按料号粒度折算。料号清单来自「配置页手工维护」与「真实产出数据中出现的料号」的并集，
-            客户更新报表重跑 <code>.extract-op.py</code> 后新料号会自动带入。
-            <strong>料号未填单价时，自动沿用本行「兜底单价」</strong>（当前大分类价），因此未维护料号价时金额不会失真。</div>
         </div>
       </div>`;
   }
@@ -150,7 +132,6 @@
             : `<span class="small muted">—</span>
                ${canEdit ? `<button class="btn btn-sm mt6" data-sub="${i}">${icon('plus', 14)} 添加料号</button>` : ''}`}
         </td>
-        <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="price" value="${t.price == null ? '' : t.price}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center"></td>
         <td class="center"><input class="input num" type="number" step="50" min="0" data-k="goal" value="${t.goal == null ? 0 : t.goal}" ${canEdit ? '' : 'readonly'} style="width:110px;text-align:center"></td>
         <td class="center"><input class="input num t-th${thCls(y, r)}" type="number" step="0.5" min="0" data-k="yellowK" value="${y}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center" title="缺口 ≥ ${y}K 时黄灯报警"></td>
         <td class="center"><input class="input num t-th${thCls(y, r)}" type="number" step="1" min="0" data-k="redK" value="${r}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center" title="缺口 ≥ ${r}K 时红灯报警"></td>
@@ -158,7 +139,7 @@
         <td class="center" data-role="alarm">${alarmBadge(a)}</td>
         ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-rm="${i}">${icon('trash', 14)}</button></td>` : ''}
       </tr>`;
-    }).join('') || `<tr><td colspan="${canEdit ? 10 : 9}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
+    }).join('') || `<tr><td colspan="${canEdit ? 9 : 8}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
   }
 
   /* =========================================================
@@ -171,7 +152,7 @@
     const list = opSubsOf(t.id, types);
     const mix = opRealSubMix(t.id);
     const totMix = Object.keys(mix).reduce((a, k) => a + (Number(mix[k]) || 0), 0);
-    const base = t.price == null || t.price === '' ? '' : Number(t.price);
+    const base = OP_EARN_PRICE[t.id] != null ? OP_EARN_PRICE[t.id] : 1.0;  // 系统默认单价（大分类不再维护兜底单价字段）
 
     const rowHtml = s => {
       const share = (mix[s.id] != null && totMix > 0) ? (Number(mix[s.id]) / totMix * 100) : null;
@@ -187,13 +168,13 @@
 
     openDialog({
       title: '小分类（封装料号）单价 · ' + esc(t.name || t.id),
-      sub: 'PKG Type「' + esc(t.id) + '」为<strong>大分类</strong>（兜底单价 ' + base + ' 元/粒）；下面每个<strong>封装料号</strong>可配各自的单价，留空则沿用兜底价',
+      sub: 'PKG Type「' + esc(t.id) + '」为<strong>大分类</strong>；下面每个<strong>封装料号</strong>可配各自的单价，留空则沿用本品类<strong>系统默认单价 ' + base + ' 元/粒</strong>',
       width: 720,
       okText: '确定',
       body: `
         <div class="cfg-note mb12">${icon('alert', 15)}
           料号来自客户报表 <code>PackageOutline</code> 列。「占比」为该料号在真实产出数据中的数量占比，仅作参考；
-          <strong>未维护料号单价时，Earn 金额按大分类兜底价折算，数值不会失真。</strong></div>
+          <strong>未维护料号单价时，Earn 金额按本品类系统默认单价折算，数值不会失真。</strong></div>
         <table class="table" id="tblSubs">
           <thead><tr>
             <th>封装料号（小分类）</th><th class="center">产出占比<div class="small muted" style="font-weight:400">真实数据</div></th>
@@ -204,7 +185,7 @@
         </table>
         <div class="flex acenter gap8 mt12">
           <button class="btn btn-sm" id="btnSubAdd">${icon('plus', 16)} 新增料号</button>
-          <button class="btn btn-sm" id="btnSubFill">${icon('refresh', 16)} 全部填充为兜底价 ${base}</button>
+          <button class="btn btn-sm" id="btnSubFill">${icon('refresh', 16)} 全部填充为系统默认单价 ${base}</button>
           <button class="btn btn-sm" id="btnSubClear">${icon('close', 16)} 清空单价（全部回落兜底）</button>
         </div>`,
       onOk: () => {
@@ -248,12 +229,12 @@
     const bFill = document.getElementById('btnSubFill');
     if (bFill) bFill.onclick = () => {
       document.querySelectorAll('#tblSubs [data-k="sprice"]').forEach(el => { el.value = base; });
-      toast('已全部填充为兜底价 ' + base + '，可再逐个修改', 'primary');
+      toast('已全部填充为系统默认单价 ' + base + '，可再逐个修改', 'primary');
     };
     const bClear = document.getElementById('btnSubClear');
     if (bClear) bClear.onclick = () => {
       document.querySelectorAll('#tblSubs [data-k="sprice"]').forEach(el => { el.value = ''; });
-      toast('已清空料号单价，全部回落大分类兜底价', 'primary');
+      toast('已清空料号单价，全部回落系统默认单价', 'primary');
     };
   }
 
@@ -294,7 +275,6 @@
         name: String(get('name') || id).trim(),
         color: prev.color || '#1d4ed8',
         subs: Array.isArray(prev.subs) ? prev.subs.map(s => ({ id: s.id, price: s.price == null ? null : Number(s.price) })) : [],   // 小分类（料号）单价
-        price: Number(get('price')) || 0,
         goal: Math.max(0, Number(get('goal')) || 0),
         yellowK: num(get('yellowK'), OP_DEFAULTS.alarm.yellowK),
         redK: num(get('redK'), OP_DEFAULTS.alarm.redK),
@@ -445,13 +425,7 @@
           </div>
         </div>
         <div class="card-body">
-          <div class="field-label mb8" style="display:block">预警逻辑分口径（10-08 修正）</div>
           <div class="cfg-row">
-            <div class="cfg-item">
-              <label class="field-label">数量口径 · 累计 goal vs total（K）</label>
-              <span class="chip">${icon('activity', 14)} 周目标均摊（沿用，逻辑不变）</span>
-              <div class="small muted mt8">周总目标均摊到每天 → 逐日<strong>累计</strong>展示 → 与实际累计值对比；判定阈值沿用各 PKG Type 的黄 / 红阈值（K）。此口径不随下面的切换改变。</div>
-            </div>
             <div class="cfg-item">
               <label class="field-label">金额口径 · 累计 Earn 目标 vs 实际（万元）</label>
               <div class="seg" id="cfgEarnMode">
@@ -561,144 +535,6 @@
         填完数值 → 点「生效」→ 该日修正值立即入库，<strong>后续日期的「生效基准 / 正常区间 / 判定」随之重算</strong>（递进链：下一天基准直接沿用该修正值，再往后回到前一日实际）；
         按钮显示「已生效」表示该日已有修正值，改动后按钮转为高亮的「生效」待点击。
         <strong>已过去的日期（早于今天）按钮禁用</strong>，历史周整周不可修正；周二下午拿到准确出库数据后修正周三 ~ 周五。</div>`;
-  }
-
-  /* =========================================================
-     ④ WIP 参与报警判定（2026-10-08 客户口径修正）
-     口径修正：WIP **不画进图表** —— 它是实时快照（《BE1 WIP Report-V26.xls》，无逐日历史），
-       画成曲线会被误读成按天数据。
-     改为：只在**报警判定**时计入 —— 数量口径判定 = (累计实际 total + WIP) vs 累计目标 goal，
-       即「已产出 + 在制」能否覆盖目标；全站统一（大屏四图徽标 / 红灯天数 / 图内红灯标记、
-       累计表达标列与红灯统计）。
-     可配：启用 / 工序单选（BE_DT、BE_SAW …）/ PKG Type 口径（跟随筛选 · 该工序全部）/ Hold 计入·剔除。
-     ========================================================= */
-  function viewWip() {
-    cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay, cfg.wipOverlay || {});
-    const o = opWipCfg(cfg);
-    const specs = opWipSpecs();
-    const R = (typeof window !== 'undefined' && window.WIP_REAL_DATA) || null;
-    const meta = (R && R.meta) || {};
-    const all = OPTypeStore.all().filter(t => t.enabled !== false).map(t => t.id);
-    const nlIds = OPDeptStore.visibleTypes('NON-LEAD', all);
-    /* 三种口径的预览量（颗）：全部 / 跟随 NON-LEAD 可见品类 / 再剔除 Hold */
-    const qtyWith = ov => opWipQtyOf(o.spec, nlIds, { wipOverlay: Object.assign({}, o, ov) });
-    const qAll = qtyWith({ scope: 'all', excludeHold: false });
-    const qFilter = qtyWith({ scope: 'filter', excludeHold: false });
-    const qFilterNoHold = qtyWith({ scope: 'filter', excludeHold: true });
-    const qUse = o.scope === 'all' ? qAll : (o.excludeHold ? qFilterNoHold : qFilter);
-    const K = v => (v / 1000).toFixed(1) + 'K';
-    const cur = specs.find(s => s.spec === o.spec) || null;
-
-    /* 判定口径预览：拿本周 NON-LEAD 的基准日，看「纯实际」与「实际 + WIP」两种判定结果 */
-    const w = genOpWeek(goalYear, goalWeek);
-    const lastI = opLastActualIdx(w);
-    const baseIdx = lastI >= 0 ? lastI : 0;
-    const wipK = o.on ? +(qUse / 1000).toFixed(1) : 0;
-    const stPure = opAggStatus(nlIds, baseIdx, w, null, 0);
-    const stWip = opAggStatus(nlIds, baseIdx, w, null, wipK);
-    const dOf = st => (st.diff == null ? '—' : (st.diff >= 0 ? '+' : '') + st.diff + 'K');
-    const nOf = st => opStatusInfo(st.status).label;
-    const dayLbl = w.days[baseIdx] ? w.days[baseIdx].label : '—';
-
-    return `
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('database', 19)} WIP 参与报警判定
-            <span class="card-sub">WIP 不上图 · 只进判定：判定口径 = (累计实际 + 在制) vs 累计目标 · 全站统一生效</span></div>
-          <div class="flex acenter gap8">
-            ${canEdit ? `<button class="btn btn-sm btn-primary" id="btnWipSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="cfg-note mb12">${icon('database', 15)} WIP 数据来自客户《${esc(meta.source || 'BE1 WIP Report-V26.xls')}》
-            （${meta.lots || 0} 批 · ${K(meta.totalQty || 0)} · ${specs.length} 个工序，抽取于 ${esc(meta.extractedAt || '—')}），
-            是<strong>实时在制快照</strong>——报表里没有逐日历史，故<strong>不能画成按天的曲线</strong>（会被误读）。
-            按 10-08 客户口径，它只在<strong>报警判定</strong>时算进去：把「已产出 + 在制」合起来跟目标比，
-            在制可补的量抵扣缺口；<strong>图表里仍然只有目标 / 实际两条线</strong>。</div>
-
-          <div class="cfg-row">
-            <div class="cfg-item"><label class="field-label">启用 WIP 参与判定</label>
-              <div class="seg" id="cfgWipOn">
-                <button data-m="on" class="${o.on ? 'active' : ''}">启用</button>
-                <button data-m="off" class="${o.on ? '' : 'active'}">停用</button>
-              </div>
-              <div class="small muted mt8">停用后判定回到原来的「纯累计实际 vs 累计目标」，WIP 完全不计入。</div>
-            </div>
-            <div class="cfg-item"><label class="field-label">WIP 工序（单选）</label>
-              <select class="input" id="selWipSpec" style="width:300px" ${canEdit ? '' : 'disabled'}>
-                ${specs.length ? specs.map(s => `<option value="${esc(s.spec)}" ${s.spec === o.spec ? 'selected' : ''}>${esc(s.spec)} · ${K(s.qty)} · ${s.lots} 批</option>`).join('')
-        : '<option>（未加载到 WIP 数据）</option>'}
-              </select>
-              <div class="small muted mt8">共 ${specs.length} 个工序，按在制数量降序；具体用哪个工序（BE_DT / BE_SAW …）由业务自行选择。</div>
-            </div>
-          </div>
-
-          <div class="cfg-row mt8">
-            <div class="cfg-item"><label class="field-label">PKG Type 口径</label>
-              <div class="seg" id="cfgWipScope">
-                <button data-m="filter" class="${o.scope === 'filter' ? 'active' : ''}">跟随部门可见范围</button>
-                <button data-m="all" class="${o.scope === 'all' ? 'active' : ''}">该工序全部</button>
-              </div>
-              <div class="small muted mt8">「跟随部门可见范围」= 只统计 NON-LEAD 可见的 PKG Type（${nlIds.map(esc).join(' / ')}），与判定用的品类集合同口径；
-                「该工序全部」= 不看 PKG Type，取该工序在制总量。</div>
-            </div>
-            <div class="cfg-item"><label class="field-label">Hold 批次</label>
-              <div class="seg" id="cfgWipHold">
-                <button data-m="keep" class="${o.excludeHold ? '' : 'active'}">计入</button>
-                <button data-m="exclude" class="${o.excludeHold ? 'active' : ''}">剔除</button>
-              </div>
-              <div class="small muted mt8">当前快照共 Hold ${meta.holdLots || 0} 批；默认计入（仍是现场在制），剔除后只算正常流动批次。</div>
-            </div>
-          </div>
-
-          <div class="cfg-row mt12">
-            <div class="cfg-item"><label class="field-label">当前配置下的判定抵扣量（预览）</label>
-              <div class="flex acenter gap8 flex-wrap mt6">
-                <span class="chip">${esc(o.spec)} · 该工序全部 <strong>${K(qAll)}</strong></span>
-                <span class="chip">NON-LEAD 可见品类 <strong>${K(qFilter)}</strong></span>
-                <span class="chip">再剔除 Hold <strong>${K(qFilterNoHold)}</strong></span>
-                <span class="chip chip-real">${icon('check', 14)} 判定实际取用 <strong>${K(o.on ? qUse : 0)}</strong></span>
-              </div>
-              <div class="small muted mt8">判定时把 <strong>${K(o.on ? qUse : 0)}</strong> 加到「累计实际」上再跟目标比（实时快照，当天固定值）。${cur ? `该工序共 ${cur.lots} 批。` : ''}</div>
-            </div>
-          </div>
-
-          <div class="cfg-row mt12">
-            <div class="cfg-item"><label class="field-label">判定口径预览（${goalYear} 年第 ${goalWeek} 周 · NON-LEAD · 截至 ${dayLbl}）</label>
-              <div class="flex acenter gap8 flex-wrap mt6">
-                <span class="chip">纯累计实际：差额 <strong>${dOf(stPure)}</strong> · ${nOf(stPure)}</span>
-                <span class="chip chip-real">${icon('database', 14)} 计入 WIP ${wipK}K：差额 <strong>${dOf(stWip)}</strong> · ${nOf(stWip)}</span>
-              </div>
-              <div class="small muted mt8">左边是原来的判定结果，右边是本次口径下的结果；阈值与差额都按 NON-LEAD 可见品类汇总（黄 / 红阈值同类求和）。</div>
-            </div>
-          </div>
-          <div class="cfg-note mt12">${icon('alert', 15)} <strong>WIP 不参与绘图，只参与判定</strong>：
-            图表里仍是「累计目标（虚线）vs 累计实际（实线）」两条线；判定（大屏达标徽标、红灯天数、图内红灯标记、累计表达标列与红灯统计）
-            都按 <strong>(累计实际 + WIP) vs 累计目标</strong> 计算。注意 WIP 是<strong>当下</strong>的在制量 —— 对「本周」是有意义的抵扣，
-            翻看<strong>历史周</strong>时它并不是那一周的在制量（报表无历史），界面会标注「实时快照」。</div>
-        </div>
-      </div>
-
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('filter', 19)} WIP 工序清单
-            <span class="card-sub">供选择参考 · ${specs.length} 个工序 · 合计 ${K(meta.totalQty || 0)}</span></div>
-        </div>
-        <div class="card-body">
-          <table class="table" id="tblWipSpec">
-            <thead><tr><th>工序（Specname）</th><th class="center">在制数量</th><th class="center">批次数</th><th class="center">占比</th><th class="center">操作</th></tr></thead>
-            <tbody>
-              ${specs.map(s => `<tr>
-                <td><strong>${esc(s.spec)}</strong>${s.spec === o.spec ? ' <span class="badge b-ok">当前</span>' : ''}</td>
-                <td class="center">${K(s.qty)}</td>
-                <td class="center">${s.lots}</td>
-                <td class="center">${(meta.totalQty ? (s.qty / meta.totalQty * 100).toFixed(1) : '0.0')}%</td>
-                <td class="center">${canEdit ? `<button class="btn btn-sm" data-ws="${esc(s.spec)}" ${s.spec === o.spec ? 'disabled' : ''}>选为判定工序</button>` : ''}</td>
-              </tr>`).join('') || '<tr><td colspan="5" class="center muted">未加载到 WIP 数据（请确认 wip-real-data.js 已引入）</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
   }
 
   /* =========================================================
@@ -836,29 +672,6 @@
       el.onchange = () => markEarnManDraft(el);
     });
 
-    /* ---- ④ WIP 参与报警判定 ----
-       UI 操作先写进工作副本 cfg.wipOverlay 并就地重渲染（刷新判定口径预览），点「保存」才落盘 */
-    const wo = () => (cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay, cfg.wipOverlay || {}));
-    [['cfgWipOn', 'on', v => v === 'on'], ['cfgWipScope', 'scope', v => v], ['cfgWipHold', 'excludeHold', v => v === 'exclude']]
-      .forEach(([id, key, conv]) => {
-        const box = document.getElementById(id); if (!box) return;
-        box.querySelectorAll('button').forEach(b => b.onclick = () => {
-          wo()[key] = conv(b.dataset.m);
-          render();
-        });
-      });
-    const sws = document.getElementById('selWipSpec');
-    if (sws) sws.onchange = () => { wo().spec = sws.value; render(); toast('已选择工序：' + sws.value + '，确认后点保存', 'primary'); };
-    document.querySelectorAll('#tblWipSpec [data-ws]').forEach(b => b.onclick = () => {
-      wo().spec = b.dataset.ws; render(); toast('已选择工序：' + b.dataset.ws + '，确认后点保存', 'primary');
-    });
-    const bws = document.getElementById('btnWipSave');
-    if (bws) bws.onclick = () => {
-      const o = wo();
-      saveCfg();
-      toast('WIP 报警判定已保存（' + (o.on ? o.spec + ' 参与判定' : '已停用') + '）', 'success');
-      render();
-    };
   }
 
   render();

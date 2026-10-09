@@ -54,7 +54,6 @@ const NAV_GROUPS = [
   {
     label: '监控室',
     items: [
-      { key: 'index', href: 'index.html', label: '监控总览', icon: 'grid' },
       { key: 'wall', href: 'wall.html', label: '监控室 · 多屏轮播', icon: 'layers', tag: '标配', tagCls: 't-purple' }
     ]
   },
@@ -91,6 +90,12 @@ const NAV_GROUPS = [
       { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
       { key: 'archive', href: 'archive.html', label: '历史日志归档', icon: 'download' }
     ]
+  },
+  {
+    label: '我方优势',
+    items: [
+      { key: 'advantage', href: 'advantage.html', label: '我方优势 · 平台价值', icon: 'target', tag: '新增', tagCls: 't-purple' }
+    ]
   }
 ];
 
@@ -98,11 +103,10 @@ const NAV_GROUPS = [
 const NAV = NAV_GROUPS.reduce((a, g) => a.concat(g.items), []);
 
 const PAGE_TITLES = {
-  index: ['监控总览', '全厂子系统健康度 · 异常处置 · 交接态势'],
   wall: ['监控室 · 多屏轮播', '带班桌多块大屏自动轮播 · 可配间隔 / 手动切换 / 大字号'],
   op: ['Output（OP）大屏', '周维度追踪 · 累计曲线对比 · 达标/临界/超标预警'],
   optable: ['周维度累计表', '各 PKG Type 逐日累计目标/实际 · 达标/临界/超标着色 · Excel 导出'],
-  opcfg: ['OP 目标与权限配置', 'PKG Type 维护（含黄/红阈值与料号单价）· 每周目标数量 · 预警分口径/夏令时 · WIP 报警判定'],
+  opcfg: ['OP 目标与权限配置', 'PKG Type 维护（含黄/红阈值与料号单价）· 每周目标数量 · 预警分口径/夏令时'],
   wip: ['WIP 在制品看板', '按 PKG Type × 工序呈现在制（数量 / Earn 口径）· 二级钻取筛选 · 指标报警配置'],
   defect: ['次品管理 · 质量预警', '类别 PPM 趋势 → 机台树 → 机台×料号 / Package 明细（产量/次品数/PPM）· 红线 2000 PPM（良率 0.998）· 真实数据三级下钻'],
   logs: ['日志管理 · 生产日志', '交接班生产日志 · LEAD / NON-LEAD 分部门查看 · 班次回看 · 只读静态展示'],
@@ -113,7 +117,8 @@ const PAGE_TITLES = {
   monthly: ['自动月报', '按月汇总告警与事件 · 预览 / 导出 PDF·Excel'],
   archive: ['历史日志归档', '已归档日志按子系统分类浏览'],
   mail: ['邮件组件 · 投递效果', '每屏标配 · 演示实际投递到邮箱的效果'],
-  users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕']
+  users: ['用户与权限管理', 'RBAC · 用户 / 角色 / 权限矩阵 / 授权留痕'],
+  advantage: ['我方优势 · 平台价值', '多源打通 · 批次追溯 · 质量分析 · 告警工单闭环 · OTD 监控 · 可复用大屏 · 已落地经验']
 };
 
 // 把 .sidebar 包进 .nav-shell 占位层：使侧边栏悬停浮出时不再挤压内容区

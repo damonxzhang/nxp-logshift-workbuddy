@@ -64,10 +64,10 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
 
   /* 保留项仍在 */
   ok(/夏令时/.test(txt), '④ 页仍保留「夏令时 / 冬令时」配置');
-  ok(/预警逻辑分口径/.test(txt), '④ 页仍保留「预警逻辑分口径（10-08 修正）」');
+  ok(/预警分口径/.test(txt), '④ 页仍保留「预警分口径」配置');
   ok(/Earn 目标手动修正/.test(txt), '④ 页仍保留「Earn 目标手动修正」表');
-  const keep = await ev(`[!!document.getElementById('cfgDst'), !!document.getElementById('cfgDstHour'), !!document.getElementById('cfgEarnMode'), !!document.getElementById('cfgAlarmMode'), !!document.getElementById('tblEarnMan')]`);
-  ok(keep && keep.every(Boolean), '夏令时/开始时间/Earn口径/比对模式/手动修正表 DOM 均在', JSON.stringify(keep));
+  const keep = await ev(`[!!document.getElementById('cfgDst'), !!document.getElementById('cfgDstHour'), !!document.getElementById('cfgEarnMode'), !!document.getElementById('tblEarnMan')]`);
+  ok(keep && keep.every(Boolean), '夏令时/开始时间/Earn口径/手动修正表 DOM 均在', JSON.stringify(keep));
 
   /* 夏令时仍可切换 */
   await ev(`(()=>{const b=[...document.querySelectorAll('#cfgDst button')].find(x=>x.dataset.m==='winter');if(b)b.click();return 1})()`);
@@ -87,7 +87,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
   /* 恢复默认配置按钮仍可用 */
   await ev(`(()=>{const b=document.getElementById('btnResetAll');if(b)b.click();return 1})()`);
   await wait(500);
-  ok(/预警逻辑分口径/.test(await ev(`document.getElementById('content').innerText`)), '「恢复默认配置」后页面仍正常渲染');
+  ok(/预警分口径/.test(await ev(`document.getElementById('content').innerText`)), '「恢复默认配置」后页面仍正常渲染');
 
   ok(errs.length === 0, '无 JS 异常', errs.join(' | '));
 

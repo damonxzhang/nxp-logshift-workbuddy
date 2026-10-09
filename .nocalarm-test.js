@@ -35,7 +35,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
   ok(tables === 1, '④ 页仅剩 Earn 手动修正一张表（tables=' + tables + '）');
 
   /* 保留项 */
-  ok(/预警逻辑分口径/.test(txt), '④ 页仍保留「预警逻辑分口径（10-08 修正）」');
+  ok(/预警分口径/.test(txt), '④ 页仍保留「预警分口径」配置');
   ok(/Earn 目标手动修正/.test(txt), '④ 页仍保留「Earn 目标手动修正」表');
   ok(/夏令时/.test(txt), '④ 页仍保留夏令时配置');
   ok(!!doc.getElementById('cfgDst') && !!doc.getElementById('cfgDstHour') && !!doc.getElementById('cfgEarnMode') && !!doc.getElementById('tblEarnMan'),
@@ -48,7 +48,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
     /* 注：jsdom 下 file:// 为 opaque origin，store.set 写 localStorage 会抛 SecurityError，
        保存流程（含 toast）在 jsdom 中无法完整走通；这里只验证「点击保存不产生未捕获异常 + 页面仍可重渲染」，
        持久化与 toast 在真实浏览器中生效（此前 CDP 版 .norefresh-test.js 已验证过同一条保存链路）。 */
-    ok(/预警逻辑分口径/.test(doc.getElementById('content').textContent), '点击保存后 ④ 页重渲染正常');
+    ok(/预警分口径/.test(doc.getElementById('content').textContent), '点击保存后 ④ 页重渲染正常');
   } catch (e) {
     ok(false, '保存流程异常', e && (e.name + ': ' + e.message));
   }
@@ -56,7 +56,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
   /* 恢复默认配置 */
   const rs = doc.getElementById('btnResetAll');
   if (rs) { rs.click(); await new Promise(r => setTimeout(r, 300)); }
-  ok(/预警逻辑分口径/.test(doc.getElementById('content').textContent), '「恢复默认配置」后页面仍正常渲染');
+  ok(/预警分口径/.test(doc.getElementById('content').textContent), '「恢复默认配置」后页面仍正常渲染');
 
   ok(errs.length === 0, '无 JS 异常', errs.join(' | '));
   console.log('\nTOTAL pass=' + pass + ' fail=' + fail);

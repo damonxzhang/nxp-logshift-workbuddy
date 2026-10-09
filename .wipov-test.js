@@ -1,12 +1,13 @@
-/* WIP 参与报警判定回归（2026-10-08 客户口径修正）
+/* WIP 参与报警判定回归（2026-10-08 客户口径修正 · 10-09 下线「④ 配置入口」）
    口径：WIP **不画进图表**（实时快照、无逐日历史），只在**报警判定**时计入 ——
         判定 = (累计实际 total + WIP) vs 累计目标 goal；全站统一（大屏徽标 / 红灯天数 / 累计表）。
-   覆盖：
+   注意：10-09 起「④ WIP 报警判定」配置域已从 op-config.html 下线（无 UI 可改），
+        判定改用 OP_DEFAULTS.wipOverlay 默认值（on / BE_DT / filter / 计入 Hold）。
+        本测试只覆盖：
      A) 引擎纯逻辑（node vm 跑 output-core.js）：opWipSpecs / opWipCfg / opWipQtyOf / opWipDeductK
         + opStatusOf / opAggStatus / opTypeAlarm 的 wipK 抵扣语义（含边界：不传 wipK = 原口径）
-     B) 配置页 ④ UI（jsdom）：页签名、启用/停用、工序切换、Hold、范围、判定口径预览
      C) 大屏 output.html（jsdom）：**不再有第三条线**、卡副标题含「报警判定已计入 WIP 抵扣」
-     D) 停用 / 换工序 / scope=all 的联动
+     D) 停用 / 换工序 / scope=all 的联动（直接写 ohd_op_cfg 验证大屏尊重配置）
    运行：NODE_PATH 指向 jsdom，node 用内置版本（见 README「九、开发校验」） */
 const path = require('path');
 const fs = require('fs');
@@ -105,90 +106,34 @@ function engineTests() {
   ok(alWip.maxGap <= alNo.maxGap, '最大缺口不变大（' + alNo.maxGap + ' → ' + alWip.maxGap + '）');
 }
 
-/* ---------------- B/C/D) jsdom：配置页 + 大屏 ---------------- */
+/* ---------------- C/D) jsdom：大屏（④ 配置域已下线，只验证判定在大屏的落地） ---------------- */
+function mockRect(win) {
+  win.HTMLElement.prototype.getBoundingClientRect = function () {
+    return { left: 0, top: 0, right: 800, bottom: 320, width: 800, height: 320, x: 0, y: 0 };
+  };
+}
+
 (async () => {
   engineTests();
-  console.log('--- 引擎逻辑完成，进入 jsdom ---');
+  console.log('--- 引擎逻辑完成，进入 jsdom 大屏 ---');
 
   const errs = [];
   const vc = new VirtualConsole();
   vc.on('jsdomError', e => { if (!/Not implemented: navigation/.test(String(e))) errs.push(String(e.message || e)); });
   vc.on('error', (...a) => errs.push('console.error: ' + a.join(' ')));
 
-  /* B) 配置页 ④ */
+  /* C) 大屏：不再有第三条线（用默认 wipOverlay：on/BE_DT/filter/计入 Hold） */
   const mem = mkMem();
-  const dom = await JSDOM.fromFile(path.resolve('op-config.html'), {
+  const dom = await JSDOM.fromFile(path.resolve('output.html'), {
     runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
-    beforeParse(window) { Object.defineProperty(window, 'localStorage', { value: mem.api, configurable: true }); }
-  });
-  await sleep(1000);
-  const doc = dom.window.document;
-  const txt = () => (doc.getElementById('content') || doc.body).textContent || '';
-  ok(errs.length === 0, '配置页渲染无 JS 异常', errs.join(' | '));
-
-  const tabs = Array.from(doc.querySelectorAll('#segTab button'));
-  const t4 = tabs.find(b => b.dataset.t === 'wip');
-  ok(!!t4 && /④ WIP 报警判定/.test(t4.textContent), '④ 页签为「WIP 报警判定」', t4 && t4.textContent.trim());
-  t4.click();
-  await sleep(400);
-  ok(/WIP 参与报警判定/.test(txt()), '④ 标题为「WIP 参与报警判定」');
-  ok(/不上图|不画进图表/.test(txt()), '注明 WIP 不上图、只进判定');
-  ok(!/叠加线只是/.test(txt()), '旧的「叠加线只是参考线」文案已移除');
-  ok(/判定口径 = \(累计实际 \+ 在制\) vs 累计目标/.test(txt()), '写明判定口径 = (累计实际 + 在制) vs 累计目标');
-  ok(/判定口径预览/.test(txt()), '含判定口径预览（纯实际 vs 计入 WIP）');
-  ok(/opWipQtyOf|./.test('') || /判定实际取用/.test(txt()), '预览区标「判定实际取用」');
-  ok(/选为判定工序/.test(txt()), '工序清单按钮为「选为判定工序」');
-
-  const sws = doc.getElementById('selWipSpec');
-  ok(!!sws, '找到工序下拉');
-  const before1 = sws.value;
-  sws.value = 'BE_SAW';
-  sws.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
-  await sleep(300);
-  ok(doc.getElementById('selWipSpec').value === 'BE_SAW', '切换工序后下拉回显 BE_SAW（' + before1 + ' → BE_SAW）');
-  ok(/BE_SAW/.test(txt()), '页面文案随工序刷新');
-
-  const segOn = doc.getElementById('cfgWipOn');
-  segOn.querySelectorAll('button').forEach(b => { if (b.dataset.m === 'off') b.click(); });
-  await sleep(300);
-  ok(/判定实际取用 <strong>0.0K<\/strong>/.test(doc.getElementById('content').innerHTML) || /判定实际取用.{0,30}0\.0K/.test(txt()), '停用后判定实际取用为 0.0K');
-  ok(/停用后判定回到原来的/.test(txt()), '停用说明文案在位');
-  doc.getElementById('cfgWipOn').querySelectorAll('button').forEach(b => { if (b.dataset.m === 'on') b.click(); });
-  await sleep(300);
-
-  const segScope = doc.getElementById('cfgWipScope');
-  segScope.querySelectorAll('button').forEach(b => { if (b.dataset.m === 'all') b.click(); });
-  await sleep(300);
-  ok(/该工序全部/.test(txt()), 'scope 切到「该工序全部」后文案在位');
-  const segHold = doc.getElementById('cfgWipHold');
-  segHold.querySelectorAll('button').forEach(b => { if (b.dataset.m === 'exclude') b.click(); });
-  await sleep(300);
-  ok(/再剔除 Hold/.test(txt()), 'Hold 剔除选项在位');
-
-  const bs = doc.getElementById('btnWipSave');
-  ok(!!bs, '找到保存按钮');
-  bs.click();
-  await sleep(400);
-  const saved = JSON.parse(mem.map.get('ohd_op_cfg') || '{}');
-  ok(saved.wipOverlay && saved.wipOverlay.spec === 'BE_SAW' && saved.wipOverlay.scope === 'all' && saved.wipOverlay.excludeHold === true,
-    '保存后 wipOverlay 落盘（spec/scope/excludeHold）', JSON.stringify(saved.wipOverlay));
-  ok(/WIP 报警判定已保存/.test(doc.body.textContent || ''), '保存 toast 文案已更新');
-  ok(errs.length === 0, '配置页全流程无 JS 异常', errs.join(' | '));
-
-  /* C) 大屏：不再有第三条线 */
-  const mem2 = mkMem();
-  const dom2 = await JSDOM.fromFile(path.resolve('output.html'), {
-    runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
-    beforeParse(window) {
-      Object.defineProperty(window, 'localStorage', { value: mem2.api, configurable: true });
-      window.HTMLElement.prototype.getBoundingClientRect = function () { return { left: 0, top: 0, right: 800, bottom: 320, width: 800, height: 320, x: 0, y: 0 }; };
-    }
+    beforeParse(window) { Object.defineProperty(window, 'localStorage', { value: mem.api, configurable: true }); mockRect(window); }
   });
   await sleep(1400);
-  const doc2 = dom2.window.document;
-  const txt2 = () => (doc2.getElementById('content') || doc2.body).textContent || '';
+  const doc = dom.window.document;
+  const txt = () => (doc.getElementById('content') || doc.body).textContent || '';
+  ok(errs.length === 0, '大屏渲染无 JS 异常', errs.join(' | '));
 
-  const cards = Array.from(doc2.querySelectorAll('.op-chart-card'));
+  const cards = Array.from(doc.querySelectorAll('.op-chart-card'));
   ok(cards.length === 4, '双部门 2×2 四张图（' + cards.length + '）');
   const nlCard = cards.find(c => /NON-LEAD/.test(c.textContent) && /累计 goal vs total/.test(c.textContent));
   ok(!!nlCard, '找到 NON-LEAD 数量图');
@@ -202,32 +147,24 @@ function engineTests() {
   /* 注意：卡片里有多个内联 SVG（图标 icon() 也是 <svg>！），必须用 .lc-wrap svg 精确定位图表 */
   const nlSvg = nlCard ? nlCard.querySelector('.lc-wrap svg') : null;
   ok(!!nlSvg, 'NON-LEAD 图已绘制 SVG');
-  /* lineChart 的折线是 <path d=... fill="none" stroke=...>；y 轴网格线是 <line>。
-     目标线带 stroke-dasharray（在 vw=1000 时 k=1、dash 原样输出），实际线没有。 */
   const nlPaths = nlSvg ? Array.from(nlSvg.querySelectorAll('path[stroke]')).filter(p => p.getAttribute('fill') === 'none') : [];
   ok(nlPaths.length === 2, '图内恰好两条折线（' + nlPaths.length + '）', nlPaths.map(p => p.getAttribute('stroke')).join(' / '));
   const nlDash = nlPaths.filter(p => (p.getAttribute('stroke-dasharray') || '') !== '').length;
   ok(nlDash === 1, '其中 1 条为虚线目标线（' + nlDash + '）');
-  /* 关键回归：WIP 那条「累计实际 + WIP」的线必须在任何 vw 下都不存在 */
   const nlDashPos = nlPaths.filter(p => { const d = p.getAttribute('stroke-dasharray') || ''; return d && !/^0/.test(d) && d !== ''; }).length;
   ok(nlDashPos === 1, '虚线只有目标线一条（WIP 线已彻底移除）');
 
-  /* 徽标口径：把 WIP 抵扣算进去后，同一日应更宽松（达标状态不更差） */
-  const badgesOf = () => {
-    const c = Array.from(doc2.querySelectorAll('.op-chart-card')).find(x => /NON-LEAD/.test(x.textContent) && /累计 goal vs total/.test(x.textContent));
+  const subWith = (() => {
+    const c = Array.from(doc.querySelectorAll('.op-chart-card')).find(x => /NON-LEAD/.test(x.textContent) && /累计 goal vs total/.test(x.textContent));
     return c ? (c.querySelector('.card-sub') || {}).textContent || '' : '';
-  };
-  const subWith = badgesOf();
+  })();
   ok(/达标|临界|超标/.test(subWith), 'NON-LEAD 卡副标题含达标徽标', subWith.slice(0, 160));
 
   /* D) 预置「停用」→ 大屏不应出现 WIP 提示；图仍两条线 */
   const mem3 = mkMem({ ohd_op_cfg: JSON.stringify({ wipOverlay: { on: false, spec: 'BE_DT', scope: 'filter', excludeHold: false } }) });
   const dom3 = await JSDOM.fromFile(path.resolve('output.html'), {
     runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
-    beforeParse(window) {
-      Object.defineProperty(window, 'localStorage', { value: mem3.api, configurable: true });
-      window.HTMLElement.prototype.getBoundingClientRect = function () { return { left: 0, top: 0, right: 800, bottom: 320, width: 800, height: 320, x: 0, y: 0 }; };
-    }
+    beforeParse(window) { Object.defineProperty(window, 'localStorage', { value: mem3.api, configurable: true }); mockRect(window); }
   });
   await sleep(1400);
   const doc3 = dom3.window.document;
@@ -240,10 +177,7 @@ function engineTests() {
   const mem4 = mkMem({ ohd_op_cfg: JSON.stringify({ wipOverlay: { on: true, spec: 'BE_SAW', scope: 'all', excludeHold: false } }) });
   const dom4 = await JSDOM.fromFile(path.resolve('output.html'), {
     runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
-    beforeParse(window) {
-      Object.defineProperty(window, 'localStorage', { value: mem4.api, configurable: true });
-      window.HTMLElement.prototype.getBoundingClientRect = function () { return { left: 0, top: 0, right: 800, bottom: 320, width: 800, height: 320, x: 0, y: 0 }; };
-    }
+    beforeParse(window) { Object.defineProperty(window, 'localStorage', { value: mem4.api, configurable: true }); mockRect(window); }
   });
   await sleep(1400);
   const doc4 = dom4.window.document;
@@ -253,14 +187,7 @@ function engineTests() {
   const items4 = c4 ? Array.from(c4.querySelectorAll('.legend .lg')).filter(x => !/超标红灯区间/.test(x.textContent)) : [];
   ok(items4.length === 2, '换工序后仍无第三条线（' + items4.length + '）');
 
-  /* 浮窗：hover 出 WIP 说明行（不绘图，仅提示判定口径）
-     要点（踩坑记录）：
-       1) lineChart 的浮窗显示条件是「该 SVG 的 getBoundingClientRect().width 非 0」，
-          jsdom 里 SVG 布局尺寸恒为 0 → **必须给这个 SVG 实例**挂 mock；
-          给 HTMLElement.prototype 挂 proxy 试过，被 jsdom 自身实现覆盖，不起作用。
-       2) 大屏有异步 `fit()`（setTimeout 30ms + 之后可能再 drawAll 一次）会重建 SVG，
-          **必须先等绘制稳定、再挂 mock、再派发 mousemove**；挂早了会被重建冲掉。
-       3) 必须查该卡片内部的 .lc-tip（不是全页第一个）。 */
+  /* 浮窗：hover 出 WIP 说明行（不绘图，仅提示判定口径） */
   await sleep(600);
   const nl4 = Array.from(doc4.querySelectorAll('.op-chart-card')).find(c => /NON-LEAD/.test(c.textContent) && /累计 goal vs total/.test(c.textContent));
   const svg4 = nl4 ? nl4.querySelector('.lc-wrap svg') : null;

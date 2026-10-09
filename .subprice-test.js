@@ -1,6 +1,6 @@
 /* 纯逻辑校验：小分类（封装料号）级单价
    1) 料号清单能从真实数据自动带出
-   2) 料号未配价时回落大分类兜底价 → Earn 数值与改造前一致（不失真）
+   2) 料号未配价时回落系统默认单价（OP_EARN_PRICE）→ Earn 数值与改造前一致（不失真）
    3) 给料号配不同单价后，Earn 按料号粒度重新折算
    4) opSubRatios 占比合计 = 1
 */
@@ -25,7 +25,7 @@ const r2 = v => +Number(v).toFixed(2);
 const subs = ctx.opSubsOf('BGA/LGA');
 ok(subs.length > 1, 'BGA/LGA 自动带出料号清单（' + subs.length + ' 个）');
 ok(subs.every(s => /^98A/.test(s.id)), '料号均为封装料号格式（98A…）', subs.map(s => s.id).slice(0, 3).join(','));
-ok(subs.every(s => s.price === null), '未配置时料号单价为空（回落大分类兜底价）');
+ok(subs.every(s => s.price === null), '未配置时料号单价为空（回落系统默认单价）');
 ok(ctx.opSubsOf('FCCSP').length >= 1, 'FCCSP 至少有 1 个料号');
 
 /* ---------- 2) 占比合计 = 1 ---------- */
@@ -66,7 +66,7 @@ const types2 = vm.runInContext('OPTypeStore.all()', ctx).map(t => Object.assign(
 const bga = types2.find(t => t.id === 'BGA/LGA');
 const bgaSubs = ctx.opSubsOf('BGA/LGA');
 const mix = ctx.opRealSubMix('BGA/LGA');
-// 给占比最大的料号一个高价 9.99，其余留空（回落兜底 1.85）
+// 给占比最大的料号一个高价 9.99，其余留空（回落系统默认单价 1.85）
 const top = Object.keys(mix).sort((a, b) => mix[b] - mix[a])[0];
 bga.subs = bgaSubs.map(s => ({ id: s.id, price: s.id === top ? 9.99 : null }));
 const earn2 = ctx.opEarnSeries(ids, wk, types2);
@@ -74,7 +74,7 @@ const d0 = i => (earn2.totalCum[i] || 0) - (earn.totalCum[i] || 0);
 ok(d0(0) > 0, 'Top 料号提价后 Earn 变大（' + r2(earn.totalCum[0]) + ' → ' + r2(earn2.totalCum[0]) + ' 万）');
 ok(ctx.opSubPriceOf('BGA/LGA', top, types2) === 9.99, 'opSubPriceOf 取到料号自己的单价');
 ok(ctx.opSubPriceOf('BGA/LGA', bgaSubs.find(s => s.id !== top).id, types2) === 1.85,
-  '未配料号价的料号回落大分类兜底价 1.85', String(ctx.opSubPriceOf('BGA/LGA', bgaSubs.find(s => s.id !== top).id, types2)));
+  '未配料号价的料号回落系统默认单价 1.85', String(ctx.opSubPriceOf('BGA/LGA', bgaSubs.find(s => s.id !== top).id, types2)));
 
 /* ---------- 5) 演示周（无真实料号数量）按占比拆分 ---------- */
 const wkDemo = ctx.genOpWeek(2026, 40);

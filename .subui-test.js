@@ -20,8 +20,8 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
 
   ok(errs.length === 0, '渲染无 JS 异常', errs.join(' | '));
   ok(/小分类（封装料号）/.test(html()), '表头含「小分类（封装料号）」列');
-  ok(/兜底单价/.test(html()), '单价列已改名为「兜底单价（元/粒）」');
-  ok(/大分类 \/ 小分类两级单价/.test(html()), '卡内说明含「大分类 / 小分类两级单价」');
+  ok(!/兜底单价/.test(html()), '大分类表已移除「兜底单价」列（不再维护大分类兜底价）');
+  ok(!/大分类 \/ 小分类两级单价/.test(html()), '卡内说明已移除「大分类 / 小分类两级单价」等大段说明');
 
   const rows = Array.from(doc.querySelectorAll('#tblTypes tbody tr[data-i]'));
   ok(rows.length >= 4, 'PKG Type 行数 >= 4（' + rows.length + '）');
@@ -41,7 +41,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
   ok(!!dlg, '弹窗已打开');
   const dtxt = dlg ? dlg.textContent : '';
   ok(/小分类（封装料号）单价/.test(dtxt), '弹窗标题为「小分类（封装料号）单价」', dtxt.slice(0, 40));
-  ok(/兜底单价/.test(dtxt) && /大分类/.test(dtxt), '弹窗说明含大分类兜底价');
+  ok(/系统默认单价/.test(dtxt) && /大分类/.test(dtxt), '弹窗说明含大分类 + 系统默认单价');
   const srows = Array.from(doc.querySelectorAll('#tblSubs tbody tr[data-s]'));
   ok(srows.length >= 15, '弹窗列出料号（' + srows.length + ' 行）');
   ok(srows.some(r => /98A/.test(r.querySelector('[data-k="sid"]').value)), '料号为封装料号格式（98A…）');
@@ -50,7 +50,7 @@ const ok = (c, m, extra) => { c ? (pass++, console.log('PASS ' + m)) : (fail++, 
   /* 给第一个料号填单价 */
   const pEl = srows[0].querySelector('[data-k="sprice"]');
   pEl.value = '3.50';
-  ok(!!doc.getElementById('btnSubFill'), '有「全部填充为兜底价」按钮');
+  ok(!!doc.getElementById('btnSubFill'), '有「全部填充为系统默认单价」按钮');
   ok(!!doc.getElementById('btnSubClear'), '有「清空单价」按钮');
 
   doc.getElementById('dlgOk').click();

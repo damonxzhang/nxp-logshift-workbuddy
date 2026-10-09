@@ -218,9 +218,53 @@
     document.head.appendChild(st);
   }
 
+  // 设备角标悬停浮窗（报修 / 换模 近 24h 明细）
+  function ensureDevTip() {
+    let t = document.getElementById('defectDevTip');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'defectDevTip';
+      t.style.cssText = 'position:fixed;z-index:95;display:none;max-width:280px;background:#fff;border:1px solid var(--line,#e1e7f0);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.16);padding:10px 12px;font-size:12px;color:var(--text);pointer-events:none;line-height:1.6';
+      document.body.appendChild(t);
+      document.addEventListener('mousemove', e => {
+        if (t.style.display === 'none') return;
+        let x = e.clientX + 14, y = e.clientY + 14;
+        const r = t.getBoundingClientRect();
+        if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - 14;
+        if (y + r.height > window.innerHeight - 8) y = e.clientY - r.height - 14;
+        t.style.left = x + 'px'; t.style.top = y + 'px';
+      });
+    }
+    return t;
+  }
+  function devTipHtml(dev, type) {
+    const ev = window.DeviceEvents ? DeviceEvents.of(dev, Date.now()) : null;
+    if (!ev) return `<div style="font-weight:700;margin-bottom:4px">${esc(dev)}</div><div class="muted">设备报修 / 模具管理数据未接入</div>`;
+    const list = type === 'repair' ? ev.repair : ev.mold;
+    const title = type === 'repair' ? '近 24h 设备报修' : '近 24h 模具更换';
+    const rows = list.length ? list.map(x => {
+      const hh = DeviceEvents.hhmm(x.t);
+      if (type === 'repair') return `<div style="display:flex;justify-content:space-between;gap:12px"><span style="font-weight:700;color:var(--text)">${hh}</span><span style="color:var(--text-2)">${esc(x.id)} · ${esc(x.reason)}</span></div>`;
+      return `<div style="display:flex;justify-content:space-between;gap:12px"><span style="font-weight:700;color:var(--text)">${hh}</span><span style="color:var(--text-2)">${esc(x.id)} · ${esc(x.from)} → ${esc(x.to)}</span></div>`;
+    }).join('') : `<div class="muted">近 24 小时无记录</div>`;
+    return `<div style="font-weight:700;margin-bottom:6px">${esc(dev)} · ${title}（${list.length}）</div>${rows}`;
+  }
+  function showDevTip(dev, type) { const t = ensureDevTip(); t.innerHTML = devTipHtml(dev, type); t.style.display = 'block'; }
+  function hideDevTip() { const t = document.getElementById('defectDevTip'); if (t) t.style.display = 'none'; }
+
   // 机台树状图：根=次品类别，二级节点=机台（点击进三级料号透视）
   function devTreeChart(el, catKey, weekIdx) {
     ensureDefCss();
+    const now = Date.now(); // 设备报修 / 换模 = 我方系统实时快照（近 24h）
+    // 机台节点后的角标（报修 / 换模），SVG pill
+    function badgeG(x, midY, type, n, col, dev) {
+      const fill = type === 'repair' ? '#fdecec' : '#eaf2fe';
+      return `<g class="dev-badge" data-type="${type}" data-d="${esc(dev)}" style="cursor:help">` +
+        `<rect x="${x}" y="${(midY - 9).toFixed(1)}" width="72" height="18" rx="9" fill="${fill}" stroke="${col}" stroke-width="1"/>` +
+        `<circle cx="${(x + 13).toFixed(1)}" cy="${midY}" r="4.5" fill="${col}"/>` +
+        `<text x="${(x + 24).toFixed(1)}" y="${(midY + 3.5).toFixed(1)}" font-size="10.5" font-weight="700" fill="${col}">${type === 'repair' ? '报修' : '换模'} ${n}</text>` +
+        `</g>`;
+    }
     const rows = (devRows(catKey, weekIdx) || []).filter(r => r.out > 0);
     const W = 960, padT = 12, padB = 12, rowH = 46;
     const H = padT + padB + Math.max(1, rows.length) * rowH;
@@ -244,18 +288,28 @@
       const hot = r.ppm != null && r.ppm >= DEV_WARN;
       const col = r.ppm != null && r.ppm >= DEV_RED ? 'var(--danger)' : hot ? 'var(--warn)' : 'var(--primary)';
       const bw = Math.max(3, ((r.ppm || 0) / maxV) * 190);
+      const ev = (window.DeviceEvents ? DeviceEvents.of(r.d, now) : { nRep: 0, nMold: 0 });
+      const repCol = ev.nRep > 0 ? 'var(--danger)' : 'var(--text-2)';
+      const molCol = ev.nMold > 0 ? '#2563eb' : 'var(--text-2)';
+      const cx = nx1 - 168; // 角标簇起点（报修 / 换模）
       s += `<g class="dnode" data-d="${esc(r.d)}" style="cursor:pointer">` +
         `<rect class="nrect" x="${nx0}" y="${y.toFixed(1)}" width="${nx1 - nx0}" height="${h}" rx="9" fill="#fff" stroke="var(--line,#e1e7f0)" stroke-width="1.4"/>` +
         `<text x="${nx0 + 12}" y="${(midY + 4).toFixed(1)}" font-size="12.5" font-weight="700" fill="var(--text)">${esc(r.d)}</text>` +
         `<rect x="${nx0 + 92}" y="${(midY - 5).toFixed(1)}" width="190" height="10" rx="5" fill="#eef2f8"/>` +
         `<rect x="${nx0 + 92}" y="${(midY - 5).toFixed(1)}" width="${bw.toFixed(1)}" height="10" rx="5" fill="${col}" opacity="${r.n ? 1 : 0.35}"/>` +
         `<text x="${nx0 + 294}" y="${(midY + 4).toFixed(1)}" font-size="12.5" font-weight="700" fill="${col}">${r.ppm == null ? '—' : Math.round(r.ppm)} <tspan font-size="10.5" font-weight="400" fill="var(--text-2)">PPM</tspan></text>` +
-        `<text x="${nx0 + 356}" y="${(midY + 4).toFixed(1)}" font-size="10.5" fill="var(--text-2)">${fmt(r.n)} 件 / ${fmt(r.out)}</text>` +
-        `<text x="${nx1 - 12}" y="${(midY + 4).toFixed(1)}" font-size="11" fill="var(--primary)" text-anchor="end">料号透视 ›</text>` +
+        badgeG(cx, midY, 'repair', ev.nRep, repCol, r.d) +
+        badgeG(cx + 78, midY, 'mold', ev.nMold, molCol, r.d) +
+        `<text x="${nx1 - 10}" y="${(midY + 5).toFixed(1)}" font-size="15" fill="var(--primary)" text-anchor="end">›</text>` +
         `</g>`;
     });
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${s}</svg>`;
     el.querySelectorAll('.dnode').forEach(g => { g.onclick = () => { drillDev = g.dataset.d; drillWeek = null; render(); }; });
+    el.querySelectorAll('.dev-badge').forEach(g => {
+      g.addEventListener('mouseover', () => showDevTip(g.dataset.d, g.dataset.type));
+      g.addEventListener('mouseout', hideDevTip);
+      g.addEventListener('click', e => { e.stopPropagation(); showDevTip(g.dataset.d, g.dataset.type); });
+    });
   }
 
   // 某机台下的全部料号（含 0 次品，与客户透视表一致）
@@ -407,7 +461,7 @@
           <div style="font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:6px;margin:2px 0 4px">${icon('layers', 16)} 机台树状图（${weekLabel(devWeek)}）</div>
           <div id="devChart"></div>
           ${anyCnt ? '' : '<div class="sub-note mt8">本周该类别在 -M 机台明细中无次品记录（各机台 PPM = 0）。</div>'}
-          <div class="sub-note mt8">根节点 = 次品类别（本周合计 PPM），子节点 = Mold机台（PPM 越高越红）；<b>点击机台节点进入三级「机台 × 料号」透视</b>。机台级关注口径：≥ ${DEV_RED} 红 / ≥ ${DEV_WARN} 橙（参考客户透视图高亮）。</div>`}
+          <div class="sub-note mt8">根节点 = 次品类别（本周合计 PPM），子节点 = Mold机台（PPM 越高越红）；<b>点击机台节点进入三级「机台 × 料号」透视</b>。机台级关注口径：≥ ${DEV_RED} 红 / ≥ ${DEV_WARN} 橙（参考客户透视图高亮）。机台后角标：<span style="color:var(--danger);font-weight:700">● 报修</span> = 设备报修系统近 24h 工单数，<span style="color:#2563eb;font-weight:700">● 换模</span> = 模具管理系统近 24h 换模次数，<b>悬停查看具体时间</b>（实时快照，与所选周无关）。</div>`}
         </div>
       </div>`;
     } else if (drillDev != null) {
@@ -421,6 +475,9 @@
       const worstCode = codes[0];
       const selOpts = avail.map(i => `<option value="${i}"${i === devWeek ? ' selected' : ''}>${weekLabel(i)}</option>`).join('');
       const meHot = me && me.ppm != null && me.ppm >= DEV_RED;
+      const ev3 = window.DeviceEvents ? DeviceEvents.of(drillDev, Date.now()) : { repair: [], mold: [], nRep: 0, nMold: 0 };
+      const repTitle = '设备报修系统 · 近 24h：\n' + (ev3.repair.length ? ev3.repair.map(x => DeviceEvents.hhmm(x.t) + '  ' + x.id + '  ' + x.reason).join('\n') : '无记录');
+      const molTitle = '模具管理系统 · 近 24h：\n' + (ev3.mold.length ? ev3.mold.map(x => DeviceEvents.hhmm(x.t) + '  ' + x.id + '  ' + x.from + ' → ' + x.to).join('\n') : '无记录');
       body = `<div class="card mt16">
         <div class="card-head"><div class="card-title">${icon('table', 19)} 三级 · ${esc(drillDev)} × 料号 透视（${weekLabel(devWeek)} · ${esc(c.name)}）</div></div>
         <div class="card-body">
@@ -429,6 +486,8 @@
             <div class="si"><div class="si-label">次品数 / 产出</div><div class="si-value" style="font-size:19px">${me ? fmt(me.n) + ' / ' + fmt(me.out) : '—'}</div></div>
             <div class="si"><div class="si-label">最差料号</div><div class="si-value" style="font-size:19px">${worstCode ? esc(worstCode.c) + `<span style="font-size:13px;margin-left:4px;color:${worstCode.ppm >= DEV_WARN ? 'var(--danger)' : 'var(--text-2)'}">${Math.round(worstCode.ppm)}</span>` : '—'}</div></div>
             <div class="si"><div class="si-label">机台 PPM 排名</div><div class="si-value">${rank >= 0 ? (rank + 1) + ' / ' + all.length : '—'}</div></div>
+            <div class="si" title="${esc(repTitle)}"><div class="si-label">近 24h 报修</div><div class="si-value" style="color:${ev3.nRep ? 'var(--danger)' : 'var(--text-2)'}">${ev3.nRep}</div></div>
+            <div class="si" title="${esc(molTitle)}"><div class="si-label">近 24h 换模</div><div class="si-value" style="color:${ev3.nMold ? '#2563eb' : 'var(--text-2)'}">${ev3.nMold}</div></div>
           </div>
           <div class="flex acenter gap8" style="margin:4px 0 10px">
             <button class="chip" id="devPrev3">‹ 上一周</button>

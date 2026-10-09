@@ -5,17 +5,15 @@
 (function () {
   renderShell('wall');
 
-  /* 轮播屏清单：前 3 块为 KPI 看板屏（P1/P2 已落地），其余为标配与底座能力屏。
-     客户规划的 8 块屏（Cell Time / EO / OTD 等）清单待确认，此处以现有屏占位。 */
+  /* 轮播屏清单 = 「专属大屏 · 一系统一屏」分组下的屏（依客户 10-09 要求），
+     不含 OP 目标与权限配置（op-config）与已下线的监控总览（index）。
+     客户规划的其余屏（Cell Time / EO / OTD 等）清单待确认，此处以现有屏占位。 */
   const WALL_SCREENS = [
-    { key: 'index', href: 'index.html', name: '监控总览', kpi: '全厂健康度 · 告警流水', icon: 'grid', tag: '已上线' },
     { key: 'op', href: 'output.html', name: 'Output（OP）大屏', kpi: 'Go/Total/Earning · 工序机台', icon: 'activity', tag: 'P2' },
+    { key: 'optable', href: 'op-table.html', name: '周维度累计表', kpi: '各 PKG Type 逐日累计 · 达标着色', icon: 'layers', tag: 'P2' },
     { key: 'wip', href: 'wip.html', name: 'WIP 在制品看板', kpi: '工序 × 品类 · Hold/OTD 预警', icon: 'layers', tag: 'P2' },
-    { key: 'alerts', href: 'alerts.html', name: '预警组件', kpi: '阈值 · 强制弹窗 · 语音', icon: 'bell', tag: '标配' },
-    { key: 'mail', href: 'mail.html', name: '邮件组件', kpi: '告警邮件投递', icon: 'mail', tag: '标配' },
-    { key: 'analytics', href: 'analytics.html', name: '异常根因分析', kpi: '高频告警 · 根因聚类', icon: 'search', tag: '已上线' },
-    { key: 'monthly', href: 'monthly.html', name: '自动月报', kpi: '月度汇总', icon: 'file', tag: '已上线' },
-    { key: 'archive', href: 'archive.html', name: '历史日志归档', kpi: '归档 · 审计检索', icon: 'download', tag: '已上线' }
+    { key: 'defect', href: 'defect.html', name: '次品管理 · 质量预警', kpi: '类别 PPM 趋势 → 机台 × 料号', icon: 'alert', tag: 'P2' },
+    { key: 'logs', href: 'logs.html', name: '日志管理 · 生产日志', kpi: '交接班生产日志 · 分部门', icon: 'file', tag: '新增' }
   ];
 
   const INTERVALS = [
@@ -24,7 +22,10 @@
   ];
 
   let cfg = store.get('wall_cfg', { interval: 60000, list: WALL_SCREENS.map(s => s.key), large: false });
-  if (!Array.isArray(cfg.list) || !cfg.list.length) cfg.list = WALL_SCREENS.map(s => s.key);
+  // 清理已下线的屏（如监控总览 index、OP 配置 opcfg），避免旧 wall_cfg 残留失效 key
+  const WALL_KEYS = WALL_SCREENS.map(s => s.key);
+  cfg.list = (Array.isArray(cfg.list) ? cfg.list : []).filter(k => WALL_KEYS.indexOf(k) >= 0);
+  if (!cfg.list.length) cfg.list = WALL_KEYS.slice();
   const save = () => store.set('wall_cfg', cfg);
 
   const list = () => WALL_SCREENS.filter(s => cfg.list.includes(s.key));
@@ -148,8 +149,8 @@
     document.getElementById('content').innerHTML = `
     <div class="notice" style="--nc:var(--primary)">
       ${icon('layers', 19)}
-      <div><strong>监控室 · 多屏轮播：</strong>带班桌多块大屏各展示一类 KPI，系统按设定间隔<strong>自动滚动</strong>，也支持<strong>手动切换</strong>与<strong>大字号</strong>适配（Surface Go / Pro 平板同样可用）。
-      屏清单、滚动频率（1 分钟 / 半分钟）与部署方式（8 台设备各开一地址 vs 单机轮播）<strong>待 09-29 与客户确认</strong>。</div>
+      <div><strong>监控室 · 多屏轮播：</strong>带班桌依次轮播<strong>「专属大屏 · 一系统一屏」</strong>的各子系统大屏（Output / 周维度累计表 / WIP / 次品管理 / 日志），系统按设定间隔<strong>自动滚动</strong>，也支持<strong>手动切换</strong>与<strong>大字号</strong>适配（Surface Go / Pro 平板同样可用）。
+      <strong>不含「OP 目标与权限配置」与已下线的「监控总览」。</strong>屏清单、滚动频率与部署方式（各屏常驻 vs 单机轮播）<strong>待与客户确认</strong>。</div>
     </div>
 
     <div class="card mt16">
@@ -215,7 +216,7 @@
                 </label>`).join('')}
             </div>
           </div>
-          <div class="cfg-note">${icon('alert', 15)} 带班桌 8 块屏的<strong>屏清单与对应 KPI</strong>、以及「8 台设备各开一地址」还是「单机轮播」，均需周二与客户确认后固化。</div>
+          <div class="cfg-note">${icon('alert', 15)} 轮播内容为各<strong>专属大屏（一系统一屏）</strong>真实页面（已裁去侧边栏与顶栏）；「OP 目标与权限配置」与「监控总览」不进轮播。屏清单与「各屏常驻 vs 单机轮播」部署方式待与客户确认后固化。</div>
         </div>
       </div>
 

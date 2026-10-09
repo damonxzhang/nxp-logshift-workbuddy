@@ -31,12 +31,12 @@ function mulberry32OP(a) {
    报警阈值 yellowK / redK 为「每个 PKG Type 独立配置」（单位 K，差额比对）：
      缺口 ≥ yellowK → 黄灯；缺口 ≥ redK → 红灯。在「OP 目标与权限配置 · ① PKG Type 维护」逐项维护。
    10-08 客户口径：PKG Type 是「大分类」，其下还有「小分类 = 封装料号（PackageOutline）」，
-     **单价细分到料号**（subs[].price）；大分类的 price 保留为「兜底价」——料号未配价时沿用。 */
+     **单价细分到料号**（subs[].price）；料号未配价时沿用<strong>单价兜底表 OP_EARN_PRICE</strong>（按品类默认单价，1.0 为保底）。大分类不再单独维护「兜底单价」字段。 */
 const OP_PKG_TYPES = [
-  { id: 'BGA/LGA', name: 'BGA/LGA', color: '#1d4ed8', goal: 3680, price: 1.85, yellowK: 1, redK: 10, enabled: true },
-  { id: 'PQFN', name: 'PQFN', color: '#0b6a86', goal: 200, price: 0.92, yellowK: 1, redK: 10, enabled: true },
-  { id: 'QFN', name: 'QFN', color: '#8b5cf6', goal: 2400, price: 1.62, yellowK: 1, redK: 10, enabled: true },
-  { id: 'FCCSP', name: 'FCCSP', color: '#a8620b', goal: 150, price: 2.30, yellowK: 1, redK: 10, enabled: true }
+  { id: 'BGA/LGA', name: 'BGA/LGA', color: '#1d4ed8', goal: 3680, yellowK: 1, redK: 10, enabled: true },
+  { id: 'PQFN', name: 'PQFN', color: '#0b6a86', goal: 200, yellowK: 1, redK: 10, enabled: true },
+  { id: 'QFN', name: 'QFN', color: '#8b5cf6', goal: 2400, yellowK: 1, redK: 10, enabled: true },
+  { id: 'FCCSP', name: 'FCCSP', color: '#a8620b', goal: 150, yellowK: 1, redK: 10, enabled: true }
 ];
 
 /* 单价兜底表（未在 PKG Type 上配置 price 时使用）。演示样例，待客户确认。 */

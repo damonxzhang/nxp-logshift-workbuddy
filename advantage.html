@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我方优势 · 统一监控与岗位交接中心</title>
+<link rel="stylesheet" href="assets/css/style.css?v=20261008r">
+<style>
+  /* ===== 我方优势页专属样式（自包含，不改动全局 style.css，避免全站 ?v= 升级） ===== */
+  .adv-hero {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 22px 24px; border-radius: var(--radius);
+    background: linear-gradient(120deg, var(--primary-soft), #ffffff 78%);
+    border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    box-shadow: var(--shadow-sm);
+  }
+  .adv-hero .ah-ic {
+    flex: 0 0 auto; width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--primary); color: #fff;
+  }
+  .adv-hero h1 { margin: 0 0 6px; font-size: 21px; font-weight: 700; color: var(--text); }
+  .adv-hero p { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--text-2); }
+
+  .adv-card { display: flex; flex-direction: column; }
+  .adv-card .card-head { align-items: flex-start; }
+  .adv-h { display: flex; align-items: center; gap: 12px; }
+  .adv-no {
+    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .adv-lead { font-size: 14px; line-height: 1.66; color: var(--text-2); margin: 0 0 14px; }
+  .adv-points { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+  .adv-points li {
+    position: relative; padding-left: 22px; font-size: 13.6px; line-height: 1.55; color: var(--text);
+  }
+  .adv-points li::before {
+    content: ""; position: absolute; left: 4px; top: 7px;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--primary);
+  }
+  .adv-points li b { color: var(--primary-dark); font-weight: 700; }
+
+  .adv-sys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 980px) { .adv-sys { grid-template-columns: 1fr; } }
+  .adv-sys .sys {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 16px 18px; background: var(--surface-2);
+  }
+  .adv-sys .sys-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .adv-sys .sys-name { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .adv-sys .sys-desc { font-size: 13px; line-height: 1.6; color: var(--text-2); margin: 0; }
+
+  .adv-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .adv-flow .node {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .adv-flow .arrow { color: var(--text-3); display: inline-flex; }
+  .adv-flow .n-warn { background: var(--danger-soft); border-color: #f6c9c6; color: #a3221e; }
+  .adv-flow .n-ok { background: var(--success-soft); border-color: #b6e2cf; color: #0d6b4b; }
+</style>
+</head>
+<body data-page="advantage">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<script src="assets/js/common.js?v=20261009f"></script>
+<script src="assets/js/data.js?v=20261008r"></script>
+<script src="assets/js/page-advantage.js?v=20261009f"></script>
+</body>
+</html>
