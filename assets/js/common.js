@@ -65,6 +65,7 @@ const NAV_GROUPS = [
       { key: 'opcfg', href: 'op-config.html', label: 'OP 目标与权限配置', icon: 'settings', tag: '配置', tagCls: 't-purple' },
       { key: 'wip', href: 'wip.html', label: 'WIP 在制品看板', icon: 'layers', tag: 'P2', tagCls: 't-red' },
       { key: 'defect', href: 'defect.html', label: '次品管理 · 质量预警', icon: 'alert', tag: 'P2', tagCls: 't-red' },
+      { key: 'defectcfg', href: 'defect-config.html', label: '次品项配置（主数据）', icon: 'settings', tag: '配置', tagCls: 't-purple' },
       { key: 'logs', href: 'logs.html', label: '日志管理 · 生产日志', icon: 'file', tag: '新增', tagCls: 't-purple' }
     ]
   },
@@ -109,6 +110,7 @@ const PAGE_TITLES = {
   opcfg: ['OP 目标与权限配置', 'PKG Type 维护（含黄/红阈值与料号单价）· 每周目标数量 · 预警分口径/夏令时'],
   wip: ['WIP 在制品看板', '按 PKG Type × 工序呈现在制（数量 / Earn 口径）· 二级钻取筛选 · 指标报警配置'],
   defect: ['次品管理 · 质量预警', '类别 PPM 趋势 → 机台树 → 机台×料号 / Package 明细（产量/次品数/PPM）· 红线 2000 PPM（良率 0.998）· 真实数据三级下钻'],
+  defectcfg: ['次品项配置（主数据）', '按部门 / 工序维护次品项（名称 + 代码）及其与设备（机台）的绑定关系 · 次品管理大屏的缺陷项主数据'],
   logs: ['日志管理 · 生产日志', '交接班生产日志 · LEAD / NON-LEAD 分部门查看 · 班次回看 · 只读静态展示'],
   systems: ['子系统接入与底座', '问卷 1.1 · 接入范围（Output / WIP）与接入方式'],
   ingest: ['采集调度与调用日志', '问卷 2.1 / 3.1 · 各子系统数据对接情况与调用日志'],

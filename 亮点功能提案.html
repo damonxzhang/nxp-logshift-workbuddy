@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>亮点功能提案 · 我方独有能力清单</title>
+<style>
+  :root{
+    --bg:#f2f5fa; --surface:#ffffff; --surface-2:#f7f9fc; --surface-3:#eef2f8;
+    --border:#e1e7f0; --text:#1d2836; --text-2:#566375; --text-3:#8a95a5;
+    --primary:#1d4ed8; --primary-soft:#e7eeff;
+    --success:#12805a; --warn:#a8620b; --danger:#cc2f2a; --info:#0b6a86; --purple:#8b5cf6;
+    --gold:#b8860b;
+    --radius:14px; --maxw:1200px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;font-size:15px}
+  a{color:var(--primary);text-decoration:none}
+  .topbar-g{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#1d2836,#26323f);
+    color:#fff;padding:16px 28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .topbar-g .logo{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center}
+  .topbar-g h1{font-size:19px;margin:0;font-weight:700}
+  .topbar-g .sub{font-size:13px;color:#aeb9c8;margin-top:2px}
+  .topbar-g .tag{margin-left:auto;font-size:12.5px;background:rgba(255,255,255,.12);
+    padding:5px 12px;border-radius:999px;color:#dbe3ee}
+  .wrap{display:flex;gap:26px;max-width:var(--maxw);margin:0 auto;padding:26px 20px 60px}
+  .toc{position:sticky;top:84px;align-self:flex-start;width:230px;flex:0 0 230px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 12px;max-height:calc(100vh - 110px);overflow:auto}
+  .toc .t-title{font-size:12px;color:var(--text-3);letter-spacing:.5px;padding:6px 10px;font-weight:700}
+  .toc a{display:block;padding:7px 10px;border-radius:9px;color:var(--text-2);font-size:13.5px;margin:2px 0}
+  .toc a:hover{background:var(--surface-3);color:var(--text)}
+  .main{flex:1;min-width:0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:22px;box-shadow:0 1px 2px rgba(20,40,80,.03)}
+  .card h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .card h3{font-size:16.5px;margin:22px 0 10px}
+  .card .lead{color:var(--text-2);margin:0 0 14px;font-size:14.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 11px;
+    border-radius:999px;font-weight:600;background:var(--surface-3);color:var(--text-2);white-space:nowrap}
+  .pill.blue{background:var(--primary-soft);color:var(--primary)}
+  .pill.green{background:#e3f6ee;color:var(--success)}
+  .pill.amber{background:#fdf1e0;color:var(--warn)}
+  .pill.red{background:#fdecea;color:var(--danger)}
+  .pill.purple{background:#f1ebfe;color:var(--purple)}
+  .pill.gold{background:#fbf3dd;color:var(--gold)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--surface-2);font-weight:600;color:var(--text-2);font-size:13.5px}
+  tbody tr:hover{background:var(--surface-2)}
+  .muted{color:var(--text-3)}
+  .small{font-size:13px}
+  .note{border-left:4px solid var(--info);background:var(--surface-2);padding:12px 16px;
+    border-radius:0 10px 10px 0;margin:14px 0;font-size:14px;color:var(--text-2)}
+  .note.amber{border-color:var(--warn);background:#fef6ec}
+  .note.green{border-color:var(--success);background:#eef9f4}
+  .note.red{border-color:var(--danger);background:#fdf3f2}
+  .grid{display:grid;gap:14px}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .kpi{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--surface-2)}
+  .kpi .k{font-size:12.5px;color:var(--text-3)}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:2px}
+  .feat{border:1px solid var(--border);border-radius:13px;padding:0;overflow:hidden;margin:16px 0;background:var(--surface)}
+  .feat .fh{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface-2);
+    border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .feat .fh .no{width:30px;height:30px;border-radius:8px;background:var(--primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:0 0 30px}
+  .feat .fh .tt{font-size:16.5px;font-weight:700}
+  .feat .fh .tags{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .feat .fb{padding:14px 18px}
+  .feat .fb p{margin:0 0 10px}
+  .feat .fb .lbl{font-size:12.5px;font-weight:700;color:var(--text-3);letter-spacing:.4px;margin:12px 0 4px}
+  .feat .fb ul{margin:4px 0 0;padding-left:18px}
+  .feat .fb li{margin:4px 0;font-size:14px}
+  .why{background:#fbf3dd;border-radius:9px;padding:10px 14px;font-size:13.5px;color:#6b4e07;margin-top:10px}
+  .why b{color:var(--gold)}
+  .ask{background:#fff8ef;border:1px dashed #e0b878;border-radius:12px;padding:14px 18px;margin:14px 0}
+  .ask .q{font-weight:700;color:#8a4b03;margin-bottom:6px}
+  footer{max-width:var(--maxw);margin:0 auto;padding:0 20px 40px;color:var(--text-3);font-size:12.5px}
+  @media (max-width:960px){
+    .wrap{flex-direction:column}.toc{position:static;width:100%;flex:none;max-height:none}
+    .g4,.g3,.g2{grid-template-columns:1fr}
+  }
+  @media print{
+    .topbar-g{background:#1d2836 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .toc{display:none}.wrap{display:block;padding:0}
+    .card,.feat{break-inside:avoid;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar-g">
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5z"/></svg>
+  </div>
+  <div>
+    <h1>亮点功能提案 · 我方独有能力清单</h1>
+    <div class="sub">筛选标准：客户自己难以实现、但能显著提升大屏价值与专业度的能力</div>
+  </div>
+  <div class="tag">2026-10-08</div>
+</div>
+
+<div class="wrap">
+  <nav class="toc">
+    <div class="t-title">目录</div>
+    <a href="#s1">一、判断标准</a>
+    <a href="#s2">二、A 类 · 数据智能</a>
+    <a href="#s3">三、B 类 · 分析深度</a>
+    <a href="#s4">四、C 类 · 时效与追溯</a>
+    <a href="#s5">五、D 类 · 交付与体验</a>
+    <a href="#s6">六、后期规划 · AI 增强</a>
+  </nav>
+
+  <main class="main">
+
+    <section class="card" id="s1">
+      <h2>一、判断标准：什么叫「客户自己做不了」</h2>
+      <p class="lead">不是功能复杂就叫亮点。真正能形成差距的，是<b>需要跨系统整合、算法加工或工程沉淀</b>的能力——客户的 IT 与业务团队做不出来，或者做出来成本远高于我们。</p>
+
+      <div class="grid g4">
+        <div class="kpi"><div class="k">① 跨源整合</div><div class="v" style="font-size:15px">多系统归一</div>
+          <div class="small muted">把 Output / WIP / 次品 / 设备等多套异构数据拼成一个口径</div></div>
+        <div class="kpi"><div class="k">② 算法加工</div><div class="v" style="font-size:15px">从数据到洞察</div>
+          <div class="small muted">趋势预测、异常聚类、根因推断，不是画个图</div></div>
+        <div class="kpi"><div class="k">③ 工程沉淀</div><div class="v" style="font-size:15px">可复用的组件</div>
+          <div class="small muted">报警引擎、下钻框架、导出体系，一次做好全站复用</div></div>
+        <div class="kpi"><div class="k">④ 管理闭环</div><div class="v" style="font-size:15px">通知到考核</div>
+          <div class="small muted">报警不止于提醒，还能留痕、考核、回溯</div></div>
+      </div>
+
+      <div class="note">
+        <b>甲方 IT 的真实约束（这些正是我们的机会）：</b>采购要走流程、上线要排期、改个查询要提需求单；报表工具（Power BI / 帆软）能做标准图表，但<b>做不了定制化的工艺流程图联动、跨系统口径统一、算法型预警</b>。我们的优势是：<b>数据口径可现场对、界面可当场改、效果能立刻给老板看</b>。
+      </div>
+    </section>
+
+    <section class="card" id="s2">
+      <h2>二、A 类 · 数据智能（跨源整合，最硬的壁垒）</h2>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">A1</div>
+          <div class="tt">跨系统「物料全链路追踪」</div>
+          <div class="tags"><span class="pill gold">★ 推荐主推</span><span class="pill blue">难度中</span><span class="pill green">价值极高</span></div>
+        </div>
+        <div class="fb">
+          <p>输入一个<b>料号（PackageOutline）或批号</b>，一屏看到它在全厂的生命轨迹：BE 段产出 → WIP 在制停留（哪一站、停了多久）→ 次品记录（哪个机台、什么缺陷）→ 最终去向。当前系统里 Output、WIP、次品是<b>三块互不相通的屏</b>，这个功能把它们缝起来。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要三个系统的数据在<b>料号粒度上对齐</b>——而客户三个系统的编码规则并不一致（有 99 前缀差异、料号别名等问题，会议已经暴露）</li>
+            <li>客户 IT 只能给你三张报表，做不了跨表的实时关联查询</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>「一个料号的问题，10 秒定位到卡在哪一站、哪个机台做的、什么时候开始异常」——这是老板和品保最想看到的能力，也是最能体现"系统整合价值"的功能。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">A2</div>
+          <div class="tt">WIP × Output 「交付风险预判」</div>
+          <div class="tags"><span class="pill gold">★ 推荐主推</span><span class="pill blue">难度中高</span><span class="pill green">价值极高</span></div>
+        </div>
+        <div class="fb">
+          <p>当前大屏回答的是"<b>现在达标了吗</b>"（累计实际 + WIP 抵扣 vs 累计目标）。本功能回答的是"<b>照这个势头走下去，本周能不能达标</b>"——结合在制分布、历史流速与剩余天数，提前 1–3 天算出欠产风险，并给出可执行的补救建议。</p>
+
+          <div class="lbl">① 计算模型（四步推演）</div>
+          <ul>
+            <li><b>第 1 步 · 可得产能</b>：把当前 WIP 按工序折算为"还能出多少成品"。对每个工序取在制量 <span class="kbd">W_s</span>，乘以该工序到最终站的<b>良率系数</b> <span class="kbd">y_s</span>（可由历史数据统计，缺省 1.0），得到 <span class="kbd">可转化量 = Σ(W_s × y_s)</span>。剔除 Hold 批次、剔除已停用站点的料。</li>
+            <li><b>第 2 步 · 流速估计</b>：用最近 4 周（可配）该 PKG Type 的日均实际产出，做<b>加权平均</b>（越近权重越高，默认 4:3:2:1），得到日流速 <span class="kbd">v</span>；同时对流速给一个<b>波动率</b> σ（历史标准差），用于后面的概率计算。数据源已具备：真实 Output 报表按天有值。</li>
+            <li><b>第 3 步 · 缺口与所需天数</b>：<span class="kbd">缺口 = 周目标 −（累计实际 + 可转化量）</span>；若缺口 ≤ 0 → <b>达标无风险</b>；若 &gt; 0 → <span class="kbd">所需天数 = 缺口 ÷ v</span>，与「本周剩余天数」相减得出<b>缓冲天数</b>（负值即已来不及）。</li>
+            <li><b>第 4 步 · 概率化</b>：考虑流速波动，用正态近似算 <span class="kbd">P(本周欠产)</span>——即"按当前流速的分布，剩余产能覆盖不了缺口的概率"。输出百分比而非简单的"能/不能"，管理层更认这种口径。</li>
+          </ul>
+
+          <div class="lbl">② 风险分级与页面呈现</div>
+          <table>
+            <thead><tr><th style="width:110px">风险等级</th><th style="width:180px">判定条件（建议阈值，可配）</th><th>建议动作（系统自动给出）</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill green">安全</span></td><td>缺口 ≤ 0，或所需天数 &lt; 剩余天数 × 60%</td><td>维持当前节奏，无需干预</td></tr>
+              <tr><td><span class="pill amber">关注</span></td><td>所需天数占剩余天数 60%–100%</td><td>提示"缓冲不足"，列出建议优先消化的工序</td></tr>
+              <tr><td><span class="pill red">高危</span></td><td>所需天数 &gt; 剩余天数，或 P(欠产) ≥ 50%</td><td>给出具体动作：调哪道工序优先排产、需追加多少在制、或建议下调本周目标</td></tr>
+              <tr><td><span class="pill" style="background:#e8e8e8">已失守</span></td><td>即使产能全满也无法达标</td><td>直接建议修正目标并标注责任工序，避免"周五才发现"</td></tr>
+            </tbody>
+          </table>
+          <p class="small muted">呈现位置：OP 大屏 KPI 区新增一张「本周交付风险」卡（风险等级色块 + 预计达成率 + 缓冲天数 + P(欠产)），点击展开推演明细（各工序可转化量 / 流速曲线 / 缺口分解）；累计表增加「预测达成率」列，与"当前达成率"并排，一眼看出趋势是变好还是变坏。</p>
+
+          <div class="lbl">③ 配置项</div>
+          <ul>
+            <li><b>流速窗口</b>（默认近 4 周）与<b>加权方式</b>（加权平均 / 简单平均 / 最近一周线性外推）</li>
+            <li><b>良率系数 y_s</b>：按工序配置，或由系统从历史 产出/投入 自动学习</li>
+            <li><b>风险阈值</b>：关注 / 高危 / 已失守 的分界，按 PKG Type 或部门独立配置</li>
+            <li><b>WIP 口径</b>：是否剔除 Hold、是否剔除特定站点（与现有「WIP 报警判定」配置保持一致，避免两套口径打架）</li>
+          </ul>
+
+          <div class="lbl">④ 边界与可信度（必须向客户说清）</div>
+          <ul>
+            <li><b>换线 / 换模导致的产能跳变</b>：流速会出现台阶式变化，模型需识别并只用"稳定期"数据，否则会低估风险</li>
+            <li><b>首次使用无历史</b>：新品类或新站点没有 4 周数据时，自动降级为"仅按 WIP 可转化量 + 名义产能"的粗估，并在页面标注「数据不足，估计偏差较大」</li>
+            <li><b>预测不是承诺</b>：页面须明确标注"基于历史流速的统计推断，供决策参考"，避免被当成考核依据后反噬</li>
+            <li><b>与现有判定口径的关系</b>：现有「(累计实际+WIP) vs 目标」是<b>即时判定</b>，本功能是<b>前瞻推断</b>，两者并存但分别标注，不混用同一张卡</li>
+          </ul>
+
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要把 <b>WIP 快照 + Output 历史 + 工序产能/良率</b> 三者建模到同一个推演链上，这不是任何单张报表能给的结果</li>
+            <li>模型参数（良率系数、流速窗口、波动率）要随数据持续校准，客户 IT 没有这个能力储备，外部 BI 工具也做不了这种定制推演</li>
+            <li>我们对这三份数据（Output / WIP / 次品）已接入真实值，模型可以直接用真实数据调参、现场验证准不准</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>把大屏从"事后看板"升级为<b>"事前预警"</b>——老板要的从来不是"昨天没达标"，而是"<b>今天要做什么才能不欠产</b>"。这是全清单里最贴近管理层决策的一项。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">A3</div>
+          <div class="tt">多系统数据「口径对账台」</div>
+          <div class="tags"><span class="pill blue">难度低</span><span class="pill green">实用度高</span></div>
+        </div>
+        <div class="fb">
+          <p>同一个指标（比如某天 BGA 产出）在不同系统里数值不一致时，<b>自动并列展示各来源数值 + 差异 + 可能原因</b>，并标注以哪个为准（如「最终 Output 以 QA 后为准，中间工序仅过程监控」——这条口径客户 09-29 会议已明确）。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>客户现在靠人工在 Excel 里对口径，一次要几小时；系统化需要先把口径规则<b>显式建模</b></li>
+            <li>这类「脏活」客户 IT 不愿做、业务不会做，但日常消耗最大</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>直接命中客户痛点——「同一天的数据，几个系统不一样，到底信哪个」这个争论可以终结。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="s3">
+      <h2>三、B 类 · 分析深度（从图表到洞察）</h2>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">B1</div>
+          <div class="tt">异常「自动归因 + 影响面评估」</div>
+          <div class="tags"><span class="pill gold">★ 推荐主推</span><span class="pill blue">难度中</span><span class="pill green">价值高</span></div>
+        </div>
+        <div class="fb">
+          <p>报警触发时，系统自动产出一份<b>事件简报</b>，回答三个问题：谁受影响、影响多大、可能为什么。把孤立的一条红灯，升级为<b>带结论、带金额、带动作</b>的事件。</p>
+
+          <div class="lbl">① 功能点分解</div>
+          <table>
+            <thead><tr><th style="width:130px">模块</th><th style="width:190px">输入</th><th>输出</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>B1-1 影响面定位</b></td>
+                <td>报警对象（PKG Type / 工序 / 机台）+ 时间窗</td>
+                <td>受影响清单：涉及哪些<b>料号</b>（列表 + 各自数量）、哪些<b>批号</b>、这些批次对应哪些<b>客户 / 订单</b>（若订单数据可接入）；按影响量降序，默认只展示 Top 10</td>
+              </tr>
+              <tr>
+                <td><b>B1-2 损失量化</b></td>
+                <td>受影响数量 + 料号单价 + 目标完成度</td>
+                <td>预计<b>欠产量（K）</b>与<b>欠产金额（万元）</b>；若涉及次品，额外给出<b>报废金额</b>；并算出对本周达成率的拉低幅度（如"将使 BGA 达成率从 98% 降至 91%"）</td>
+              </tr>
+              <tr>
+                <td><b>B1-3 多源归因</b></td>
+                <td>同期各系统异常信号</td>
+                <td>自动关联并排序可疑原因：① 同期该机台<b>次品 PPM 是否飙升</b>；② 该工序<b>CT / OTD 是否超期</b>；③ 上游站<b>WIP 是否积压</b>；④ 是否为<b>批量连锁</b>（同时段多品类同站报警 → 怀疑系统性原因，如设备/物料批次）还是<b>偶发单点</b>。每条原因附<b>证据数值</b>可点开核对</td>
+              </tr>
+              <tr>
+                <td><b>B1-4 处置建议</b></td>
+                <td>归因结果 + 历史相似事件</td>
+                <td>给出 1–3 条建议动作（如"优先排查 BMD-09 模具"、"该批次建议转站"）；并展示<b>历史同类事件当时的处理方式与恢复耗时</b>，供参考</td>
+              </tr>
+              <tr>
+                <td><b>B1-5 事件简报</b></td>
+                <td>以上全部</td>
+                <td>生成一张可导出/可邮件的事件卡（结论 + 数据 + 证据 + 建议），一键推给责任人与主管</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="lbl">② 呈现与交互</div>
+          <ul>
+            <li>报警弹窗 / 报警卡上增加「<b>查看事件简报</b>」入口，点开为抽屉式简报页，不改动现有报警主流程</li>
+            <li>简报页顶部是结论条（一句话 + 影响金额），中部是证据区（各系统数值对比），底部是建议动作与历史参考</li>
+            <li>所有证据数值均可点回原屏定位（如点"次品 PPM 飙升"直接跳到 defect.html 对应机台）</li>
+          </ul>
+
+          <div class="lbl">③ 配置项</div>
+          <ul>
+            <li>归因信号开关：四类信号各可启用/停用；关联时间窗可配（默认 ±2 小时）</li>
+            <li>批量连锁判定阈值：同时段同站报警条数 ≥ N 即标记为连锁</li>
+            <li>简报内容模板：含哪些模块、是否默认附历史相似事件</li>
+          </ul>
+
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要跨屏关联分析（报警 × 次品 × WIP × 产出 × 订单），任何单系统视角天然做不到</li>
+            <li>原型已有「相似告警自动聚类」基础（`analytics-core.js`）与料号级单价（算金额直接可用），对本我们是增量开发，对客户是新建能力</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>现有系统的报警只告诉你"出事了"；这个功能告诉你"<b>出什么事、影响了谁、要赔多少钱、大概为什么、上次是怎么解决的</b>"。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">B2</div>
+          <div class="tt">次品「机台健康度画像 + 劣化预警」</div>
+          <div class="tags"><span class="pill blue">难度中</span><span class="pill green">价值高</span></div>
+        </div>
+        <div class="fb">
+          <p>现有次品看板显示的是<b>当期 PPM 是多少</b>；本功能回答的是<b>这台机台正在变好还是变坏，会不会马上超标</b>。给每台机台一个持续更新的"健康档案"。</p>
+
+          <div class="lbl">① 功能点分解</div>
+          <table>
+            <thead><tr><th style="width:130px">模块</th><th style="width:190px">输入</th><th>输出</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>B2-1 健康分</b></td>
+                <td>近 N 周 PPM、与红线/预警线的距离、波动幅度</td>
+                <td>0–100 的机台健康分（绿 / 黄 / 红三档），并拆解扣分原因：是"绝对值高"扣分，还是"波动大"或"趋势差"扣分</td>
+              </tr>
+              <tr>
+                <td><b>B2-2 劣化趋势识别</b></td>
+                <td>逐周 PPM 时序（已接入 41 周 × 9–10 台）</td>
+                <td>自动识别三类形态：① <b>持续爬升</b>（连续 N 周上升，未超标但趋势危险）② <b>阶跃跳变</b>（某周突然翻倍 → 疑似设备故障 / 换模问题 / 换料）③ <b>周期性波动</b>（与保养周期相关）。每类给出证据图（自动截取相关周段）</td>
+              </tr>
+              <tr>
+                <td><b>B2-3 提前预警</b></td>
+                <td>趋势斜率 + 当前距红线距离</td>
+                <td>外推"按当前趋势，<b>约 X 周后触及红线</b>"，提前 1–3 周发出"劣化预警"（区别于"超标报警"）；等级可配</td>
+              </tr>
+              <tr>
+                <td><b>B2-4 机台横向对比</b></td>
+                <td>全部机台同周期数据</td>
+                <td>健康分排行 + 同型号机台对比（同一料号在不同机台上的 PPM 差异 → 帮助定位是"机台问题"还是"料号问题"）；标注<b>标杆机台</b>（长期最优，可作为参数基准）</td>
+              </tr>
+              <tr>
+                <td><b>B2-5 机台档案页</b></td>
+                <td>上述全部</td>
+                <td>单机台专属页：健康分时间轴、劣化事件记录、主要缺陷构成、该机台历史做过的料号及其 PPM 表现、维护记录（若可接入）</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="lbl">② 算法口径（可向客户解释）</div>
+          <ul>
+            <li><b>健康分</b>：以红线（2000 PPM）为 0 分、以优秀水位（如 500 PPM）为 100 分做线性映射，再按波动率做扣减；具体系数可配</li>
+            <li><b>趋势判定</b>：用最近 N 周做线性回归，斜率为正且显著性达标 → 判"持续爬升"；单周环比 &gt; 2 倍 → 判"阶跃"</li>
+            <li><b>外推</b>：按回归斜率线性外推至红线，得到"预计 X 周后超标"；同时给出置信度，数据点不足时降级提示</li>
+            <li><b>最小数据量</b>：少于 4 周数据的机台只显示当前值、不做趋势判定，页面明示"数据不足"</li>
+          </ul>
+
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要时序分析 + 多周期对比建模，客户目前只有<b>当周透视表</b>，没有把历史拉通看的工具</li>
+            <li>真实数据我们已完整接入（41 周 × 9–10 台 Mold 机台，可逐周逐机台逐料号），素材充足，模型能直接跑出真实结论给客户看</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>从「次品超标了才去查」变为「<b>机台在劣化就提前提醒</b>」——这是质量预警从"事后"到"事前"的真正升级，也是设备/品质部门最认的能力。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">B3</div>
+          <div class="tt">目标「合理性体检」</div>
+          <div class="tags"><span class="pill purple">特色</span><span class="pill blue">难度低</span></div>
+        </div>
+        <div class="fb">
+          <p>现在周目标由人填写（或沿用上周），系统只负责展示达成情况。<b>本功能在目标填写的那一刻就做一道体检</b>，判断这个目标"跳一跳够得着"还是"从第一天就注定完不成"，把问题暴露在周一上午而不是周五下班。</p>
+
+          <div class="lbl">① 功能点分解</div>
+          <table>
+            <thead><tr><th style="width:130px">模块</th><th style="width:190px">输入</th><th>输出</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>B3-1 历史达成率对照</b></td>
+                <td>本周目标 + 该 PKG Type 近 8 周实际达成率</td>
+                <td>"本周目标较上周高 23%，而近 8 周该品类平均达成率为 94%，最高 101%"——直接指出目标是否超出历史能力区间</td>
+              </tr>
+              <tr>
+                <td><b>B3-2 产能上限校验</b></td>
+                <td>目标数量 + 相关工序的名义日产能 + 可用天数</td>
+                <td>理论最大可达产出；若目标 &gt; 上限，直接提示"即使满产也达不到，建议下调至 X K"</td>
+              </tr>
+              <tr>
+                <td><b>B3-3 在制支撑度校验</b></td>
+                <td>目标缺口 + 当前 WIP 可转化量（复用 A2 第 1 步）</td>
+                <td>"当前 WIP 仅够支撑 X K，缺口 Y K 需在本周新投产"，并标注需要多投多少</td>
+              </tr>
+              <tr>
+                <td><b>B3-4 完工所需条件（反算）</b></td>
+                <td>目标值</td>
+                <td>要达成目标，本周最低需要：① 日流速不低于 v；② 在制不低于 W；③ 关键工序不能停线。给出这三个"最低门槛值"，供排产参考</td>
+              </tr>
+              <tr>
+                <td><b>B3-5 目标变更留痕</b></td>
+                <td>历史目标版本</td>
+                <td>记录每周目标的设定值、设定人、设定时间与修改原因；支持"原目标 vs 调整后目标"对比，避免事后争议</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="lbl">② 呈现方式</div>
+          <ul>
+            <li>在 <span class="kbd">op-config.html</span> 的「每周目标数量」填写区，每行实时显示体检结果徽标（<span class="pill green">合理</span> <span class="pill amber">偏紧</span> <span class="pill red">不可达</span>），鼠标悬停展开数据依据</li>
+            <li>不阻断填写——体检只做提示，最终由业务决定是否调整（避免系统越权）</li>
+            <li>周中若实际严重偏离，可回看"当初体检是怎么提示的"，形成闭环</li>
+          </ul>
+
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要把<b>目标、产能、在制库存、历史达成</b>四者建在同一模型里——这是典型的"没人愿意做的脏活"，但对管理价值极高</li>
+            <li>无需新增数据源，全部复用现有 Output 历史 + WIP 快照 + 工序清单</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>把大屏从"<b>考核工具</b>"变成"<b>决策工具</b>"——管理层会主动用，因为它帮他们"定一个能完成的合理目标"，而不是事后被追责。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">B4</div>
+          <div class="tt">「同环比 + 历史基准」对比体系</div>
+          <div class="tags"><span class="pill blue">难度低</span><span class="pill green">实用度高</span></div>
+        </div>
+        <div class="fb">
+          <p>所有指标默认带三层对比：<b>本周 vs 上周 vs 近 4 周均值</b>，并在图上画出历史基准带（如「同期最好水平」「警戒水位」）。让"好还是不好"一眼可判——现在的大屏只有本期数据，看不出相对水平。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要完整历史数据留存与对齐（客户现在历史数据散在各处、口径还变过）</li>
+            <li>我们的引擎天生按周管理历史，加一层对比是顺手的事</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>投入最小、感知最强——几乎每个图表都能加，立刻显得"专业"。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="s4">
+      <h2>四、C 类 · 时效与追溯（客户最痛的场景）</h2>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">C1</div>
+          <div class="tt">「时效倒计时」统一引擎</div>
+          <div class="tags"><span class="pill gold">★ 直接命中需求</span><span class="pill blue">难度低</span></div>
+        </div>
+        <div class="fb">
+          <p>把客户原始需求里的三类倒计时（OTD 与铜线 C/T &gt; 24H、原材料 / COMPOUND 到期、PMC 出炉 120H）<b>统一成一个可配置引擎</b>：任意"起始事件 + 时长阈值 + 报警规则"都能配一条，页面统一呈现「还剩 X 小时」的倒计时卡片 + 分级变色。后续新增任何时效要求，**改配置即可，不用改代码**。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>客户原需求是三条独立规则；做成通用引擎需要抽象能力</li>
+            <li>客户要新增第四条规则时，通常得再提一次开发需求 —— 我们能现场配</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>现场演示「我加一条新规则」——改个配置，30 秒后大屏就多了一张倒计时卡。这个说服力极强。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">C2</div>
+          <div class="tt">报警「全生命周期闭环」留痕</div>
+          <div class="tags"><span class="pill blue">难度低</span><span class="pill green">审计刚需</span></div>
+        </div>
+        <div class="fb">
+          <p>当前系统做到"报警 + 确认"就结束了。<b>本功能把每条报警变成一条有始有终的工单</b>：从触发、确认、处置、到恢复与复盘，全程留痕并量化响应效率。</p>
+
+          <div class="lbl">① 状态机（报警的五态流转）</div>
+          <table>
+            <thead><tr><th style="width:110px">状态</th><th style="width:170px">进入条件</th><th>记录内容</th></tr></thead>
+            <tbody>
+              <tr><td><b>触发</b></td><td>规则命中，系统自动生成</td><td>触发时间、触发规则、触发时的实测值与阈值、报警级别（红/黄）</td></tr>
+              <tr><td><b>已知悉</b></td><td>责任人点击确认</td><td>确认人、确认时间、<b>响应时长</b>（= 确认时间 − 触发时间）</td></tr>
+              <tr><td><b>处理中</b></td><td>填写处置措施</td><td>处置人、措施描述、关联的工单 / 换模 / 维修记录（若可接入）</td></tr>
+              <tr><td><b>已恢复</b></td><td>实测值回到阈值内（可自动识别）或人工标记</td><td>恢复时间、<b>处置时长</b>（= 恢复 − 知悉）、恢复方式（自动 / 人工）</td></tr>
+              <tr><td><b>已闭环</b></td><td>填写原因与预防措施</td><td>根因分类、是否已彻底解决、<b>是否复发</b></td></tr>
+            </tbody>
+          </table>
+          <p class="small muted">补充：超时未确认的报警自动<b>升级提醒</b>（推给上一级或追加语音播报），避免报警被无视——这正好复用会议已确认的多级报警能力。</p>
+
+          <div class="lbl">② 量化指标（管理层最关心的部分）</div>
+          <ul>
+            <li><b>平均响应时长</b>：从触发到有人确认，按系统 / 部门 / 报警级别分组统计</li>
+            <li><b>平均处置时长</b>：从知悉到恢复，识别"哪些类别的问题最难搞"</li>
+            <li><b>闭环率</b>：有多少报警走完了五态、多少停在"已知悉"再无下文</li>
+            <li><b>复发率与重复报警 TOP</b>：同一对象短期内反复报警 → 说明上次没解决根本问题，自动标记</li>
+            <li><b>责任分布</b>：按人 / 班组统计处理量与时效率（需权限管控，避免变成"监控员工"引发抵触）</li>
+          </ul>
+
+          <div class="lbl">③ 页面与交互</div>
+          <ul>
+            <li>报警列表增加状态列与时间轴（横向五节点，已完成节点亮色），点击展开完整履历</li>
+            <li>新增「报警效率」分析页（可并入现有 <span class="kbd">analytics.html</span>）：响应时长分布、闭环率趋势、复发 TOP 排行、按部门对比</li>
+            <li>月度报告自动引用这些指标，形成"报警—处置—复盘"的完整管理闭环</li>
+            <li>报警履历可导出 Excel，作为审计凭证</li>
+          </ul>
+
+          <div class="lbl">④ 配置项</div>
+          <ul>
+            <li>各状态的<b>超时阈值</b>（如红级 15 分钟未确认即升级）与升级对象</li>
+            <li>是否允许"人工标记恢复"（有些异常系统无法自动判定）</li>
+            <li>闭环是否强制填写根因（可设为必填 / 选填）</li>
+          </ul>
+
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>涉及跨页状态流转、超时升级与审计留痕，原型已有 <b>RBAC + 审计日志底座</b>可直接复用，客户从零做需要重建整套权限与审计</li>
+            <li>这是管理层考核现场响应能力的核心数据，客户通常想不到要做——属于我们主动提供的"专业增值"</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>把报警从"<b>通知</b>"升级为"<b>可考核的管理动作</b>"——老板能问出「上次那台机台报警，谁处理的，多久好的，后来还犯过吗」。</div>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="fh">
+          <div class="no">C3</div>
+          <div class="tt">交接日志「智能摘要 + 待办提取」<span class="pill purple" style="margin-left:6px">后期规划 · AI</span></div>
+          <div class="tags"><span class="pill purple">需大模型</span><span class="pill amber">难度中</span></div>
+        </div>
+        <div class="fb">
+          <p>交接日志现在是一条条纯文本（客户截图里就是这样）。系统自动把当班所有日志<b>聚合成一段结构化摘要</b>：本班发生 N 起异常、涉及 X 台设备、遗留 M 项待跟进；并自动提取<b>待办事项清单</b>，交班时一键推给接班人确认。</p>
+          <div class="lbl">事前可做的准备</div>
+          <ul>
+            <li><b>现在就能做的</b>：日志字段结构化（类型 / 设备 / 严重度 / 是否延续），使摘要与待办提取更准——这不依赖 AI，属于数据治理</li>
+            <li><b>预留接口</b>：把日志数据整理成"可喂给模型"的规范结构，后期接模型即可用，不必回头改数据结构</li>
+            <li><b>规则先行</b>：先用关键词规则做一版"伪摘要"（异常条数、涉及设备数），验证业务是否真需要，再决定是否上模型</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>「8 小时班次、37 条日志」→「本班 3 项异常、2 项待跟进」一句话讲清，交接效率质变。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">C4</div>
+          <div class="tt">图片存证「智能识别 + 检索」<span class="pill purple" style="margin-left:6px">后期规划 · AI</span></div>
+          <div class="tags"><span class="pill purple">需大模型</span><span class="pill amber">难度中</span></div>
+        </div>
+        <div class="fb">
+          <p>客户要求"上传照片 + 关键词搜索"。可再进一步：照片上传时<b>自动识别图内容</b>（是设备显示屏？模具照片？产品外观不良？），自动打标签、提取屏幕上的数字（机台号、参数值）；之后按内容检索——「找出所有含模具破损的照片」。</p>
+          <div class="lbl">事前可做的准备</div>
+          <ul>
+            <li><b>现在就能做的</b>：上传时让用户手动选一个「照片类型」标签（设备屏 / 模具 / 产品 / 其他），积累标注数据；同时保留人工关键词——人工标签即是未来模型的训练样本</li>
+            <li><b>预留接口</b>：存储层保留原图与可扩展的标签字段，后期接入识别服务时直接回填，不改上传流程</li>
+            <li><b>检索先可用</b>：先用"类型标签 + 关键词 + 时间 + 上传人"组合检索，解决"翻不出来"的主要痛点</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>解决"照片传了几千张，找的时候靠人翻"的死结。这也是客户原始需求里"关键词搜索"的升级版。</div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="card" id="s5">
+      <h2>五、D 类 · 交付与体验（我们独有的工程优势）</h2>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">D1</div>
+          <div class="tt">「大屏体检」自诊断页</div>
+          <div class="tags"><span class="pill blue">难度低</span><span class="pill green">省维护成本</span></div>
+        </div>
+        <div class="fb">
+          <p>一页看清系统健康状况：各数据源上次同步时间、数据是否滞后、接口失败率、报警规则是否被误配、有哪些配置项处于"待确认 / 未维护"状态（如某个料号还没配单价）。运维人员打开就能判断"今天的数据可不可信"。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>要求对全站配置与数据源有全局视图，客户是分散管理</li>
+            <li>能大幅减少"为什么大屏数字不对"的扯皮，上线后维护成本直线下降</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>演示时顺手展示，体现我们考虑到了<b>上线之后</b>的事——这通常能让技术负责人印象深刻。</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">D2</div>
+          <div class="tt">「一键情景演练」演示模式</div>
+          <div class="tags"><span class="pill blue">难度低</span><span class="pill green">演示神器</span></div>
+        </div>
+        <div class="fb">
+          <p>内置一个演示开关：一键让大屏进入"异常场景"——模拟某站积压、某机台次品飙升、某料号即将超期，屏幕立刻变红、弹窗、语音播报全链路走一遍。<b>不需要等真实异常发生</b>，开会时随时可以演示完整的报警闭环。</p>
+          <div class="lbl">为什么客户做不了</div>
+          <ul>
+            <li>需要预置可控的模拟数据层与场景剧本，属于演示工程的活儿</li>
+            <li>原型 <span class="kbd">wall.html</span> 已有「N1 多级报警演练」雏形，扩展为多场景即可</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>解决"演示时没有真实报警可看"的尴尬——每次汇报都能稳定演出高光时刻。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="s6">
+      <h2>六、后期规划 · AI 增强（现阶段先做数据准备）</h2>
+      <p class="lead">以下能力依赖大模型，<b>建议作为后期开发内容</b>。但落地的前置条件不是模型，而是数据——<b>现阶段可以先做数据侧的准备工作</b>，等模型接入时即可直接启用，不用回头返工。</p>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">AI1</div>
+          <div class="tt">「自然语言问数」Ask the Dashboard</div>
+          <div class="tags"><span class="pill purple">后期开发</span><span class="pill gold">壁垒最高</span><span class="pill green">惊艳度高</span></div>
+        </div>
+        <div class="fb">
+          <p>大屏右侧一个输入框，直接用中文提问：<i>「上周 PQFN 哪个机台次品最多」「本周 BGA 的 Earn 达标了吗」「BE_DT 站积压了多少」</i>。系统理解意图后自动取数、生成图表并给出结论，还能一键把结果<b>存为看板卡片</b>或<b>导出成邮件</b>。</p>
+
+          <div class="lbl">① 现阶段可做的准备（不用等模型）</div>
+          <ul>
+            <li><b>口径语义化（最关键的准备工作）</b>：把现有引擎里已经代码化的口径——周历（周六起始）、达标判定、料号两级单价、部门可见范围、WIP 判定——整理成一份<b>结构化的「指标字典」</b>：每个指标的名称、同义词、单位、计算公式、可用维度、数据来源。这是问数能力的核心资产，没有它模型也答不准。</li>
+            <li><b>问句样本收集</b>：请业务方列出 30–50 条他们最常问的问题（如"哪个站积压最多""这周还差多少"），作为后期模型测试集；同时可据此反推哪些指标最需要做。</li>
+            <li><b>结构化取数接口</b>：把"取某个指标、某个维度、某个时间窗"封装成统一的查询函数（引擎里已有大量此类函数，只需归一），后期模型只需生成"调用哪个函数、传什么参数"，而不直接写 SQL——<b>既安全又准确</b>。</li>
+            <li><b>权限对齐</b>：问数必须继承现有数据权限（带班只能问本部门），这个规则现在就要确认清楚。</li>
+          </ul>
+
+          <div class="lbl">② 前置条件（需客户确认）</div>
+          <ul>
+            <li><b>数据出网合规</b>：是否允许调用外部大模型服务；若不允许，需评估本地化部署模型的可行性（成本更高但数据不出厂）</li>
+            <li><b>准确度预期管理</b>：问数会有理解偏差，需明确"给的是参考结论，关键决策仍需人工核对"</li>
+          </ul>
+          <div class="why"><b>亮点点：</b>这是现场演示的<b>"必杀技"</b>——老板随口一问，屏幕立刻出图。传统系统做到这一步通常要几十万起步的 BI 投入。<b>建议：现阶段先把指标字典和样本问题做出来，作为后期开发的输入物交给客户评审。</b></div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">AI2</div>
+          <div class="tt">交接日志「智能摘要 + 待办提取」<span class="pill" style="margin-left:6px;background:#eef2f8;color:#5b6b7e">见 C3</span></div>
+          <div class="tags"><span class="pill purple">后期开发</span><span class="pill amber">难度中</span></div>
+        </div>
+        <div class="fb">
+          <p>把当班所有日志聚合成结构化摘要，并自动提取待办事项清单（详见 C3）。</p>
+          <div class="lbl">现阶段可做的准备</div>
+          <ul>
+            <li>日志字段结构化（类型 / 设备 / 严重度 / 是否延续）——<b>不依赖 AI，属于数据治理，现在就能做</b></li>
+            <li>先用关键词规则做一版"伪摘要"（异常条数、涉及设备数）验证业务价值，再决定是否上模型</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="fh">
+          <div class="no">AI3</div>
+          <div class="tt">图片存证「智能识别 + 检索」<span class="pill" style="margin-left:6px;background:#eef2f8;color:#5b6b7e">见 C4</span></div>
+          <div class="tags"><span class="pill purple">后期开发</span><span class="pill amber">难度中</span></div>
+        </div>
+        <div class="fb">
+          <p>上传时自动识别图片内容、打标签、OCR 提取屏幕数字，支持按内容检索（详见 C4）。</p>
+          <div class="lbl">现阶段可做的准备</div>
+          <ul>
+            <li>上传时增加「照片类型」人工标签（设备屏 / 模具 / 产品 / 其他）——<b>既立刻改善检索，又积累未来模型的训练样本</b></li>
+            <li>存储层保留可扩展标签字段，后期接入识别服务时直接回填，不改上传流程</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note amber">
+        <b>给客户的说明建议：</b>这三项不是"暂时不做"，而是"<b>分两步做</b>"——第一步（现阶段）把数据准备好、把规则跑通、把效果验证出来；第二步再接模型。这样客户看到的是稳健路线，而不是一个悬在空中的 AI 承诺，也避免"接了模型但数据一塌糊涂"导致项目失败。
+      </div>
+    </section>
+
+
+  </main>
+</div>
+
+<footer>
+  本清单基于现有演示原型（16 个页面 · OP / WIP / 次品三块真实数据大屏 + 平台底座 + 预警邮件组件 + 分析与归档）与客户 09-24 / 09-29 / 10-07 三次会议口径整理。<br>
+  筛选原则：只列客户自行开发困难或无法实现的能力，不含标准报表类功能。
+</footer>
+
+</body>
+</html>

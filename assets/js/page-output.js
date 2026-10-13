@@ -171,6 +171,15 @@
         ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} 报警判定已计入 WIP 抵扣：<strong>${esc(p.wip.spec)} ${p.wip.k}K</strong>
             （${p.wip.scope === 'all' ? '该工序全部' : '跟随筛选'} · 实时快照，不参与绘图）—— 判定口径 = (累计实际 + 在制) vs 累计目标</div>`
         : '';
+      /* BGA/LGA 走 I/O 加权口径（客户 IO 表：PKG_I/O × Unit ÷ 255），其余品类按颗数；
+         这里把该面板里两类口径的品类分别标出来，并说明目标已同步折算。 */
+      const ioIds = (p.ids || []).filter(id => opUsesIo(id));
+      const qtyIds = (p.ids || []).filter(id => !opUsesIo(id));
+      const ioTag = (isG && ioIds.length)
+        ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} <strong>数量口径</strong>：${ioIds.map(id => `<span class="chip" title="标准 I/O 当量 = 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})">${esc(id)} = 标准 I/O 当量</span>`).join(' ')}` +
+          `${qtyIds.length ? `　${qtyIds.map(id => esc(id) + ' = 颗数').join('、')}` : ''}` +
+          `　—— 周目标已按「料号产出结构 × 各料号 PKG_I/O」加权同步折算（金额 Earn 随之按 I/O 当量 × 单价折算）；PKG_CODE / PKG_I/O 由客户在 <a href="op-config.html">OP 配置页 · ④ 料号 I/O 维护</a> 配置${week.byType[ioIds[0]] && week.byType[ioIds[0]].ioConfigured === false ? '，<b style="color:var(--warn)">当前尚未配置 PKG_I/O，实际等同颗数</b>' : ''}</div>`
+        : '';
       return `<div class="card op-chart-card">
           <div class="card-head">
             <div class="card-title">${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K）' : '累计 Earn 目标 vs 实际（万元）'}
@@ -178,7 +187,7 @@
             <div class="legend">${p.series.map(legendItem).join('')}
               ${p.redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
           </div>
-          <div class="card-body">${wipTag}<div id="pc_${esc(p.key)}"></div></div>
+          <div class="card-body">${ioTag}${wipTag}<div id="pc_${esc(p.key)}"></div></div>
         </div>`;
     };
 
@@ -210,7 +219,7 @@
             <div class="fi">
               <label class="field-label">图表视图</label>
               <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（数量 / 金额）四张图；单部门：当前视角部门上下两张图">
-                <button data-v="dual" class="${isDual ? 'active' : ''}">双部门 2×2</button>
+                <button data-v="dual" class="${isDual ? 'active' : ''}">BE</button>
                 <button data-v="single" class="${isDual ? '' : 'active'}">单部门</button>
               </div>
             </div>

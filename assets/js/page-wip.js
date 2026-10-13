@@ -42,6 +42,9 @@
   const selTypes = () => { const ok = typeSel.filter(t => ALL_TYPES.includes(t)); return ok.length ? ok : ALL_TYPES; };
   const saveSel = () => store.set('wip_types', typeSel);
 
+  /* ---------------- 工序流转视图状态（来源 NONLEAD.xlsx） ---------------- */
+  let flowType = store.get('wip_flow', 'BGA'); // 流转路径所选封装类型（BGA / PQFN / QFN / FCCSP），横向展示在热力矩阵上方
+
   /* ---------------- 聚合 ----------------
      每个工序：按品类数量 / 金额、批次数、Hold、OTD 逾期 */
   function stepAgg() {
@@ -95,6 +98,7 @@
     const heatRows = steps.slice(0, 16);
 
     document.getElementById('content').innerHTML = `
+      <div id="wipMain">
       <div class="notice mt16">
         ${icon('database', 17)} <strong>真实数据</strong> · 来源客户 IT 导出《${esc(m.source || 'BE1 WIP Report-V26.xls')}》在制品快照 ·
         共 <strong>${(m.lots || rows.length).toLocaleString('en-US')}</strong> 批 · 合计 <strong>${fmtVal((m.totalQty || 0) / 1000)}K</strong> ·
@@ -130,6 +134,8 @@
         </div>
       </div>
 
+      <div id="wipFlow"></div>
+
       <div class="grid g-23 mt16">
         <section class="card">
           <div class="card-head"><div class="card-title">${icon('grid', 19)} 工序 × PKG Type 热力矩阵
@@ -154,7 +160,8 @@
             <span class="tk-step">${esc(r[0])}</span><span>${typeName(r[1])} · ${fmtVal(r[7] / 1000)}K</span></span>`).join('')}</div></div>`
         : '<div class="small muted">当前无 Hold 批次。</div>'}
         </div>
-      </section>`;
+      </section>
+      </div>`;
 
     /* KPI 数字滚动 */
     countUp(document.getElementById('kTotal'), unit === 'K' ? g.qty / 1000 : g.earn, 1, unitLabel());
@@ -178,6 +185,9 @@
     renderHeat(heatRows, steps);
     renderRank(steps);
     startPatrol(steps);
+
+    /* 工序流转路径（横向）渲染在热力矩阵上方 */
+    renderFlow();
   }
 
   /* ---------------- 热力矩阵 ---------------- */
@@ -278,6 +288,113 @@
     }, 3500);
   }
 
+  /* =====================================================================
+     工序流转视图（来源《NONLEAD.xlsx》BGA / PQFN / QFN / FCCSP）
+     竖向工序链：按流程一步步下来；末行多去处 → 二级联动（一级=去处汇总，二级=各去处明细）
+     ===================================================================== */
+  function flowWipOf(code) {
+    return rows.filter(r => r[0] === code && r[1] === flowType);
+  }
+  function flowQty(code) {
+    const rs = flowWipOf(code);
+    return { q: rs.reduce((a, r) => a + r[7], 0) / 1000, n: rs.length };
+  }
+  function flowNode(code, name, m, isEnd) {
+    const hot = m.q >= 50;
+    return `<div class="fl-node" data-step="${esc(code)}" title="进入 ${esc(code)} WIP 明细">
+        <div class="fl-node-body ${hot ? 'hot' : ''}">
+          <div class="fl-code">${esc(code)}</div>
+          <div class="fl-name">${esc(name)}</div>
+          <div class="fl-qrow"><span class="fl-q">${fmtVal(m.q)}K</span><span class="fl-n">${m.n} 批</span></div>
+        </div>
+        ${isEnd ? '' : '<div class="fl-arrow"></div>'}
+      </div>`;
+  }
+  function renderFlow() {
+    const flow = (typeof WIP_FLOW_DATA !== 'undefined' && WIP_FLOW_DATA[flowType]) || null;
+    const el = document.getElementById('wipFlow');
+    if (!flow) { el.innerHTML = '<div class="notice mt16">未找到流转路径数据（wip-flow-data.js）。</div>'; return; }
+    const stepName = c => (window.WIP_FLOW_STEP && WIP_FLOW_STEP[c]) || c;
+    const isCascade = flow.to.length > 1;
+
+    const chain = flow.steps.map(code => flowNode(code, stepName(code), flowQty(code), false)).join('');
+
+    let terminal, leavesRow = '';
+    if (isCascade) {
+      const tot = flow.to.reduce((a, c) => a + flowQty(c).q, 0);
+      const totN = flow.to.reduce((a, c) => a + flowQty(c).n, 0);
+      const leaves = flow.to.map(c => {
+        const m = flowQty(c);
+        return `<div class="fl-leaf" data-step="${esc(c)}" title="进入 ${esc(c)} WIP 明细">
+            <div class="fl-leaf-code">${esc(c)}</div>
+            <div class="fl-leaf-name">${esc(stepName(c))}</div>
+            <div class="fl-leaf-q">${fmtVal(m.q)}K</div>
+            <div class="fl-leaf-n">${m.n} 批</div>
+          </div>`;
+      }).join('');
+      terminal = `<div class="fl-branch" id="flBranch">
+          <div class="fl-branch-head" id="flBranchHead" title="点击展开 / 收起去处明细">
+            <div class="fl-branch-label"><span class="fl-branch-ico"></span> 去处分流 <span class="fl-tag">二级联动</span></div>
+            <div class="fl-branch-meta">分流向 <b>${flow.to.length}</b> 个去处 · <b>${fmtVal(tot)}K</b> · ${totN} 批
+              <span class="fl-chev" id="flChev"></span></div>
+          </div>
+        </div>`;
+      leavesRow = `<div class="fl-leaves" id="flLeaves" hidden><span class="fl-leaves-tag">去处明细（二级）</span>${leaves}</div>`;
+    } else {
+      const c = flow.to[0];
+      terminal = flowNode(c, stepName(c) + '（去处）', flowQty(c), true);
+    }
+
+    const typeBtns = Object.keys(WIP_FLOW_DATA).map(t =>
+      `<button class="chip ${t === flowType ? '' : 'muted'}" data-ft="${t}" style="cursor:pointer;${t === flowType ? 'border-color:#0b6a86;color:#0b6a86;font-weight:700' : ''}">${esc(t)}</button>`).join('');
+
+    el.innerHTML = `
+      <div class="card mt16">
+        <div class="card-head">
+          <div class="card-title">${icon('activity', 19)} ${esc(flow.name)} 工序流转路径
+            <span class="card-sub">来源《NONLEAD.xlsx》· <b>从左到右</b>按流程一步步下来 · 叠加真实在制量（wip-real-data.js）· 点击任意节点进入该工序 WIP 明细 · 末行多去处即「二级联动」</span></div>
+          <div class="flex gap8 flex-wrap">${typeBtns}</div>
+        </div>
+        <div class="card-body fl-wrap">
+          <div class="fl-scroll">
+            <div class="fl-chain">
+              ${chain}
+              ${terminal}
+            </div>
+            ${leavesRow}
+          </div>
+          <div class="fl-legend">
+            <div class="fl-legend-title">${icon('info', 15)} 说明</div>
+            <ul>
+              <li><strong>横向链条</strong>（从左到右）= 该封装类型「按流程一步步下来」的工序顺序；链条较长时可左右滚动。</li>
+              <li>每个节点显示<strong>真实在制量</strong>（K / 批），点击进入对应工序的二级 WIP 筛选。</li>
+              <li><strong>二级联动</strong>：末行「去处分流」含多个去处时，点击该节点在下方展开各去处的在制明细（再点收起）。</li>
+              <li>PQFN 末行为单一去处（BE_MT），无需展开。</li>
+            </ul>
+          </div>
+        </div>
+      </div>`;
+
+    el.querySelectorAll('[data-ft]').forEach(b => {
+      b.onclick = () => { flowType = b.dataset.ft; store.set('wip_flow', flowType); renderFlow(); };
+    });
+    el.querySelectorAll('[data-step]').forEach(n => {
+      n.onclick = () => { if (n.closest('#flBranchHead')) return; openDrawer(n.dataset.step); };
+    });
+    const bh = el.querySelector('#flBranchHead');
+    const lv = el.querySelector('#flLeaves');
+    const ch = el.querySelector('#flChev');
+    const br = el.querySelector('#flBranch');
+    if (bh && lv) {
+      bh.onclick = () => {
+        const open = lv.hidden;
+        lv.hidden = !open;
+        if (ch) ch.classList.toggle('open', open);
+        if (br) br.classList.toggle('open', open);
+      };
+    }
+  }
+
   /* ---------------- 工具 ---------------- */
   function hexRGB(h) {
     const n = parseInt(h.slice(1), 16);
@@ -297,7 +414,7 @@
 
   function openDrawer(step) {
     try {
-      dr = { step, types: selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, kw: '', sort: 'otd', page: 1 };
+      dr = { step, types: selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, thawOnly: false, kw: '', sort: 'otd', page: 1 };
       buildDrawer();
       document.getElementById('wipMask').classList.add('open');
       document.getElementById('wipDrawer').classList.add('open');
@@ -319,6 +436,7 @@
       && (!dr.loc || r[9] === dr.loc)
       && (!dr.bank || r[15] === dr.bank)
       && (!dr.holdOnly || r[13] > 0)
+      && (!dr.thawOnly || (typeof CompoundThaw !== 'undefined' && CompoundThaw.of(r[6], Date.now()).status === 'overtime'))
       && (!kw || (r[6] + ' ' + r[4] + ' ' + r[3] + ' ' + r[5]).toLowerCase().includes(kw)));
     const cmp = {
       otd: (a, b) => (a[12] == null ? 1e9 : a[12]) - (b[12] == null ? 1e9 : b[12]),
@@ -337,6 +455,7 @@
     const earn = list.reduce((a, r) => a + r[7] * priceOfSub(r[1], r[3]) / 10000, 0);
     const hold = list.filter(r => r[13] > 0).length;
     const otd = list.filter(r => r[12] != null && r[12] < 0).length;
+    const thawN = (typeof CompoundThaw !== 'undefined') ? list.filter(r => CompoundThaw.of(r[6], Date.now()).status === 'overtime').length : 0;
     const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     if (dr.page > pages) dr.page = pages;
     const view = list.slice((dr.page - 1) * PAGE_SIZE, dr.page * PAGE_SIZE);
@@ -355,12 +474,18 @@
         <div>
           <div class="wd-title">${icon('layers', 20)} 工序详情 · <code>${esc(dr.step)}</code>
             ${hold ? `<span class="chip" style="color:var(--danger);border-color:#f3c2bf">Hold ${hold}</span>` : ''}
-            ${otd ? `<span class="chip" style="color:var(--danger);border-color:#f3c2bf">OTD 逾期 ${otd}</span>` : ''}</div>
+            ${otd ? `<span class="chip" style="color:var(--danger);border-color:#f3c2bf">OTD 逾期 ${otd}</span>` : ''}
+            ${thawN ? `<span class="chip chip-demo" title="演示补充能力 · 非客户初始需求">⚠ 解冻超时 ${thawN}（演示）</span>` : ''}</div>
           <div class="wd-sub">二级界面 · 按自定义条件筛选 WIP · 单价随 OP 配置联动（Earn 万元 = 颗 × 元/粒 ÷ 10000）</div>
         </div>
         <button class="btn btn-sm" id="wdClose">${icon('close', 16)} 关闭</button>
       </div>
       <div class="wd-body">
+        <div class="thaw-demo-note" style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin:2px 0 12px;padding:10px 14px;border:1.5px dashed #e0a94e;border-radius:10px;background:#fff8ec;color:#8a5410;font-size:13px;line-height:1.7">
+          ${icon('info', 15)} <b style="color:#7a4a0e">演示补充能力 · 非客户初始需求</b>
+          <span class="chip chip-demo" style="margin:0 6px">需向客户特别说明</span>
+          <span>「塑封料解冻」列（含「仅看解冻超时」筛选与 ⚠ 解冻超时计数）为我方本次演示增强，数据源由模拟的 <code style="font-family:ui-monospace,Consolas,monospace;font-size:12px">CompoundThaw</code> 提供，用于向客户演示「物料解冻超时 → WIP 在制滞留」的关联思路；<b style="color:#7a4a0e">不属原《OneBE 添加交接信息》WIP 需求范围</b>，演示时请明确区分真实数据与演示数据。</span>
+        </div>
         <div class="wd-filters">
           <span class="small muted" style="font-weight:700">pkg type</span>${ALL_TYPES.map(chip).join('')}
           <select id="fSize"><option value="">PKG SIZE 全部</option>${sizes.map(s => `<option ${dr.size === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
@@ -368,6 +493,7 @@
           <select id="fLoc"><option value="">机台/位置全部</option>${locs.map(s => `<option ${dr.loc === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
           <select id="fBank"><option value="">Bank 全部</option>${banks.map(s => `<option ${dr.bank === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
           <button class="chip ${dr.holdOnly ? '' : 'muted'}" id="fHold" style="cursor:pointer;${dr.holdOnly ? 'color:var(--danger);border-color:#f3c2bf;font-weight:700' : ''}">仅看 Hold</button>
+          <button class="chip chip-demo ${dr.thawOnly ? 'on' : ''}" id="fThaw" style="cursor:pointer" title="演示补充能力 · 非客户初始需求">仅看解冻超时 · 演示</button>
           <input type="text" id="fKw" placeholder="搜索批次 / 器件 / 料号 / 产品族…" value="${esc(dr.kw)}" style="width:210px">
         </div>
 
@@ -405,13 +531,19 @@
           <table class="table wdt" style="width:100%;border:0;min-width:980px">
             <thead><tr><th>批次号</th><th>PKG Type</th><th>尺寸</th><th>封装料号</th><th>器件</th>
               <th class="num">数量</th><th>机台/位置</th><th class="num">BE CT(天)</th><th class="num">ASSY CT(天)</th>
-              <th class="num">OTD 余量(天)</th><th>Hold</th><th>Bank</th><th>线材</th></tr></thead>
+              <th class="num">OTD 余量(天)</th><th>Hold</th><th>塑封料解冻 <span class="tag-hint warn">演示</span></th><th>Bank</th><th>线材</th></tr></thead>
             <tbody>${view.map(r => {
               const ct = r[10], otdV = r[12];
               const ctCls = ct != null && ct >= alarmCfg.ctR ? 'r2' : (ct != null && ct >= alarmCfg.ctY ? 'r1' : '');
               const rowCls = (ct != null && ct >= alarmCfg.ctR) || (otdV != null && otdV <= alarmCfg.otd && otdV < 0) ? 'al-red'
                 : (ct != null && ct >= alarmCfg.ctY ? 'al-yel' : '');
-              return `<tr class="${rowCls}">
+              const tw = (typeof CompoundThaw !== 'undefined') ? CompoundThaw.of(r[6], Date.now()) : { status: 'ready', matLot: '—', start: 0, ready: 0, overtime: 0 };
+              const twTag = tw.status === 'ready' ? `<span style="color:#0b8a5a;font-weight:700">已解冻</span>`
+                : tw.status === 'thawing' ? `<span style="color:#1d4ed8">解冻中</span>`
+                : `<span style="color:#b45309;font-weight:700">⚠ 解冻超时 ${tw.overtime}h</span>`;
+              const twTitle = `物料批号 ${tw.matLot} · 解冻开始 ${CompoundThaw.hhmm(tw.start)} · 预计就绪 ${CompoundThaw.hhmm(tw.ready)}${tw.status === 'overtime' ? ' · 已超时 ' + tw.overtime + ' 小时' : ''} · 演示补充数据`;
+              const extraStyle = tw.status === 'overtime' ? 'box-shadow: inset 3px 0 0 #b45309;' : '';
+              return `<tr class="${rowCls}" style="${extraStyle}">
                 <td style="font-family:ui-monospace,Consolas,monospace">${esc(r[6])}</td>
                 <td><span style="color:${TYPE_COLOR[r[1]] || 'var(--text-3)'};font-weight:700">${esc(typeName(r[1]))}</span></td>
                 <td>${esc(r[2]) || '—'}</td>
@@ -423,8 +555,14 @@
                 <td class="num">${r[11] == null ? '—' : r[11].toFixed(1)}</td>
                 <td class="num ${otdV != null && otdV < 0 ? 'otd-bad' : ''}">${otdV == null ? '—' : otdV.toFixed(1)}</td>
                 <td>${r[13] > 0 ? `<span class="chip" style="color:var(--danger);border-color:#f3c2bf">${r[13]} 天</span>` : '<span class="muted small">—</span>'}</td>
+                <td title="${twTitle}">
+                  <div>${twTag}</div>
+                  <div class="muted small" style="margin-top:3px;font-family:ui-monospace,Consolas,monospace;line-height:1.45">
+                    开始 ${CompoundThaw.hhmm(tw.start)}<br>结束 ${CompoundThaw.hhmm(tw.ready)}
+                  </div>
+                </td>
                 <td>${esc(r[15])}</td><td>${esc(r[16]) || '—'}</td></tr>`;
-            }).join('') || '<tr><td colspan="13" class="center muted" style="padding:26px">当前筛选条件下无批次。</td></tr>'}</tbody>
+            }).join('') || '<tr><td colspan="14" class="center muted" style="padding:26px">当前筛选条件下无批次。</td></tr>'}</tbody>
           </table>
         </div>
 
@@ -454,6 +592,7 @@
     };
     bind('#fSize', 'size'); bind('#fOutline', 'outline'); bind('#fLoc', 'loc'); bind('#fBank', 'bank'); bind('#fSort', 'sort');
     drawer.querySelector('#fHold').onclick = () => { dr.holdOnly = !dr.holdOnly; dr.page = 1; buildDrawer(); };
+    drawer.querySelector('#fThaw').onclick = () => { dr.thawOnly = !dr.thawOnly; dr.page = 1; buildDrawer(); };
     let kwTimer = null;
     const kwEl = drawer.querySelector('#fKw');
     kwEl.oninput = () => {
@@ -473,9 +612,10 @@
     const ex = drawer.querySelector('#wdExport');
     if (ex) ex.onclick = () => {
       const headers = ['批次号', 'PKG Type', 'PKG SIZE', '封装料号', '器件', '产品族', '数量(颗)', 'Qty by I/O', '机台/位置',
-        'BE_CT(天)', 'ASSY_CT(天)', 'OTD余量(天)', 'Hold(天)', 'Hold原因', 'Bank', '线材', 'DC'];
+        'BE_CT(天)', 'ASSY_CT(天)', 'OTD余量(天)', 'Hold(天)', 'Hold原因', '塑封料解冻(演示补充)', 'Bank', '线材', 'DC'];
       const rs = drRows();
-      exportExcel('WIP_' + dr.step + '_在制明细.xls', headers, rs.map(r => [r[6], r[1], r[2], r[3], r[4], r[5], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17]]));
+      const thawLabel = r => { const t = CompoundThaw.of(r[6], Date.now()); return t.status === 'ready' ? '已解冻' : t.status === 'thawing' ? '解冻中' : '解冻超时' + t.overtime + 'h'; };
+      exportExcel('WIP_' + dr.step + '_在制明细.xls', headers, rs.map(r => [r[6], r[1], r[2], r[3], r[4], r[5], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], thawLabel(r), r[15], r[16], r[17]]));
       toast('已导出 ' + rs.length + ' 批明细（' + dr.step + '）', 'success');
     };
     drawer.querySelector('#pgPrev').onclick = () => { if (dr.page > 1) { dr.page--; buildDrawer(); } };

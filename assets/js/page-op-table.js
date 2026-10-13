@@ -164,17 +164,6 @@
         </div>
       </div>
 
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('alert', 19)} 异常报警 · 周维度（${focusLabel}）
-            <span class="card-sub">差额比对 · 阈值逐 PKG Type 独立配置 · 逐品类列出累计、报警天数与当前阈值</span></div>
-          ${redTypes.length ? `<span class="chip chip-danger">${icon('alert', 14)} ${redTypes.length} 类红灯</span>` : (warnTypes.length ? `<span class="chip">${icon('alert', 14)} ${warnTypes.length} 类黄灯</span>` : '<span class="chip">本周无报警</span>')}
-        </div>
-        <div class="card-body" style="max-height:360px;overflow:auto">
-          ${renderAlarmTable(ids, wipKOf)}
-        </div>
-      </div>
-
       <div class="card mt16 no-print">
         <div class="card-head"><div class="card-title">${icon('alert', 19)} 口径说明
           <span class="card-sub">待客户确认项</span></div></div>
@@ -183,6 +172,7 @@
             <li><strong>目标(累计)</strong>：每周第一天填「一周总目标」，系统均摊到每天并以<strong>累计值</strong>逐日展示（示例 3,680 → 526、1,051、1,577…3,680）。</li>
             <li><strong>实际(累计)</strong>：由 IT 数据库定时获取（当前为确定性演示样例，库表 / 刷新频率待 IT 确认）。</li>
             <li><strong>异常判定</strong>：每日 <strong>(累计实际 + 在制 WIP)</strong> vs 累计目标的差额，阈值<strong>逐个 PKG Type 独立配置</strong>（当前 ${opAlarmText(ids)}），在 <a href="op-config.html">OP 配置页 · ① PKG Type 维护</a> 中逐项维护。</li>
+            <li><strong>BGA/LGA 的 I/O 加权口径（与其它品类不同）</strong>：客户《NONLEAD.xlsx》IO sheet 中 <strong>PKG_CODE</strong>（封装代码）与 <strong>PKG_I/O</strong>（I/O 数）<strong>均由客户自行配置</strong>，原始式为「实际结果 = PKG_I/O × Unit（实际数量）÷ ${OP_IO_BASE}」。因此本表中 <strong>BGA/LGA 的目标与实际一律折算成「标准 I/O 当量」= 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})</strong>，<strong>周目标同步按「料号产出结构 × 各料号 PKG_I/O」加权系数折算</strong>，保证两者同量纲可比；QFN / PQFN / FCCSP 仍按<strong>颗数</strong>。映射关系在 <a href="op-config.html">OP 配置页 · ④ 料号 I/O 维护</a> 维护，未配 PKG_I/O 的料号按品类加权系数兜底（一个都没配时等同颗数）。</li>
             <li><strong>WIP 抵扣（10-08 客户口径）</strong>：在制 WIP 是<strong>实时快照</strong>（《BE1 WIP Report-V26.xls》，无逐日历史），<strong>不画进图表</strong>，只在报警判定时计入 —— 判定口径 = (累计实际 + WIP) vs 累计目标，即「已产出 + 在制」能否覆盖目标。工序、PKG Type 口径与是否剔除 Hold 在 <a href="op-config.html">OP 配置页 · ④ 报警判定 WIP</a> 配置${wipAggK ? `；当前视角下抵扣 <strong>${wipAggK}K</strong>` : '；当前未启用或未选中工序，抵扣 0'}。表格单元格仍显示<strong>纯累计实际</strong>（对账用），WIP 只影响红/黄着色与「超 / 警」角标。</li>
             <li><strong>FE 实际(累计)</strong>：预留扩展行，口径待定；<strong>Earn</strong> 由单价 × 累计实际换算（万元）。</li>
             <li>周目标、价格、报警阈值、刷新频率、夏令时等均可在 <a href="op-config.html">OP 配置页</a> 调整。</li>
@@ -251,9 +241,16 @@
         return `<td class="${cls} ${i === todayIdx ? 'is-today' : ''}${focusCls(i)}">${v}${flag}</td>`;
       }).join('');
       const feCells = `<td colspan="7" class="cell-fe">—（预留扩展行 · FE total）</td>`;
+      /* BGA/LGA 走 I/O 加权口径（客户 IO 表：PKG_I/O × Unit ÷ 255），其余品类按颗数 */
+      const ioBadge = t.ioMode
+        ? `<span class="tag-flag" title="标准 I/O 当量 = 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})；周目标已按料号 I/O 结构同步折算${t.ioConfigured ? '' : '；当前尚未配置 PKG_I/O，实际等同颗数'}">I/O 口径${t.ioConfigured ? '' : '（待配置）'}</span>`
+        : '';
+      const ioMeta = t.ioMode
+        ? `<div class="small muted" style="margin-top:2px">口径：标准 I/O 当量（颗数 × PKG_I/O ÷ ${OP_IO_BASE}）· 加权系数 ${t.ioFactor == null ? '—' : Number(t.ioFactor).toFixed(3)}${t.qtyWeekGoal != null ? ` · 原颗数口径 周目标 ${t.qtyWeekGoal}K` : ''}</div>`
+        : '';
       return `
         <tr class="row-goal">
-          <td class="lbl"><span class="pt-dot" style="background:${info.color || '#1d4ed8'}"></span><strong>${esc(id)}</strong>${meta}</td>
+          <td class="lbl"><span class="pt-dot" style="background:${info.color || '#1d4ed8'}"></span><strong>${esc(id)}</strong>${ioBadge}${meta}${ioMeta}</td>
           <td class="lbl goal-num">目标(累计)</td>${goalCells}
         </tr>
         <tr class="row-total">

@@ -5,6 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WIP 在制品看板 · 统一监控与交接中心</title>
 <link rel="stylesheet" href="assets/css/style.css?v=20261008r">
+<style>
+  /* ===== WIP · 工序流转路径（横向，页面专属，不污染全局 style.css） ===== */
+  .fl-wrap{ display:block; }
+  .fl-scroll{ overflow-x:auto; overflow-y:visible; padding:2px 2px 8px; }
+  .fl-chain{ display:flex; flex-direction:row; align-items:stretch; flex-wrap:nowrap; min-width:max-content; }
+  .fl-node{ display:flex; flex-direction:row; align-items:center; flex:0 0 auto; cursor:pointer; }
+  .fl-node-body{ width:152px; padding:9px 10px; border:1px solid var(--border); border-radius:11px; background:var(--surface);
+    text-align:center; box-shadow:0 1px 2px rgba(16,24,40,.04); transition:transform .12s, border-color .12s, box-shadow .12s; }
+  .fl-node:hover .fl-node-body{ border-color:#0b6a86; transform:translateY(-2px); box-shadow:0 5px 16px rgba(11,106,134,.14); }
+  .fl-node-body.hot{ border-color:#e0a94e; background:#fff8ec; }
+  .fl-code{ font-family:ui-monospace,Consolas,monospace; font-weight:700; font-size:13.5px; color:var(--text-1);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fl-name{ font-size:11.5px; color:var(--text-3); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fl-qrow{ display:flex; align-items:baseline; justify-content:center; gap:7px; margin-top:5px; }
+  .fl-q{ font-size:17px; font-weight:800; color:#0b6a86; }
+  .fl-n{ font-size:11.5px; color:var(--text-3); }
+  .fl-arrow{ flex:0 0 auto; width:30px; height:2px; background:linear-gradient(90deg,var(--border),#0b6a86);
+    position:relative; margin:0 2px; align-self:center; }
+  .fl-arrow::after{ content:""; position:absolute; right:-1px; top:50%; transform:translateY(-50%);
+    border-left:7px solid #0b6a86; border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+  .fl-branch{ flex:0 0 auto; display:flex; align-items:center; }
+  .fl-branch-head{ width:196px; padding:11px 12px; border:1.5px dashed #0b6a86; border-radius:11px; background:#eef7fa;
+    cursor:pointer; text-align:center; transition:box-shadow .15s, background .15s; }
+  .fl-branch.open .fl-branch-head{ background:#e2f2f7; box-shadow:0 0 0 3px rgba(11,106,134,.14); }
+  .fl-branch-label{ font-weight:800; font-size:13px; color:#0b6a86; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .fl-branch-ico{ width:14px; height:14px; border:2px solid #0b6a86; border-radius:50%; position:relative; }
+  .fl-branch-ico::before, .fl-branch-ico::after{ content:""; position:absolute; top:50%; width:9px; height:2px; background:#0b6a86; }
+  .fl-branch-ico::before{ left:11px; transform:rotate(28deg); transform-origin:left; }
+  .fl-branch-ico::after{ left:11px; transform:rotate(-28deg); transform-origin:left; }
+  .fl-tag{ font-size:11px; font-weight:700; color:#fff; background:#8b5cf6; border-radius:6px; padding:1px 7px; }
+  .fl-branch-meta{ font-size:11.5px; color:var(--text-3); margin-top:4px; display:flex; align-items:center; justify-content:center; gap:5px; }
+  .fl-chev{ display:inline-block; width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent;
+    border-top:6px solid var(--text-3); transition:transform .18s; }
+  .fl-chev.open{ transform:rotate(180deg); }
+  .fl-leaves{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; justify-content:flex-end;
+    padding:10px 10px 8px; margin-top:6px; border:1.5px dashed #0b6a86; border-radius:11px; background:#f5fbfd; min-width:max-content; }
+  .fl-leaves[hidden]{ display:none; }
+  .fl-leaves-tag{ font-size:11.5px; font-weight:700; color:#0b6a86; background:#fff; border:1px solid #bfe0ea;
+    border-radius:7px; padding:4px 9px; align-self:center; margin-right:auto; white-space:nowrap; }
+  .fl-leaf{ width:98px; padding:8px 6px; border:1px solid var(--border); border-radius:9px; background:var(--surface);
+    text-align:center; cursor:pointer; transition:transform .12s, border-color .12s; }
+  .fl-leaf:hover{ border-color:#0b6a86; transform:translateY(-1px); }
+  .fl-leaf-code{ font-family:ui-monospace,Consolas,monospace; font-weight:700; font-size:12px; color:var(--text-1); }
+  .fl-leaf-name{ font-size:11px; color:var(--text-3); margin-top:1px; min-height:14px; }
+  .fl-leaf-q{ font-size:14px; font-weight:800; color:#0b6a86; margin-top:3px; }
+  .fl-leaf-n{ font-size:11px; color:var(--text-3); }
+  .fl-legend{ margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 16px; }
+  .fl-legend-title{ font-weight:700; font-size:13.5px; display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .fl-legend ul{ margin:0; padding-left:18px; }
+  .fl-legend li{ font-size:12.5px; color:var(--text-3); line-height:1.85; }
+</style>
 </head>
 <body data-page="wip">
 <div class="layout">
@@ -14,11 +65,14 @@
     <main class="content" id="content"></main>
   </div>
 </div>
-<script src="assets/js/common.js?v=20261009f"></script>
+<script src="assets/js/common.js?v=20261013c"></script>
 <script src="assets/js/data.js?v=20261008r"></script>
 <script src="assets/js/wip-real-data.js?v=20261008r"></script>
-<script src="assets/js/output-core.js?v=20261009b"></script>
+<script src="assets/js/io-real-data.js?v=20261013a"></script>
+<script src="assets/js/output-core.js?v=20261013a"></script>
+<script src="assets/js/compound-thaw.js?v=20261010c"></script>
+<script src="assets/js/wip-flow-data.js?v=20261013a"></script>
 <!-- wip-viz.js（动态可视化 5 方案）已于 2026-10-08 整块下线，不再引用；文件保留作历史参考 -->
-<script src="assets/js/page-wip.js?v=20261008r"></script>
+<script src="assets/js/page-wip.js?v=20261013e"></script>
 </body>
 </html>

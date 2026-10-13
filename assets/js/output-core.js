@@ -113,6 +113,104 @@ function opSubRatios(typeId, types) {
   return m;
 }
 
+/* =========================================================================
+   料号 I/O 加权口径（BGA/LGA 专有 —— 计算方法与其他 PKG Type 不同）
+   -------------------------------------------------------------------------
+   客户《NONLEAD.xlsx》IO sheet：实际结果 = PKG_I/O × Unit（实际数量）÷ 255
+     · PKG_I/O：该封装料号的 I/O（焊球 / 引脚）数，**由客户自行配置**
+     · PKG_CODE：客户封装代码，**由客户自行配置**
+     · 恒为 BGA / LGA 两类 → 对应 OP 的 PKG Type「BGA/LGA」（OP 里 BGA 与 LGA 合并计量）
+   因此 OP 大屏里 BGA/LGA 的产出、目标统一折算成「标准 I/O 当量」：
+       I/O 当量 = 颗数 × (PKG_I/O ÷ 255)
+   而 QFN / PQFN / FCCSP **仍按颗数**计量，口径不同（图上会分别标注）。
+   料号 ↔ (PKG_CODE, PKG_I/O) 的映射在 OP 配置页「④ 料号 I/O 维护」由客户维护；
+   一个料号都没配时回落系数 1.0（即等同颗数口径），并在界面上给出醒目提示。
+   ========================================================================= */
+
+/* 走 I/O 加权口径的 PKG Type（其余品类仍按颗数） */
+const OP_IO_TYPES = ['BGA/LGA'];
+/* 折算基数：客户 IO 表中固定 255（由 io-real-data.js 带出） */
+const OP_IO_BASE = (typeof IO_REAL_DATA !== 'undefined' && IO_REAL_DATA && IO_REAL_DATA.base) ? Number(IO_REAL_DATA.base) || 255 : 255;
+function opUsesIo(typeId) { return OP_IO_TYPES.indexOf(typeId) >= 0; }
+/* 客户 IO 表候选池（PKG_CODE + PKG_I/O），配置页「一键带入」用 */
+function opIoCandidates() {
+  if (typeof IO_REAL_DATA === 'undefined' || !IO_REAL_DATA) return [];
+  return (IO_REAL_DATA.codes || []).map(c => ({ pkg: c.pkg, code: c.code, io: c.io }));
+}
+
+/* 料号 I/O 配置：{ 'BGA/LGA': [{ sub:'98ASA00081D', code:'5289', io:225 }, ...] } */
+const OP_IO_STORE = {
+  KEY: 'op_io_map',
+  raw() {
+    const v = store.get('op_io_map', null);
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    return v;
+  },
+  /* 某品类的配置数组，字段容错补齐；从未配置时返回 [] */
+  all(typeId) {
+    const r = this.raw();
+    if (!r || !Array.isArray(r[typeId])) return [];
+    return r[typeId].map(x => ({
+      sub: String(x && x.sub != null ? x.sub : '').trim(),
+      code: x && x.code != null ? String(x.code).trim() : '',
+      io: x && x.io != null && x.io !== '' && isFinite(Number(x.io)) ? Number(x.io) : null
+    })).filter(x => x.sub);
+  },
+  /* 料号 → {code, io} 映射表 */
+  map(typeId) {
+    const m = {};
+    this.all(typeId).forEach(x => { m[x.sub] = { code: x.code, io: x.io }; });
+    return m;
+  },
+  save(typeId, list) {
+    const r = this.raw() || {};
+    r[typeId] = (list || []).filter(x => x && String(x.sub || '').trim())
+      .map(x => ({ sub: String(x.sub).trim(), code: x.code == null ? '' : String(x.code).trim(), io: (x.io === '' || x.io == null || !isFinite(Number(x.io))) ? null : Number(x.io) }));
+    store.set('op_io_map', r);
+    opAlarmCacheClear();
+  },
+  reset(typeId) {
+    const r = this.raw() || {};
+    delete r[typeId];
+    store.set('op_io_map', r);
+    opAlarmCacheClear();
+  },
+  /* 该品类是否已配 I/O（至少一个料号配了有效 PKG_I/O） */
+  configured(typeId) {
+    return this.all(typeId).some(x => x.io != null && x.io > 0);
+  }
+};
+
+/* 单料号 I/O 折算系数 = PKG_I/O ÷ 255；未配置返回 null */
+function opIoFactorOf(typeId, subId) {
+  if (!opUsesIo(typeId)) return null;
+  const rec = OP_IO_STORE.map(typeId)[subId];
+  if (!rec || rec.io == null || !(rec.io > 0)) return null;
+  return rec.io / OP_IO_BASE;
+}
+
+/* 品类级加权系数（用于把周目标从「颗数」折算成「I/O 当量」）：
+   按料号产出结构占比对各料号系数加权平均；未配料号按已配料号的加权均值兜底。
+   一个料号都没配 → 返回 null（调用方回落 1.0）。 */
+function opIoFactorOfType(typeId, types) {
+  if (!opUsesIo(typeId)) return null;
+  const cfg = OP_IO_STORE.map(typeId);
+  const ratios = opSubRatios(typeId, types);
+  let sw = 0, sf = 0;
+  Object.keys(ratios).forEach(sid => {
+    const rec = cfg[sid];
+    if (!rec || rec.io == null || !(rec.io > 0)) return;
+    sw += ratios[sid]; sf += ratios[sid] * (rec.io / OP_IO_BASE);
+  });
+  if (sw <= 0) {
+    /* 料号结构为空（无任何料号）时，退化为「全部已配料号的简单均值」 */
+    const vals = Object.keys(cfg).map(k => cfg[k].io).filter(v => v != null && v > 0).map(v => v / OP_IO_BASE);
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  return sf / sw;   // 未配料号按该均值计 → 归一化后总系数恰为 sw 加权均值
+}
+
 /* ---------------- 演示剖面（仅在「该周没有真实数据」时作为回落） ----------------
    数组为「当日实际 / 当日目标」的比值（7 天，六→五）。已有真实数据的周（见 op-real-data.js）
    不会用到这里的数值，页面会标注「真实数据 / 演示数据」以作区分。
@@ -494,7 +592,55 @@ function genOpWeek(year, weekNo) {
       subCum[sid] = arr;
     });
 
-    byType[t.id] = { goalCum, totalCum, weekGoal, subCum };
+    /* ---------- BGA/LGA：口径换成「标准 I/O 当量」 ----------
+       实际 = Σ(料号累计颗数 × PKG_I/O ÷ 255)（料号未配 I/O → 用品类加权系数兜底）
+       目标 = 周目标(颗) × 品类加权系数
+       原「颗数」口径完整保留在 qtyGoalCum / qtyTotalCum / qtyWeekGoal，供明细与对账使用。 */
+    const out = { goalCum, totalCum, weekGoal, subCum };
+    if (opUsesIo(t.id)) {
+      const fType = opIoFactorOfType(t.id, types);
+      /* 标记口径（无论是否已配置，界面都要能看到「这个品类走 I/O 口径」） */
+      out.ioMode = true;
+      out.ioBase = OP_IO_BASE;
+      out.ioFactor = (fType == null ? 1 : fType);
+      out.ioConfigured = fType != null;
+      out.unit = '标准 I/O 当量';
+      out.unitShort = 'I/O';
+      out.qtyUnit = '颗';
+      out.qtyGoalCum = goalCum.slice();
+      out.qtyTotalCum = totalCum.slice();
+      out.qtyWeekGoal = weekGoal;
+      out.qtySubCum = subCum;
+      out.ioHitSubs = 0; out.ioMissSubs = Object.keys(subCum).length;
+      /* 一个料号都没配 PKG_I/O → 整体回落 1.0，数值完全等同原「颗数」口径（不做任何折算） */
+      if (fType != null) {
+        const f = fType;
+        /* 料号级明细先折算（I/O 当量），大分类累计再由料号级汇总而来 ——
+           这样严格保证「Σ 料号级 = 大分类累计」（不出现二次取整的 1K 偏差）。 */
+        let hit = 0, miss = 0;
+        const ioSubCum = {};
+        Object.keys(subCum).forEach(sid => {
+          const fi = opIoFactorOf(t.id, sid);
+          if (fi == null) miss++; else hit++;
+          const fk = fi == null ? f : fi;                  // 未配 I/O 的料号按品类加权系数兜底（不丢量）
+          ioSubCum[sid] = subCum[sid].map(v => (v == null ? null : Math.max(0, Math.round(v * fk))));
+        });
+        out.ioHitSubs = hit; out.ioMissSubs = miss;
+        out.subCum = ioSubCum;
+        const ioTotalCum = [];
+        for (let i = 0; i < 7; i++) {
+          if (totalCum[i] == null) { ioTotalCum.push(null); continue; }
+          let s = 0;
+          Object.keys(ioSubCum).forEach(sid => { const v = ioSubCum[sid][i]; if (v != null) s += v; });
+          ioTotalCum.push(Math.max(0, s));
+        }
+        out.totalCum = ioTotalCum;
+        out.weekGoal = Math.max(0, Math.round(weekGoal * f));
+        out.goalCum = goalCum.map(g => (g == null ? null : Math.max(0, Math.round(g * f))));
+        out.goalCum[6] = out.weekGoal;
+      }
+    }
+    byType[t.id] = out;
   });
   return {
     year, week: weekNo, key: opWeekKey(year, weekNo), start, days, byType, types,

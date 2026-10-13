@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>次品项配置（主数据） · 统一监控与岗位交接中心</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=20261008r">
+  <style>
+    /* 次品项配置页专属样式（不污染全局 style.css） */
+    .eq-chip { display:inline-flex; align-items:center; gap:6px; background:var(--surface-3); border:1px solid var(--border);
+      border-radius:999px; padding:5px 12px; font-size:13px; color:var(--text-2); cursor:pointer; user-select:none; }
+    .eq-chip:hover { border-color:var(--primary); }
+    .eq-chip.on { background:rgba(37,99,235,.12); border-color:var(--primary); color:#1a3f9e; font-weight:600; }
+    .eq-chip.lang { font-family:'JetBrains Mono',Consolas,monospace; }
+    .dept-badge { display:inline-flex; align-items:center; padding:3px 11px; border-radius:999px; font-size:12.5px; font-weight:600; }
+    .eq-pool { display:inline-flex; align-items:center; gap:6px; background:var(--surface-3); border:1px solid var(--border);
+      border-radius:999px; padding:5px 8px 5px 13px; font-size:13.5px; color:var(--text); }
+    .eq-pool .eq-x { border:0; background:transparent; color:var(--text-3); font-size:17px; line-height:1; cursor:pointer;
+      width:20px; height:20px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; }
+    .eq-pool .eq-x:hover { background:#fdecea; color:var(--danger); }
+    .eq-pool .eq-used { font-style:normal; font-size:11px; color:var(--text-3); background:var(--surface-2);
+      border:1px solid var(--border); border-radius:6px; padding:1px 6px; margin-left:2px; }
+  </style>
+</head>
+<body data-page="defectcfg">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<script src="assets/js/common.js?v=20261013c"></script>
+<script src="assets/js/data.js?v=20261008r"></script>
+<script src="assets/js/defect-real-data.js?v=20261009a"></script>
+<script src="assets/js/defect-config-core.js?v=20261013a"></script>
+<script src="assets/js/page-defect-config.js?v=20261013a"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /* ============ Output（OP）独立配置页 ============
-   三个配置域（原「部门可见范围」与「④ WIP 报警判定配置」均已下线），全部写入 localStorage，与大屏 output.html 共用同一份数据：
+   四个配置域（原「部门可见范围」与「④ WIP 报警判定配置」均已下线；④ 现为「料号 I/O 维护」），全部写入 localStorage，与大屏 output.html 共用同一份数据：
      ① PKG Type 维护（增删改：名称 / 小分类单价 / 默认周目标 / 报警阈值 / 启用）  → OPTypeStore
         · 报警阈值（黄灯 / 红灯，单位 K）挂在每个 PKG Type 上逐项维护
         · 10-08 客户口径：PKG Type = 大分类，其下还有「小分类 = 封装料号（PackageOutline）」，
@@ -11,6 +11,11 @@
           金额（Earn）口径可切换「递进式 ±5%」（周六看上周五实际、周日看周六实际，逐日递进），
           并支持周二拿到准确出库数据后手动修正本周后续几天的 Earn 目标（按周保存）。
      · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
+     ④ 料号 I/O 维护（2026-10-13 新增）                                            → OP_IO_STORE
+        · 客户《NONLEAD.xlsx》IO sheet 中 **PKG_CODE（封装代码）与 PKG_I/O 均可自行配置**：
+          原始式「实际结果 = PKG_I/O × Unit（实际数量）÷ 255」。
+        · 这里维护「OP 产出报表里的料号 ↔ PKG_CODE ↔ PKG_I/O」的对应关系；
+          配好后 BGA/LGA 的产出与周目标在大屏 / 周维度累计表统一折算成「标准 I/O 当量」。
    权限：需 Output（OP）模块「编辑」权限；否则整页只读。 */
 (function () {
   renderShell('opcfg');
@@ -32,14 +37,17 @@
   const curEarnProg = () => Object.assign({}, OP_DEFAULTS.earnProg, cfg.earnProg || {});
 
   /* ---------------- 状态 ---------------- */
-  let tab = 'types';                       // types | goals | alarm
+  let tab = 'types';                       // types | goals | alarm | io
   let types = OPTypeStore.all();           // 工作副本
   let goalYear = cur.year, goalWeek = cur.week;
+  let ioType = OP_IO_TYPES[0] || 'BGA/LGA';      // 当前维护 I/O 映射的 PKG Type
+  let ioRows = null;                             // 工作副本；null = 从仓库读
 
   const TABS = [
     { key: 'types', label: '① PKG Type 维护', icon: 'layers' },
     { key: 'goals', label: '② 每周目标数量', icon: 'target' },
-    { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' }
+    { key: 'alarm', label: '③ 预警分口径 / 夏令时', icon: 'alert' },
+    { key: 'io', label: '④ 料号 I/O 维护', icon: 'database' }
   ];
 
   function render() {
@@ -55,7 +63,7 @@
       <div class="card mt16 no-print">
         <div class="card-head">
           <div class="card-title">${icon('settings', 19)} 配置域
-            <span class="card-sub">共 3 类 · 保存后立即写入本地配置仓库</span></div>
+            <span class="card-sub">共 ${TABS.length} 类 · 保存后立即写入本地配置仓库</span></div>
           <div class="flex acenter gap8">
             <div class="seg" id="segTab">
               ${TABS.map(t => `<button data-t="${t.key}" class="${tab === t.key ? 'active' : ''}">${icon(t.icon, 15)} ${t.label}</button>`).join('')}
@@ -73,8 +81,117 @@
   function tabBody() {
     if (tab === 'types') return viewTypes();
     if (tab === 'goals') return viewGoals();
+    if (tab === 'io') return viewIo();
     return viewAlarm();
   }
+
+  /* =========================================================
+     ④ 料号 I/O 维护（BGA/LGA 专有口径：产出 = 颗数 × PKG_I/O ÷ 255）
+     ------------------------------------------------------------
+     客户《NONLEAD.xlsx》IO sheet 中 **PKG_CODE / PKG_I/O 两个字段均可由客户自行配置**：
+     这里维护「OP 产出报表里的料号（12 位） ↔ 客户封装代码 PKG_CODE ↔ 该封装料号的 I/O 数」。
+     配置后 Output（OP）大屏 / 周维度累计表里该 PKG Type 的目标与实际会统一折算成
+     「标准 I/O 当量」；其它 PKG Type 仍按颗数。
+     ========================================================= */
+  function ioRowsOf(tid) { return (ioRows && ioType === tid) ? ioRows : OP_IO_STORE.all(tid); }
+  function ioPool() { return opIoCandidates(); }
+  function ioPoolMap() { const m = {}; ioPool().forEach(c => { if (!m[c.code]) m[c.code] = c.io; }); return m; }
+  /* 该品类在真实产出里出现过的料号（作为待配置的 OP 料号清单） */
+  function ioSubPool(tid) {
+    const fromData = Object.keys(opSubRatios(tid, types));
+    const saved = OP_IO_STORE.all(tid).map(x => x.sub);
+    return Array.from(new Set(fromData.concat(saved))).sort();
+  }
+  function collectIo() {
+    const tbl = document.getElementById('tblIo');
+    if (!tbl) return ioRowsOf(ioType);
+    const num = v => { const s = String(v == null ? '' : v).trim(); return (s === '' || !isFinite(Number(s))) ? null : Number(s); };
+    return Array.from(tbl.querySelectorAll('tbody tr[data-i]')).map(tr => ({
+      sub: tr.querySelector('[data-k="sub"]').value.trim(),
+      code: tr.querySelector('[data-k="code"]').value.trim(),
+      io: num(tr.querySelector('[data-k="io"]').value)
+    })).filter(x => x.sub);
+  }
+  function viewIo() {
+    const tid = ioType;
+    const rows = ioRowsOf(tid);
+    const pool = ioPool(), poolMap = ioPoolMap();
+    const subPool = ioSubPool(tid);
+    const types2 = types;
+    const fType = opIoFactorOfType(tid, types2);
+    const configured = rows.some(r => r.io != null && r.io > 0);
+    const missSubs = subPool.filter(s => {
+      const r = rows.find(x => x.sub === s);
+      return !r || r.io == null || !(r.io > 0);
+    });
+    const codeList = pool.map(c => `<option value="${esc(c.code)}">`).join('');
+    const body = rows.length ? rows.map((r, i) => {
+      const f = (r.io == null || !(r.io > 0)) ? null : r.io / OP_IO_BASE;
+      const inPool = poolMap[r.code] != null;
+      return `<tr data-i="${i}">
+        <td><input class="input" data-k="sub" value="${esc(r.sub)}" list="ioSubList" ${canEdit ? '' : 'readonly'} style="min-width:150px" placeholder="产出报表里的料号"></td>
+        <td><input class="input" data-k="code" value="${esc(r.code)}" list="ioCodeList" ${canEdit ? '' : 'readonly'} style="min-width:96px" placeholder="封装代码"></td>
+        <td class="center"><input class="input num" type="number" min="0" step="1" data-k="io" value="${r.io == null ? '' : r.io}" ${canEdit ? '' : 'readonly'} style="width:96px;text-align:center" placeholder="未配"></td>
+        <td class="num">${f == null ? '<span class="muted">按品类系数兜底</span>' : f.toFixed(3)}</td>
+        <td class="small muted" data-k="src">${inPool ? '客户 IO 表命中（PKG_I/O = ' + fmtNum(poolMap[r.code]) + '）' : (r.code ? '<span style="color:var(--warn)">不在客户 IO 表候选中</span>' : '—')}</td>
+        ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-iorm="${i}">${icon('trash', 14)}</button></td>` : ''}
+      </tr>`;
+    }).join('') : `<tr><td colspan="${canEdit ? 6 : 5}" class="center muted">该 PKG Type 尚未配置料号 I/O —— 可点「新增料号」或「从客户 IO 表带入候选」。</td></tr>`;
+
+    return `
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">${icon('database', 19)} ④ 料号 I/O 维护（BGA/LGA 产出口径）
+            <span class="card-sub">客户《NONLEAD.xlsx》IO sheet 中 <b>PKG_CODE</b>（封装代码）与 <b>PKG_I/O</b>（I/O 数）<b>均可自行配置</b>；此处维护「OP 料号 ↔ PKG_CODE ↔ PKG_I/O」的对应关系</span></div>
+          <div class="flex acenter gap8 flex-wrap">
+            <span class="small muted">PKG Type</span>
+            <div class="seg" id="ioSeg">${types.map(t => `<button data-iot="${esc(t.id)}" class="${tid === t.id ? 'active' : ''}">${esc(t.name || t.id)}${opUsesIo(t.id) ? '' : ' · 颗数'}</button>`).join('')}</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="notice" style="--nc:${configured ? 'var(--success)' : 'var(--warn)'}">
+            ${icon('info', 17)}
+            <div>
+              <strong>折算公式</strong>：I/O 当量 = <b>颗数 × (PKG_I/O ÷ ${OP_IO_BASE})</b>　　（客户 IO 表原始式：实际结果 = PKG_I/O × Unit ÷ ${OP_IO_BASE}）
+              <br><strong>当前 ${esc(tid)}</strong>：${opUsesIo(tid) ? `已配 <b>${rows.filter(r => r.io != null && r.io > 0).length}</b> 个料号，品类加权系数 <b>${fType == null ? '—（未配置，回落 1.0 即等同颗数）' : fType.toFixed(3)}</b>` : '<b>该品类不走 I/O 口径</b>，仍按颗数计量（仅 BGA/LGA 使用 I/O 加权）'}
+              ${missSubs.length ? `<br><span style="color:var(--warn)">提示：产出报表里还有 <b>${missSubs.length}</b> 个料号未配 PKG_I/O（${esc(missSubs.slice(0, 6).join('、'))}${missSubs.length > 6 ? ' …' : ''}），未配的按品类加权系数兜底。</span>` : ''}
+              ${!configured && opUsesIo(tid) ? '<br><span style="color:var(--danger)"><b>尚未配置任何 PKG_I/O</b>：大屏与累计表当前仍按「颗数」显示，补齐配置后自动切换为 I/O 加权当量。</span>' : ''}
+            </div>
+          </div>
+
+          <div class="flex acenter gap8 mt12 flex-wrap">
+            ${canEdit ? `<button class="btn btn-sm" id="btnIoAdd">${icon('plus', 16)} 新增料号</button>
+            <button class="btn btn-sm" id="btnIoSeed">${icon('download', 16)} 从客户 IO 表带入候选（${pool.length} 条）</button>
+            <button class="btn btn-sm btn-primary" id="btnIoSave">${icon('check', 16)} 保存</button>
+            <button class="btn btn-sm" id="btnIoReset">${icon('refresh', 16)} 恢复默认（清空该品类）</button>` : '<span class="chip">只读</span>'}
+            <button class="btn btn-sm" id="btnIoExport">${icon('download', 16)} Excel 导出</button>
+            <span class="flex-1"></span>
+            <span class="small muted">候选库：客户 IO 表 ${pool.length} 条（BGA / LGA 合计），输入 PKG_CODE 时会自动带出 PKG_I/O</span>
+          </div>
+
+          <datalist id="ioCodeList">${codeList}</datalist>
+          <datalist id="ioSubList">${subPool.map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+
+          <div class="table-wrap mt10">
+            <table class="table" id="tblIo">
+              <thead><tr>
+                <th>OP 料号（产出报表）</th><th>PKG_CODE（封装代码）</th><th class="center">PKG_I/O</th>
+                <th class="num">折算系数 I/O ÷ ${OP_IO_BASE}</th><th>数据来源校验</th>${canEdit ? '<th class="center">操作</th>' : ''}
+              </tr></thead>
+              <tbody>${body}</tbody>
+            </table>
+          </div>
+          <div class="sub-note mt8">
+            · <b>OP 料号</b>：产出报表（BE1 Output Report）里的 12 位料号，可从下拉候选里选，也可手工输入；共 ${subPool.length} 个料号在本品类的产出中出现。
+            · <b>PKG_CODE / PKG_I/O</b>：客户《NONLEAD.xlsx》IO sheet 的两个可配置字段；填入客户表里的 PKG_CODE 后，<b>PKG_I/O 会自动带出</b>，也可手工覆盖。
+            · <b>折算系数</b> = PKG_I/O ÷ ${OP_IO_BASE}，作用于该料号的产出数量；<b>周目标</b>同步按「料号产出结构 × 各料号系数」的加权系数折算，保证实际与目标同量纲可比。
+            · 留空 PKG_I/O 的料号按<b>品类加权系数</b>兜底（不丢量）；一个料号都没配时整体回落 1.0（等同颗数口径）。
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function fmtNum(v) { return (v == null ? '—' : Math.round(v).toLocaleString()); }
 
   /* =========================================================
      ① PKG Type 维护
@@ -549,6 +666,7 @@
       OPTypeStore.reset();
       store.set('op_week_goals', {});
       OPDeptStore.reset();          // 部门可见范围无配置入口了，恢复默认时一并清掉历史残留
+      store.set('op_io_map', {});    // 料号 I/O 映射一并清空
       store.set('op_cfg', {});
       cfg = Object.assign({}, OP_DEFAULTS, {});
       cfg.alarm = Object.assign({}, OP_DEFAULTS.alarm);
@@ -558,8 +676,79 @@
       cfg.dstStartHour = OP_DEFAULTS.dstStartHour;
       cfg.wipOverlay = Object.assign({}, OP_DEFAULTS.wipOverlay);   // WIP 参与报警判定
       types = OPTypeStore.all();
+      ioRows = null;
       toast('已恢复默认配置', 'success'); render();
     };
+
+    /* ---- ④ 料号 I/O 维护（BGA/LGA 口径） ---- */
+    const ioSeg = document.getElementById('ioSeg');
+    if (ioSeg) ioSeg.querySelectorAll('button').forEach(b => {
+      b.onclick = () => { ioRows = null; ioType = b.dataset.iot; render(); };
+    });
+    const ba1 = document.getElementById('btnIoAdd');
+    if (ba1) ba1.onclick = () => {
+      ioRows = collectIo().concat([{ sub: '', code: '', io: null }]);
+      render(); toast('已新增一行：填入 OP 料号 + PKG_CODE（PKG_I/O 会自动带出）后保存', 'primary');
+    };
+    const bs1 = document.getElementById('btnIoSave');
+    if (bs1) bs1.onclick = () => {
+      const list = collectIo();
+      const seen = {}, dup = [];
+      list.forEach(x => { if (seen[x.sub]) dup.push(x.sub); seen[x.sub] = 1; });
+      if (dup.length) { toast('OP 料号重复：' + dup.join('、'), 'danger'); return; }
+      ioRows = list; OP_IO_STORE.save(ioType, list);
+      const f = opIoFactorOfType(ioType, types);
+      toast('料号 I/O 已保存（' + list.length + ' 行 · 品类加权系数 ' + (f == null ? '未配置' : f.toFixed(3)) + '），大屏即时生效', 'success');
+      render();
+    };
+    const br1 = document.getElementById('btnIoReset');
+    if (br1) br1.onclick = () => {
+      OP_IO_STORE.reset(ioType); ioRows = null;
+      toast('已清空 ' + ioType + ' 的料号 I/O 配置', 'success'); render();
+    };
+    const bg1 = document.getElementById('btnIoSeed');
+    if (bg1) bg1.onclick = () => {
+      const cur = collectIo();
+      const has = {}; cur.forEach(x => { has[x.code] = 1; });
+      const add = ioPool().filter(c => !has[c.code]).map(c => ({ sub: '', code: c.code, io: c.io }));
+      if (!add.length) { toast('客户 IO 表候选已全部带入', 'warn'); return; }
+      ioRows = cur.concat(add);
+      render();
+      toast('已带入客户 IO 表 ' + add.length + ' 条候选（OP 料号留空，请在左侧填入对应料号后保存）', 'primary');
+    };
+    const be1 = document.getElementById('btnIoExport');
+    if (be1) be1.onclick = () => {
+      const list = collectIo();
+      exportExcel('OP_料号I_O映射_' + ioType + '.xls',
+        ['OP 料号', 'PKG_CODE', 'PKG_I/O', '折算系数 I/O÷' + OP_IO_BASE, '数据来源校验'],
+        list.map(x => [x.sub, x.code, x.io == null ? '' : x.io,
+          (x.io == null || !(x.io > 0)) ? '' : (x.io / OP_IO_BASE).toFixed(3),
+          ioPoolMap()[x.code] != null ? '客户 IO 表命中' : (x.code ? '不在客户 IO 表候选中' : '')]));
+      toast('已导出 ' + list.length + ' 行', 'success');
+    };
+    document.querySelectorAll('#tblIo [data-iorm]').forEach(b => b.onclick = () => {
+      const list = collectIo();
+      list.splice(Number(b.dataset.iorm), 1);
+      ioRows = list; render();
+    });
+    /* 输入 PKG_CODE 时自动带出客户 IO 表里的 PKG_I/O（仅在 PKG_I/O 为空时带出，不覆盖手工值） */
+    document.querySelectorAll('#tblIo [data-k="code"]').forEach(el => {
+      el.onchange = () => {
+        const v = el.value.trim();
+        const tr = el.closest('tr');
+        const ioEl = tr && tr.querySelector('[data-k="io"]');
+        const fcEl = tr && tr.querySelector('td:nth-child(4)');
+        const srcEl = tr && tr.querySelector('[data-k="src"]');
+        const c = v ? ioPool().find(x => x.code === v) : null;
+        if (ioEl && c && ioEl.value === '') {
+          ioEl.value = c.io;
+          if (fcEl) fcEl.textContent = (c.io / OP_IO_BASE).toFixed(3);
+          toast('已按客户 IO 表带出 PKG_I/O = ' + c.io, 'primary');
+        }
+        if (srcEl) srcEl.innerHTML = !v ? '—'
+          : (c ? '客户 IO 表命中（PKG_I/O = ' + fmtNum(c.io) + '）' : '<span style="color:var(--warn)">不在客户 IO 表候选中</span>');
+      };
+    });
 
     /* ---- ① PKG Type ---- */
     const ba = document.getElementById('btnTypeAdd');
