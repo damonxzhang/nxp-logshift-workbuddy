@@ -1,10 +1,12 @@
 /* ============ OP 专属大屏：Output（OP）周维度累计追踪 ============
    权威规格：《Output 大屏（周维度追踪）需求提示词》+ 客户补充口径。
    界面：年份 / 周别 / 视角部门 / PKG Type 筛选 → 累计对比图 → 数据刷新。
-   图表排布（10-08 客户确认）：默认「双部门 2×2」= LEAD / NON-LEAD 两个部门 ×（数量 / 金额）两张图，
-     行 = 口径、列 = 部门，同一行共用 Y 轴上限以便横向比高低；可切「单部门」回到原上下两张图。
-   周维度累计表与「异常报警 · 周维度」均已拆分为独立页面 op-table.html（本屏只保留筛选与两张累计对比曲线）。
-   PKG Type 维护、每周目标数量、预警分口径统一在独立配置页 op-config.html 完成
+   图表排布（10-13 客户确认 BGA/LGA 单独成图）：默认「双部门 3×2」= LEAD / NON-LEAD 两个部门 ×
+     （**颗数** / **BGA·LGA 标准 I/O 当量** / 金额）三种口径，行 = 口径、列 = 部门，
+     同一行共用 Y 轴上限以便横向比高低；可切「单部门」回到单列三张。
+     BGA/LGA 因计算方法与其他品类不同（客户 IO 表 I/O 加权），**不与颗数口径混在同一张图**，单独占一行。
+   周维度累计表已拆分为独立页面 op-table.html（本屏只保留筛选与三行累计对比曲线）。
+   PKG Type 维护、每周目标数量、料号 I/O 维护、预警分口径统一在独立配置页 op-config.html 完成
    （「部门可见范围」配置域已下线，部门固定 LEAD / NON-LEAD / PLATING，可见范围用引擎内置默认）。 */
 (function () {
   renderShell('op');
@@ -41,9 +43,10 @@
   applyDeptScope();
 
   /* ---------------- 视图模式（10-08 客户确认） ----------------
-     dual（默认）：LEAD + NON-LEAD 两个部门 ×（数量 / 金额）= 四张图，2×2 排布
-                  （行 = 口径，列 = 部门，同一行共用 Y 轴上限以便直接横向对比）
-     single：沿用原来的「单一视角部门 · 上下两张图」 */
+     dual（默认）：LEAD + NON-LEAD 两个部门 ×（颗数 / BGA·LGA 标准 I/O 当量 / 金额）= 3×2 排布
+     single：单一视角部门，单列三张（颗数 / I/O 当量 / 金额）
+     注：BGA/LGA 走 I/O 加权口径（客户《NONLEAD.xlsx》IO sheet：PKG_I/O × Unit ÷ 255），
+        与其它品类（颗数）**量纲不同、不可同图**，故单独成图一行 */
   const DUAL_DEPTS = ['LEAD', 'NON-LEAD'];
   let viewMode = store.get('op_view_mode', 'dual') === 'single' ? 'single' : 'dual';
   const saveViewMode = () => store.set('op_view_mode', viewMode);
@@ -117,52 +120,61 @@
       : '';
 
     /* ---------------- 图表面板 ----------------
-       dual   → 行=口径（数量 / 金额），列=部门（LEAD / NON-LEAD），四张图 2×2
-       single → 单一视角部门上排数量、下排金额 */
+       dual   → 行=口径（数量 / I/O 当量 / 金额），列=部门（LEAD / NON-LEAD），3×2 排布
+       single → 单一视角部门：数量 / I/O 当量 / 金额 上下三张
+       2026-10-13 客户要求：BGA/LGA 走 I/O 加权口径，**不与其它品类混在同一张图**，
+       故把 I/O 口径单独拆成一行（单独成图），数量图只留颗数口径品类。 */
     const isDual = viewMode === 'dual';
     const panelDepts = isDual ? DUAL_DEPTS : [dept];
     function makePanel(d, kind) {
-      const pids = isDual ? idsForDept(d) : ids;
-      const srs = kind === 'goal' ? goalSeries(pids) : earnSeries(pids);
+      const base = isDual ? idsForDept(d) : ids;
+      /* I/O 口径品类单独成图；数量图只保留颗数口径品类（两者互不混排） */
+      const pids = kind === 'io' ? base.filter(id => opUsesIo(id)) : base.filter(id => !opUsesIo(id));
+      if (!pids.length) return null;
+      const srs = kind === 'earn' ? earnSeries(base) : goalSeries(pids);
       /* WIP（10-08 客户口径修正）：**不画进图表** —— WIP 是实时快照、没有逐日历史，
          画成曲线会被误读成按天数据。它只在**报警判定**时算进去：
          数量口径判定 = (累计实际 total + WIP) vs 累计目标 goal。
          这里只把抵扣量取出来传给 opAggStatus / opTypeAlarm，图里保持两条线。 */
       let wip = null;
       const wo = opWipCfg(cfg);
-      if (kind === 'goal' && d === 'NON-LEAD' && wo.on && wo.spec) {
+      if ((kind === 'goal' || kind === 'io') && d === 'NON-LEAD' && wo.on && wo.spec) {
         const k = opWipDeductK(pids, cfg, wo);
         if (k > 0) wip = { spec: wo.spec, k: k, scope: wo.scope, excludeHold: wo.excludeHold };
       }
-      const wipK = (kind === 'goal' && wip) ? wip.k : 0;
+      const wipK = ((kind === 'goal' || kind === 'io') && wip) ? wip.k : 0;
+      /* 达标状态 / 红灯天数：数量图与 I/O 图各按各自品类算；金额图沿用原口径（全部品类、wipK=0） */
+      const stIds = kind === 'earn' ? base : pids;
       return {
-        key: kind + '-' + d, dept: d, kind, ids: pids, series: srs,
-        redDays: redDaysOf(pids, wipK),
-        st: opAggStatus(pids, focusIdx, week, null, wipK),
+        key: kind + '-' + d, dept: d, kind, ids: stIds, series: srs,
+        redDays: redDaysOf(stIds, wipK),
+        st: opAggStatus(stIds, focusIdx, week, null, wipK),
         gap: gapAt(srs, focusIdx),
         gapWithWip: wipK ? gapAt(srs, focusIdx, wipK) : null,
-        em: earnMeta(pids),
+        em: earnMeta(stIds),
         wip
       };
     }
     const panels = [];
-    if (isDual) ['goal', 'earn'].forEach(kind => panelDepts.forEach(d => panels.push(makePanel(d, kind))));
-    else ['goal', 'earn'].forEach(kind => panels.push(makePanel(dept, kind)));
+    ['goal', 'io', 'earn'].forEach(kind => panelDepts.forEach(d => {
+      const p = makePanel(d, kind);
+      if (p) panels.push(p);
+    }));
     /* 同一行（同一口径）共用 Y 轴上限，两个部门可直接横向比高低 */
     const maxByKind = {};
-    ['goal', 'earn'].forEach(kind => {
+    ['goal', 'io', 'earn'].forEach(kind => {
       maxByKind[kind] = Math.max(1, ...panels.filter(p => p.kind === kind).map(p => chartMax(p.series)));
     });
 
     const panelCard = p => {
-      const isG = p.kind === 'goal';
+      const isG = p.kind === 'goal', isIo = p.kind === 'io', isE = p.kind === 'earn';
       const overN = (p.em.prog || []).filter(x => x && (x.status === 'critical' || x.status === 'over')).length;
-      const deptTag = isDual ? `<span class="chip">${icon('users', 14)} ${esc(p.dept)} · 可见 ${p.ids.length} 类</span> ` : '';
+      const deptTag = isDual ? `<span class="chip">${icon('users', 14)} ${esc(p.dept)} · ${isE ? '全部品类' : p.ids.length + ' 类'}</span> ` : '';
       const gapTxt = p.gap != null
-        ? ` · ${focusLabel}差额 <strong class="${p.gap < 0 ? 'red-inline' : 'green-inline'}">${p.gap >= 0 ? '+' : ''}${p.gap}${isG ? 'K' : '万'}</strong>`
+        ? ` · ${focusLabel}差额 <strong class="${p.gap < 0 ? 'red-inline' : 'green-inline'}">${p.gap >= 0 ? '+' : ''}${p.gap}${isE ? '万' : 'K'}</strong>`
         : '';
       const redTxt = p.redDays.length ? ` · <span class="red-inline">红灯 ${p.redDays.length} 天</span>` : '';
-      const earnTag = (!isG && p.em.mode === 'progressive')
+      const earnTag = (isE && p.em.mode === 'progressive')
         ? ` · 递进式 ±${p.em.pct}%${overN ? ` · <span class="red-inline">超差 ${overN} 天</span>` : ''}`
         : '';
       /* WIP（10-08 修正）：**图里不画**，只在报警判定时把「已产出 + 在制」合起来跟目标比。
@@ -171,23 +183,35 @@
         ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} 报警判定已计入 WIP 抵扣：<strong>${esc(p.wip.spec)} ${p.wip.k}K</strong>
             （${p.wip.scope === 'all' ? '该工序全部' : '跟随筛选'} · 实时快照，不参与绘图）—— 判定口径 = (累计实际 + 在制) vs 累计目标</div>`
         : '';
-      /* BGA/LGA 走 I/O 加权口径（客户 IO 表：PKG_I/O × Unit ÷ 255），其余品类按颗数；
-         这里把该面板里两类口径的品类分别标出来，并说明目标已同步折算。 */
-      const ioIds = (p.ids || []).filter(id => opUsesIo(id));
-      const qtyIds = (p.ids || []).filter(id => !opUsesIo(id));
-      const ioTag = (isG && ioIds.length)
-        ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} <strong>数量口径</strong>：${ioIds.map(id => `<span class="chip" title="标准 I/O 当量 = 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})">${esc(id)} = 标准 I/O 当量</span>`).join(' ')}` +
-          `${qtyIds.length ? `　${qtyIds.map(id => esc(id) + ' = 颗数').join('、')}` : ''}` +
-          `　—— 周目标已按「料号产出结构 × 各料号 PKG_I/O」加权同步折算（金额 Earn 随之按 I/O 当量 × 单价折算）；PKG_CODE / PKG_I/O 由客户在 <a href="op-config.html">OP 配置页 · ④ 料号 I/O 维护</a> 配置${week.byType[ioIds[0]] && week.byType[ioIds[0]].ioConfigured === false ? '，<b style="color:var(--warn)">当前尚未配置 PKG_I/O，实际等同颗数</b>' : ''}</div>`
-        : '';
+      /* 口径说明（2026-10-13）：BGA/LGA 已从数量图拆出、单独成图，三张图各表一种口径，互不混排。 */
+      const ioTypesOf = ids => ids.filter(id => opUsesIo(id));
+      const ioNotCfg = ids => { const w = week.byType[ids[0]]; return w && w.ioConfigured === false; };
+      let caliberTag = '';
+      if (isG) {
+        caliberTag = `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
+          —— BGA/LGA 走 I/O 加权口径，已单独成图（见下一行）；本周目标与实际同量纲可直接比。</div>`;
+      } else if (isIo) {
+        const b = week.byType[p.ids[0]];
+        caliberTag = `<div class="small muted mt8">${icon('database', 13)} <strong>本图口径：标准 I/O 当量</strong>（${p.ids.map(esc).join('、')}）——
+          I/O 当量 = 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})，<b>周目标已按「料号产出结构 × 各料号 PKG_I/O」加权同步折算</b>，与实际同量纲可比；
+          PKG_CODE / PKG_I/O 由客户在 <a href="op-config.html">OP 配置页 · ④ 料号 I/O 维护</a> 配置。${ioNotCfg(p.ids) ? '<b style="color:var(--warn)">当前尚未配置 PKG_I/O，实际等同颗数。</b>' : (b && b.ioFactor != null ? ` 当前品类加权系数 <b>${Number(b.ioFactor).toFixed(3)}</b>。` : '')}</div>`;
+      } else {
+        const ioIds = ioTypesOf(p.ids);
+        caliberTag = ioIds.length
+          ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含全部 ${p.ids.length} 个品类；其中 <b>${ioIds.map(esc).join('、')}</b> 的数量已按 I/O 加权折算，故金额随之按「I/O 当量 × 单价」计算（其数量曲线见上一行独立图）。</div>`
+          : '';
+      }
+      const title = isIo
+        ? `${icon('layers', 20)} ${esc(p.ids.join('、'))} · 累计 goal vs total 曲线对比（标准 I/O 当量）`
+        : `${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K · 颗数）' : '累计 Earn 目标 vs 实际（万元）'}`;
       return `<div class="card op-chart-card">
           <div class="card-head">
-            <div class="card-title">${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K）' : '累计 Earn 目标 vs 实际（万元）'}
+            <div class="card-title">${isDual && isIo ? esc(p.dept) + ' · ' : ''}${title}
               <span class="card-sub">${deptTag}目标（虚线）vs 实际（实线）· 悬停看当日明细 · 点击图表查看「周维度累计表」 · ${badge(p.st.status)}${gapTxt}${redTxt}${earnTag}</span></div>
             <div class="legend">${p.series.map(legendItem).join('')}
               ${p.redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
           </div>
-          <div class="card-body">${ioTag}${wipTag}<div id="pc_${esc(p.key)}"></div></div>
+          <div class="card-body">${caliberTag}${wipTag}<div id="pc_${esc(p.key)}"></div></div>
         </div>`;
     };
 
@@ -218,7 +242,7 @@
             </div>
             <div class="fi">
               <label class="field-label">图表视图</label>
-              <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（数量 / 金额）四张图；单部门：当前视角部门上下两张图">
+              <div class="seg" id="segView" title="双部门 3×2：LEAD / NON-LEAD ×（颗数 / BGA·LGA 标准 I/O 当量 / 金额）；单部门：当前视角部门单列三张。注：BGA/LGA 量纲与其他品类不同，已单独成图">
                 <button data-v="dual" class="${isDual ? 'active' : ''}">BE</button>
                 <button data-v="single" class="${isDual ? '' : 'active'}">单部门</button>
               </div>
@@ -242,7 +266,7 @@
       <div class="grid ${isDual ? 'g-2 op-chart-grid' : ''} op-chart-stack mt16" id="chartStack">
         ${panels.map(panelCard).join('')}
       </div>
-      ${isDual ? `<div class="sub-note mt8">2×2 排布：行 = 口径（数量 / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。</div>` : ''}
+      ${isDual ? `<div class="sub-note mt8">3×2 排布：行 = 口径（<b>颗数</b> / <b>BGA·LGA 标准 I/O 当量</b> / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。<b>BGA/LGA 因计算方法与其他品类不同（I/O 加权），已单独成图，不与颗数口径混排</b>。</div>` : `<div class="sub-note mt8">上排 = 颗数口径，下排 = BGA/LGA 标准 I/O 当量口径，末排 = 金额（万元）；<b>BGA/LGA 因计算方法与其他品类不同，已单独成图</b>。</div>`}
 
       <div class="card mt16 no-print">
         <div class="card-head"><div class="card-title">${icon('refresh', 19)} 数据刷新
@@ -264,7 +288,8 @@
          浮层这里给一行只读提示（说明该图判定已含 WIP 抵扣）与「产出 + 在制 = 判定口径值」，
          不改变图内折线本身。 */
       const tipGap = p => i => {
-        const srs = p.series, unit = p.kind === 'goal' ? 'K' : '万';
+        const srs = p.series, unit = p.kind === 'earn' ? '万' : 'K';
+        const unitTxt = p.kind === 'io' ? ' I/O当量' : (unit === 'K' ? 'K' : ' 万');
         const wip = p.wip;
         const g0 = srs[0].data[i], t0 = srs[1].data[i];
         const wipLine = wip
@@ -278,7 +303,7 @@
         }
         const d = +(t0 - g0).toFixed(1);
         const dEff = wip ? +(t0 + wip.k - g0).toFixed(1) : d;
-        return `<div class="lc-tgap ${d < 0 ? '' : 'ok'}">差额(实际-目标) <strong>${d >= 0 ? '+' : ''}${d.toLocaleString('en-US')}${unit}</strong>${wip && dEff !== d ? ` · 计入 WIP 后 <strong class="${dEff < 0 ? 'red-inline' : 'green-inline'}">${dEff >= 0 ? '+' : ''}${dEff}${unit}</strong>` : ''}</div>` + wipLine;
+        return `<div class="lc-tgap ${d < 0 ? '' : 'ok'}">差额(实际-目标) <strong>${d >= 0 ? '+' : ''}${d.toLocaleString('en-US')}${unitTxt}</strong>${wip && dEff !== d ? ` · 计入 WIP 后 <strong class="${dEff < 0 ? 'red-inline' : 'green-inline'}">${dEff >= 0 ? '+' : ''}${dEff}${unitTxt}</strong>` : ''}</div>` + wipLine;
       };
       const tipTitle = i => `${days[i].label} · 周六起第 ${i + 1} 天${days[i].isToday ? '（今天）' : ''}`;
 
@@ -293,12 +318,13 @@
         panels.forEach(p => {
           const el = document.getElementById('pc_' + p.key);
           if (!el) return;
-          const unit = p.kind === 'goal' ? 'K' : '万';
+          const unit = p.kind === 'earn' ? '万' : 'K';
+          const yUnit = p.kind === 'io' ? ' I/O当量' : ' ' + unit;
           const cw = el.clientWidth || BASE_CW;
           lineChart(el, {
             series: p.series, labels: wdLabel, height: Math.round(H * vwFor(cw) / cw), vw: vwFor(cw),
             hover: true, tipUnit: unit, tipTitle, tipExtra: tipGap(p),
-            min: 0, max: maxByKind[p.kind] * 1.08, yUnit: ' ' + unit,
+            min: 0, max: maxByKind[p.kind] * 1.08, yUnit,
             marks: p.redDays.map(i => ({ i, v: p.series[1].data[i], color: '#cc2f2a', text: '超标' })),
             endAt: focusIdx,
             /* 图表直接可点（2026-10-08 客户要求：不再挂在浮窗上）：
@@ -312,8 +338,10 @@
       };
 
       /* 按视口余量自适应：先画一版量出「卡头 + 内边距 + 图例」的固定占用，
-         再把剩余高度按「两行」平分（2×2 = 两行两列；单部门 = 两行一列），
+         再把剩余高度按实际行数平分（dual 3 行 2 列；单部门 3 行 1 列），
          力争全部图卡在一个屏内同时可见。 */
+      const cols = isDual ? 2 : 1;
+      const rowCount = Math.max(1, Math.ceil(panels.length / cols));
       const fit = () => {
         drawAll(240);
         const cards = Array.prototype.slice.call(stack.querySelectorAll('.op-chart-card'));
@@ -326,8 +354,8 @@
         const topAbs = stack.getBoundingClientRect().top + window.scrollY;   // 文档坐标：不受当前滚动位置影响
         const GAP = 14;                                                      // 与 .op-chart-stack 的 gap 一致
         const avail = window.innerHeight - topAbs - 18;
-        const perRow = (avail - GAP) / 2;                                    // 两行 + 行间距
-        const wantPx = Math.max(150, Math.min(340, perRow - overhead));
+        const perRow = (avail - GAP * (rowCount - 1)) / rowCount;             // 行高 + 行间距
+        const wantPx = Math.max(130, Math.min(340, perRow - overhead));
         if (Math.abs(wantPx - 240) > 6) drawAll(wantPx);
       };
       fit();
@@ -428,7 +456,7 @@
       viewMode = v; saveViewMode();
       render();
       toast(v === 'dual'
-        ? '已切换：双部门 2×2（LEAD / NON-LEAD × 数量 / 金额）'
+        ? '已切换：双部门 3×2（LEAD / NON-LEAD × 颗数 / BGA·LGA I/O 当量 / 金额）'
         : '已切换：单部门视图（' + dept + '）', 'primary');
     });
 

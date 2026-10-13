@@ -561,6 +561,124 @@
     return `<span title="${esc(tip)}" style="cursor:help;color:${pkCol};font-weight:${peak.ppm >= DEV_WARN ? 700 : 400}">峰值 ${Math.round(peak.ppm)}·${esc(peak.d)}·共${k}机台</span> <span style="font-size:11px">${tag}</span>`;
   }
 
+  /* ---------- L4：料号跨机台 可视化（并排两张：① 各机台 PPM 柱状 ② 各机台次品占比 环形饼图） ----------
+     两图与下方明细表同源同口径（该料号 × 本周 × 同类别 × 各 Mold 机台），用于一眼定位主要贡献机台。
+     用 SVG 静态绘制 + 原生 <title> 悬停提示（无额外脚本依赖）。 */
+  const DEV_PALETTE = ['#2563eb', '#ea580c', '#0d9488', '#b91c1c', '#7c3aed', '#65a30d', '#db2777', '#0891b2', '#ca8a04', '#4f46e5', '#16a34a', '#dc2626', '#0284c7', '#9333ea', '#c2410c', '#475569'];
+  const devColor = i => DEV_PALETTE[i % DEV_PALETTE.length];
+  const niceCeil = v => { const p = Math.pow(10, Math.floor(Math.log10(Math.max(v, 1e-6)))); const nn = v / p; return (nn <= 1 ? 1 : nn <= 2 ? 2 : nn <= 2.5 ? 2.5 : nn <= 5 ? 5 : 10) * p; };
+  // Y 轴上限走「好刻度」阶梯，保证 350 预警线（必要时含 500 红线）始终落在绘图区内
+  const L4_NICE = [50, 100, 150, 200, 250, 300, 350, 400, 500, 600, 750, 800, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 8000, 10000];
+  const l4Top = maxP => {
+    const need = Math.max(maxP * 1.08, maxP >= DEV_WARN ? DEV_RED * 1.15 : DEV_WARN * 1.12, 10);
+    for (let i = 0; i < L4_NICE.length; i++) if (L4_NICE[i] >= need) return L4_NICE[i];
+    return niceCeil(need);
+  };
+  const l4Band = v => (v >= DEV_RED ? 'var(--danger)' : (v >= DEV_WARN ? 'var(--warn)' : 'var(--text)'));
+
+  // ① 各机台 PPM 柱状（含 350 预警线 / 500 红线；本机台高亮描边）
+  function l4BarChart(across, curDev) {
+    const W = 470, H = 250, padL = 50, padR = 16, padT = 24, padB = 48;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const n = Math.max(across.length, 1), slot = plotW / n, bw = Math.min(42, slot * 0.56);
+    const maxP = across.reduce((a, x) => Math.max(a, x.ppm), 0);
+    const yTop = l4Top(maxP);
+    const yOf = v => padT + plotH - (v / yTop) * plotH;
+    let s = '';
+    [0, .25, .5, .75, 1].forEach(t => {
+      const y = padT + plotH * (1 - t);
+      s += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line,#e1e7f0)" stroke-width=".8"/>` +
+        `<text x="${padL - 7}" y="${(y + 3.5).toFixed(1)}" font-size="9.5" fill="var(--text-2)" text-anchor="end">${Math.round(yTop * t)}</text>`;
+    });
+    s += `<text x="${padL - 7}" y="${padT - 10}" font-size="9.5" fill="var(--text-2)" text-anchor="end">PPM</text>`;
+    [[DEV_WARN, 'var(--warn)', '预警线 ' + DEV_WARN], [DEV_RED, 'var(--danger)', '红线 ' + DEV_RED]].forEach(([lv, col, txt]) => {
+      if (lv >= yTop) return;
+      const y = yOf(lv);
+      s += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1.1" stroke-dasharray="5 3" opacity=".8"/>` +
+        `<text x="${(W - padR - 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" font-size="9" fill="${col}" text-anchor="end">${txt}</text>`;
+    });
+    across.forEach((a, i) => {
+      const x = padL + slot * i + (slot - bw) / 2;
+      const h = Math.max(1.5, Math.min(plotH, (a.ppm / yTop) * plotH));
+      const y = padT + plotH - h;
+      const isMe = a.d === curDev, col = l4Band(a.ppm);
+      const tip = `${isMe ? '▶ ' : ''}${a.d}${isMe ? '（本机台）' : ''}\nPPM ${Math.round(a.ppm)} · 次品 ${fmt(a.n)} / 结料 ${fmt(a.out)}\n占该料号次品 ${(a.share != null ? a.share : 0).toFixed(1)}%`;
+      s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}" fill-opacity="${isMe ? 1 : 0.78}" rx="2.5"${isMe ? ` stroke="#0f172a" stroke-width="1.6" stroke-dasharray="3 2"` : ''}><title>${esc(tip)}</title></rect>` +
+        `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" font-size="9.5" font-weight="${isMe ? 700 : 400}" fill="${col}" text-anchor="middle">${Math.round(a.ppm)}</text>` +
+        `<text transform="rotate(-32 ${(x + bw / 2).toFixed(1)} ${(padT + plotH + 14).toFixed(1)})" x="${(x + bw / 2).toFixed(1)}" y="${(padT + plotH + 14).toFixed(1)}" font-size="10" font-weight="${isMe ? 700 : 400}" fill="${isMe ? 'var(--text)' : 'var(--text-2)'}" text-anchor="end"><title>${esc(tip)}</title>${esc(a.d)}${isMe ? ' ◂' : ''}</text>`;
+    });
+    return `<svg class="l4-svg" viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${s}</svg>`;
+  }
+
+  // ② 各机台次品数占比 环形图（右列表例：机台 / 次品数 / 占比）
+  function l4PieChart(across, curDev, totN, wppm) {
+    const W = 470, H = 250, cx = 118, cy = 122, R = 74, r = 44;
+    let s = '';
+    if (!totN) {
+      s += `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="#eef2f8" stroke-width="${R - r}"/>` +
+        `<text x="${cx}" y="${cy + 4}" font-size="12" fill="var(--text-2)" text-anchor="middle">无次品</text>`;
+    } else {
+      const live = across.filter(a => a.n > 0);
+      if (live.length <= 1) {
+        const c0 = live[0] || null;
+        const col = c0 ? l4Band(c0.ppm) : '#cbd5e1';
+        s += `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="${col}" stroke-width="${R - r}" stroke-opacity="${c0 && c0.d === curDev ? 1 : 0.8}"><title>${c0 ? esc(c0.d) + '：100.0%（' + fmt(c0.n) + ' 颗）' : '无次品'}</title></circle>`;
+      } else {
+        let ang = -Math.PI / 2, idx = 0;
+        across.forEach((a, i) => {
+          const frac = a.n / totN;
+          if (frac <= 0) { return; }
+          idx++;
+          const a2 = ang + frac * Math.PI * 2;
+          const col = l4Band(a.ppm), isMe = a.d === curDev;
+          const x1 = cx + R * Math.cos(ang), y1 = cy + R * Math.sin(ang);
+          const x2 = cx + R * Math.cos(a2), y2 = cy + R * Math.sin(a2);
+          const xi2 = cx + r * Math.cos(a2), yi2 = cy + r * Math.sin(a2);
+          const xi1 = cx + r * Math.cos(ang), yi1 = cy + r * Math.sin(ang);
+          const large = frac > 0.5 ? 1 : 0;
+          const tip = `${isMe ? '▶ ' : ''}${a.d}${isMe ? '（本机台）' : ''}\n次品 ${fmt(a.n)} 颗 · 占 ${(frac * 100).toFixed(1)}%\nPPM ${Math.round(a.ppm)} · 结料 ${fmt(a.out)}`;
+          s += `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} L${xi2.toFixed(1)} ${yi2.toFixed(1)} A${r} ${r} 0 ${large} 0 ${xi1.toFixed(1)} ${yi1.toFixed(1)} Z" fill="${col}" fill-opacity="${isMe ? 1 : 0.8}" stroke="#fff" stroke-width="1.4"><title>${esc(tip)}</title></path>`;
+          // 占比 ≥ 8% 时在扇区内标百分比
+          if (frac >= 0.08) {
+            const mid = (ang + a2) / 2, rm = (R + r) / 2;
+            s += `<text x="${(cx + rm * Math.cos(mid)).toFixed(1)}" y="${(cy + rm * Math.sin(mid) + 3.4).toFixed(1)}" font-size="10.5" font-weight="700" fill="#fff" text-anchor="middle" pointer-events="none">${Math.round(frac * 100)}%</text>`;
+          }
+          ang = a2;
+        });
+      }
+    }
+    s += `<text x="${cx}" y="${cy - 4}" font-size="11" fill="var(--text-2)" text-anchor="middle">次品合计</text>` +
+      `<text x="${cx}" y="${cy + 17}" font-size="20" font-weight="800" fill="var(--text)" text-anchor="middle">${fmt(totN)}</text>` +
+      `<text x="${cx}" y="${cy + 34}" font-size="10.5" fill="var(--text-2)" text-anchor="middle">加权 ${Math.round(wppm)} PPM</text>`;
+    // 右侧图例
+    const lx = 216, ly = 40, gap = Math.min(24, (H - 66) / Math.max(across.length, 1));
+    across.forEach((a, i) => {
+      const y = ly + i * gap, isMe = a.d === curDev;
+      const share = totN ? a.n / totN * 100 : 0;
+      s += `<rect x="${lx}" y="${(y - 8).toFixed(1)}" width="10" height="10" rx="2" fill="${l4Band(a.ppm)}" fill-opacity="${isMe ? 1 : 0.8}"><title>${esc(a.d)}</title></rect>` +
+        `<text x="${lx + 16}" y="${(y + 1).toFixed(1)}" font-size="11" font-weight="${isMe ? 700 : 400}" fill="var(--text)">${isMe ? '▶ ' : ''}${esc(a.d)}<tspan font-size="9.5" fill="var(--text-3,#64748b)">${isMe ? '（本机台）' : ''}</tspan></text>` +
+        `<text x="${lx + 152}" y="${(y + 1).toFixed(1)}" font-size="11" fill="var(--text-2)" text-anchor="end">${fmt(a.n)} 颗</text>` +
+        `<text x="${lx + 214}" y="${(y + 1).toFixed(1)}" font-size="11" font-weight="700" fill="${isMe ? 'var(--text)' : 'var(--text-2)'}" text-anchor="end">${share.toFixed(1)}%</text>`;
+    });
+    return `<svg class="l4-svg" viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${s}</svg>`;
+  }
+
+  // 两张图并排（一行两列，窄屏自动堆叠）
+  function l4Charts(across, curDev, totN, wppm) {
+    if (!across.length) return '';
+    const withShare = across.map(a => Object.assign({}, a, { share: totN ? a.n / totN * 100 : 0 }));
+    const box = (title, sub, inner) => `<div class="l4-box">
+        <div class="l4-box-hd">${title}<span class="l4-box-sub">${sub}</span></div>
+        ${inner}
+      </div>`;
+    const icBar = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6.5 21v-7M11.5 21V6M16.5 21v-11M21 21v-4"/></svg>';
+    const icPie = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.3"/></svg>';
+    return `<div class="l4-2col">
+      ${box(icBar + ' 各机台 PPM 对比', '柱高 = 该料号在本机台的 PPM（含预警 / 红线）', l4BarChart(withShare, curDev))}
+      ${box(icPie + ' 各机台次品占比', '环宽 = 该机台次品数 ÷ 该料号本周次品总数', l4PieChart(withShare, curDev, totN, wppm))}
+    </div>`;
+  }
+
   function devPivotTable(catKey, weekIdx, onlyDev) {
     const all = devRows(catKey, weekIdx);
     if (!all) return '';
@@ -824,13 +942,14 @@
             <button class="chip" id="l4Back" style="margin-left:auto">‹ 返回三级（${esc(drillDev)} × 料号透视）</button>
             <span class="sub-note">切换周可对比同一料号的历史跨机台表现</span>
           </div>
+          ${across.length ? l4Charts(across, drillDev, totN, wppm) : ''}
           ${across.length ? `<table class="table"><thead><tr><th>机台</th><th class="num">ICOS结料数量</th><th class="num">次品数</th><th class="num">PPM</th><th class="num">占该料号次品</th><th class="num">相对本机</th><th>PPM 对比</th></tr></thead><tbody>${rowsHtml}
             <tr style="background:#eef3fa"><td style="font-weight:700">合计 / 加权</td><td class="num" style="font-weight:700">${fmt(totOut)}</td><td class="num" style="font-weight:700">${fmt(totN)}</td><td class="num" style="font-weight:700">${Math.round(wppm)}</td><td class="num">100.0%</td><td class="num">—</td><td></td></tr>
           </tbody></table>` : '<div class="notice" style="--nc:var(--warn)">本周该类别下未检索到该料号的跨机台记录。</div>'}
           <div class="sub-note mt8" style="border-left:3px solid ${vColor};padding-left:10px">
             <b>分析结论：<span style="color:${vColor}">${vText}</span></b><br>${esc(vTip)}
           </div>
-          <div class="sub-note mt8">口径：仅统计<b>本周实际生产过该料号</b>的 Mold 机台（未生产不列入）；PPM = 次品数 ÷ ICOS结料数量 × 100 万；机台级关注线 ≥ ${DEV_RED} 红 / ≥ ${DEV_WARN} 橙。「占该料号次品」= 该机台次品数 ÷ 该料号本周次品总数，用于定位主要贡献机台。点击顶部面包屑或「返回三级」回到机台 × 料号透视。</div>
+          <div class="sub-note mt8">口径：仅统计<b>本周实际生产过该料号</b>的 Mold 机台（未生产不列入）；PPM = 次品数 ÷ ICOS结料数量 × 100 万；机台级关注线 ≥ ${DEV_RED} 红 / ≥ ${DEV_WARN} 橙。「占该料号次品」= 该机台次品数 ÷ 该料号本周次品总数，用于定位主要贡献机台。<b>表格上方两图与表格同源</b>：左图柱高 = 各机台 PPM（虚线为 ${DEV_WARN} 预警线 / ${DEV_RED} 红线，本机台描边高亮），右图环宽 = 各机台次品数占比（含机台图例），可一眼定位主要贡献机台与离群机台。点击顶部面包屑或「返回三级」回到机台 × 料号透视。</div>
         </div>
       </div>`;
     } else if (drillDev != null) {

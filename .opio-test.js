@@ -167,12 +167,29 @@ function loadPage(file, wait) {
   {
     const { win, doc, errors } = await loadPage('output.html', 900);
     const txt = () => (doc.getElementById('content') || doc.body).textContent || '';
+    const cards = () => Array.from(doc.querySelectorAll('.op-chart-card'));
     ok(errors.length === 0, 'output.html 无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
-    ok(/BGA\/LGA = 标准 I\/O 当量/.test(txt()), '大屏标注 BGA/LGA = 标准 I/O 当量');
-    ok(/周目标已按「料号产出结构 × 各料号 PKG_I\/O」加权同步折算/.test(txt()), '大屏说明目标已同步折算');
-    ok(/④ 料号 I\/O 维护/.test(txt()), '大屏给出配置入口指引');
-    ok(/QFN = 颗数/.test(txt()), '大屏同时标注 QFN = 颗数（口径区分）');
-    ok(doc.querySelectorAll('#pc_goal_lead').length >= 0, '图表容器渲染正常');
+
+    /* --- BGA/LGA 单独成图，不再混在「累计 goal vs total」数量图里 --- */
+    ok(cards().length === 6, '双部门 3×2：颗数 / I/O当量 / 金额 × LEAD/NON-LEAD 共 6 张（' + cards().length + '）');
+    const ioCards = cards().filter(c => /本图口径：标准 I\/O 当量/.test(c.textContent));
+    const qtyCards = cards().filter(c => /本图口径：颗数/.test(c.textContent));
+    const earnCards = cards().filter(c => /累计 Earn 目标 vs 实际/.test(c.textContent));
+    ok(ioCards.length === 2, 'I/O 口径独立成图 2 张（LEAD / NON-LEAD），实际 ' + ioCards.length);
+    ok(qtyCards.length === 2, '颗数口径图 2 张，实际 ' + qtyCards.length);
+    ok(earnCards.length === 2, '金额图 2 张，实际 ' + earnCards.length);
+    ok(ioCards.every(c => /BGA\/LGA/.test(c.textContent)), 'I/O 图标题/口径说明标明 BGA/LGA');
+    ok(ioCards.every(c => /累计 goal vs total 曲线对比（标准 I\/O 当量）/.test(c.textContent)), 'I/O 图标题含「累计 goal vs total 曲线对比（标准 I/O 当量）」');
+    ok(qtyCards.every(c => !/BGA\/LGA/.test(c.textContent.replace(/BGA\/LGA 走 I\/O 加权口径[^<]*/, ''))),
+      '颗数图中不再出现 BGA/LGA（已完全拆出）');
+    ok(qtyCards.every(c => /累计 goal vs total 曲线对比（K · 颗数）/.test(c.textContent)), '颗数图标题标明「K · 颗数」');
+    ok(qtyCards.some(c => /QFN/.test(c.textContent) && /本图口径：颗数/.test(c.textContent)), '颗数图列出 QFN 等品类');
+
+    /* --- 口径说明 --- */
+    ok(/周目标已按「料号产出结构 × 各料号 PKG_I\/O」加权同步折算/.test(txt()), 'I/O 图说明目标已同步折算');
+    ok(/④ 料号 I\/O 维护/.test(txt()), '给出配置入口指引');
+    ok(/3×2 排布：行 = 口径（颗数 \/ BGA·LGA 标准 I\/O 当量 \/ 金额）/.test(txt()), '布局说明改为 3×2 三种口径');
+    ok(/BGA\/LGA 因计算方法与其他品类不同/.test(txt()), '布局说明写明 BGA/LGA 不与颗数口径混排');
     ok(errors.length === 0, 'output.html 全程无 JS 异常');
   }
   {

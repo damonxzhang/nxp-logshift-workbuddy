@@ -23,6 +23,15 @@
     .dp-sm-svg{display:block;width:100%;height:36px;margin:5px 0 3px;overflow:visible}
     .dp-sm-ft{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:11px;color:var(--text-3,#64748b)}
     .dp-sm-ft b{font-size:16px;font-weight:800;line-height:1}
+    /* 四级 · 料号跨机台分析：并排两图（柱状 PPM + 环形次品占比）专属样式 */
+    .l4-2col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:2px 0 14px}
+    @media (max-width:1080px){.l4-2col{grid-template-columns:1fr}}
+    .l4-box{border:1px solid var(--border,#e1e7f0);border-radius:10px;padding:9px 12px 6px;background:#fff}
+    .l4-box-hd{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--text,#1f2937);
+      padding-bottom:6px;margin-bottom:2px;border-bottom:1px dashed var(--border,#e1e7f0)}
+    .l4-box-hd svg{color:var(--primary,#2563eb);flex:0 0 auto}
+    .l4-box-sub{font-weight:400;font-size:11.5px;color:var(--text-3,#64748b);margin-left:auto;text-align:right}
+    @media (max-width:640px){.l4-box-sub{display:none}}
   </style>
 </head>
 <body data-page="defect">
@@ -37,6 +46,6 @@
 <script src="assets/js/data.js?v=20261008r"></script>
 <script src="assets/js/defect-real-data.js?v=20261009a"></script>
 <script src="assets/js/device-events.js?v=20261009a"></script>
-<script src="assets/js/page-defect.js?v=20261013g"></script>
+<script src="assets/js/page-defect.js?v=20261013h"></script>
 </body>
 </html>

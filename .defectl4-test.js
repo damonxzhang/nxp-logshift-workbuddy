@@ -81,6 +81,74 @@ function loadPage(file, wait) {
     ok(/#l4Back|返回三级/.test(doc.getElementById('content').innerHTML) || doc.getElementById('l4Back') != null, '四级页有「返回三级」入口');
     ok(/四级 ·/.test(doc.querySelector('.crumb').textContent || ''), '面包屑显示四级层级');
 
+    /* ---- 新增：四级页表格上方并排两图（① 各机台 PPM 柱状 ② 各机台次品占比环形饼图） ---- */
+    console.log('\n【defect.html · 四级图表（柱状 + 饼图）】');
+    const col = doc.querySelector('#content .l4-2col');
+    ok(col != null, '四级页渲染并排两图容器 .l4-2col');
+    const boxes = col ? col.querySelectorAll('.l4-box') : [];
+    ok(boxes.length === 2, '容器内恰好两张图卡（实际 ' + boxes.length + '）');
+    const t0 = boxes[0] ? boxes[0].textContent : '', t1 = boxes[1] ? boxes[1].textContent : '';
+    ok(/各机台 PPM 对比/.test(t0), '左图为「各机台 PPM 对比」（柱状）');
+    ok(/各机台次品占比/.test(t1), '右图为「各机台次品占比」（饼图）');
+    const svg0 = boxes[0] ? boxes[0].querySelector('svg.l4-svg') : null;
+    const svg1 = boxes[1] ? boxes[1].querySelector('svg.l4-svg') : null;
+    ok(svg0 != null && svg0.querySelectorAll('rect').length > 0, '左图渲染出柱体 rect（' + (svg0 ? svg0.querySelectorAll('rect').length : 0) + ' 根）');
+    ok(svg0 != null && /预警线 350/.test(svg0.textContent), '左图标注 350 预警线');
+    {
+      const barMax = svg0 ? Array.from(svg0.querySelectorAll('rect')).reduce((a, r) => a, 0) : 0;
+      const anyHigh = svg0 ? Number((/fill="var\(--danger\)"[^>]*rx/.test(svg0.innerHTML)) ? 1 : 0) : 0;
+      ok(!anyHigh || /红线 500/.test(svg0.textContent), '存在 ≥500 PPM 柱时同步标注 500 红线（无高柱则可不标）');
+    }
+    const segs = svg1 ? svg1.querySelectorAll('path, circle').length : 0;
+    ok(svg1 != null && segs > 0, '右图渲染出扇区/环形（' + segs + ' 个图元）');
+    ok(svg1 != null && /次品合计/.test(svg1.textContent), '右图环形中心标注「次品合计」');
+    ok(svg1 != null && /%/.test(svg1.textContent), '右图图例给出占比 %');
+
+    // 与表格同源：柱状/饼图机台数 = 表格「机台」行数（不含合计行）
+    const tbl0 = doc.querySelector('#content table.table');
+    const devCount = tbl0 ? Array.from(tbl0.querySelectorAll('tbody tr')).filter(tr => !/合计/.test(tr.textContent)).length : 0;
+    const barCount = svg0 ? svg0.querySelectorAll('rect').length : 0;
+    ok(devCount > 0 && barCount >= devCount, '柱体数（' + barCount + '）覆盖表格机台行数（' + devCount + '）');
+    // 柱高必须与 PPM 单调一致（最高 PPM → 最高柱）
+    {
+      const trs = Array.from(tbl0 ? tbl0.querySelectorAll('tbody tr') : []).filter(tr => !/合计/.test(tr.textContent));
+      const tds = trs.map(tr => tr.querySelectorAll('td'));
+      const devPpm = tds.map(td => ({ d: td[0].textContent.replace('▶ ', '').replace('（本机台）', '').trim(), ppm: Number(td[3].textContent) }));
+      const rects = Array.from(svg0 ? svg0.querySelectorAll('rect') : []);
+      const hs = rects.map(r => Number(r.getAttribute('height')));
+      const topDev = devPpm.slice().sort((a, b) => b.ppm - a.ppm)[0];
+      const maxH = Math.max.apply(null, hs);
+      const maxIdx = hs.indexOf(maxH);
+      ok(topDev && devPpm[maxIdx] && devPpm[maxIdx].d === topDev.d,
+        '最高 PPM 机台（' + (topDev ? topDev.d + ' ' + topDev.ppm : '—') + '）对应最高柱（实际最高柱为 ' + (devPpm[maxIdx] ? devPpm[maxIdx].d : '—') + '）');
+      const minH = Math.min.apply(null, hs);
+      const ppmPos = devPpm.filter(x => x.ppm > 0).map(x => x.ppm);
+      if (ppmPos.length === devPpm.length) {
+        const sortedP = ppmPos.slice().sort((a, b) => b - a);
+        const rH = maxH / minH, rP = sortedP[0] / sortedP[sortedP.length - 1];
+        ok(Math.abs(rH - rP) < 0.08 * rP + 0.05,
+          '柱高与 PPM 严格成比例（高度比 ' + rH.toFixed(2) + ' vs PPM 比 ' + rP.toFixed(2) + '）');
+      } else {
+        const zi = devPpm.findIndex(x => x.ppm === 0);
+        ok(zi >= 0 && hs[zi] <= 2, 'PPM = 0 的机台柱为最小占位（高度 ' + hs[zi] + '）');
+      }
+      ok(maxH > 20 && maxH <= 178, '最高柱高度合理（' + maxH + ' ≤ 绘图区 178）');
+    }
+
+    // 图表位于表格上方
+    ok(col && tbl0 && (col.compareDocumentPosition(tbl0) & win.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, '两图位于明细表上方');
+    // 并排一行（同一父容器内两列网格）
+    ok(col && win.getComputedStyle(col).gridTemplateColumns.split(' ').length === 2 || /l4-2col/.test(col.className), '两图并排同一行（2 列网格）');
+
+    // 切换周后图表随之刷新
+    const sel4 = doc.getElementById('devSel4');
+    if (sel4 && sel4.options.length > 1) {
+      sel4.value = sel4.options[1].value;
+      sel4.dispatchEvent(new win.Event('change', { bubbles: true }));
+      const col2 = doc.querySelector('#content .l4-2col');
+      ok(col2 != null && col2.querySelectorAll('svg.l4-svg').length === 2, '切换周后两图仍正常渲染');
+    }
+
     const back = doc.getElementById('l4Back');
     ok(click(back), '点击「返回三级」');
     ok(/三级 ·/.test(txt()) && !/四级 · 料号/.test(txt()), '返回到三级（四级已退出）');
