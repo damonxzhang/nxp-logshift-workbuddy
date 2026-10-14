@@ -13,7 +13,7 @@
      · 夏令时改手动：取消自动切换，默认保持夏令时；切冬令时手动点击；开始时间可指定 6 点 / 7 点。
      ④ 料号 I/O 维护（2026-10-13 新增）                                            → OP_IO_STORE
         · 客户《NONLEAD.xlsx》IO sheet 中 **PKG_CODE（封装代码）与 PKG_I/O 均可自行配置**：
-          原始式「实际结果 = PKG_I/O × Unit（实际数量）÷ 255」。
+          原始式「实际结果 = PKG_I/O × Unit（实际数量）÷ 225」。
         · 这里维护「OP 产出报表里的料号 ↔ PKG_CODE ↔ PKG_I/O」的对应关系；
           配好后 BGA/LGA 的产出与周目标在大屏 / 周维度累计表统一折算成「标准 I/O 当量」。
    权限：需 Output（OP）模块「编辑」权限；否则整页只读。 */
@@ -52,14 +52,6 @@
 
   function render() {
     document.getElementById('content').innerHTML = `
-      <div class="notice mt16" style="--nc:var(--primary)">
-        ${icon('settings', 19)}
-        <div><strong>Output（OP）独立配置页：</strong>PKG Type 维护（含<strong>逐品类的黄灯 / 红灯报警阈值</strong>与<strong>小分类（封装料号）单价</strong>）、<strong>每周 PKG Type 目标数量</strong>、
-        预警分口径（数量沿用均摊 / Earn 递进式 ±5%）/ 夏令时（手动）均在此配置，保存后
-        <a class="chip chip-link" href="output.html">Output（OP）大屏</a> 即时生效。
-        ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无 Output（OP）「编辑」权限，仅可查看配置。'}</div>
-      </div>
-
       <div class="card mt16 no-print">
         <div class="card-head">
           <div class="card-title">${icon('settings', 19)} 配置域
@@ -86,7 +78,7 @@
   }
 
   /* =========================================================
-     ④ 料号 I/O 维护（BGA/LGA 专有口径：产出 = 颗数 × PKG_I/O ÷ 255）
+     ④ 料号 I/O 维护（BGA/LGA 专有口径：产出 = 颗数 × PKG_I/O ÷ 225）
      ------------------------------------------------------------
      客户《NONLEAD.xlsx》IO sheet 中 **PKG_CODE / PKG_I/O 两个字段均可由客户自行配置**：
      这里维护「OP 产出报表里的料号（12 位） ↔ 客户封装代码 PKG_CODE ↔ 该封装料号的 I/O 数」。
@@ -120,10 +112,6 @@
     const types2 = types;
     const fType = opIoFactorOfType(tid, types2);
     const configured = rows.some(r => r.io != null && r.io > 0);
-    const missSubs = subPool.filter(s => {
-      const r = rows.find(x => x.sub === s);
-      return !r || r.io == null || !(r.io > 0);
-    });
     const codeList = pool.map(c => `<option value="${esc(c.code)}">`).join('');
     const body = rows.length ? rows.map((r, i) => {
       const f = (r.io == null || !(r.io > 0)) ? null : r.io / OP_IO_BASE;
@@ -136,17 +124,12 @@
         <td class="small muted" data-k="src">${inPool ? '客户 IO 表命中（PKG_I/O = ' + fmtNum(poolMap[r.code]) + '）' : (r.code ? '<span style="color:var(--warn)">不在客户 IO 表候选中</span>' : '—')}</td>
         ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-iorm="${i}">${icon('trash', 14)}</button></td>` : ''}
       </tr>`;
-    }).join('') : `<tr><td colspan="${canEdit ? 6 : 5}" class="center muted">该 PKG Type 尚未配置料号 I/O —— 可点「新增料号」或「从客户 IO 表带入候选」。</td></tr>`;
+    }).join('') : '';
 
     return `
       <div class="card">
         <div class="card-head">
-          <div class="card-title">${icon('database', 19)} ④ 料号 I/O 维护（BGA/LGA 产出口径）
-            <span class="card-sub">客户《NONLEAD.xlsx》IO sheet 中 <b>PKG_CODE</b>（封装代码）与 <b>PKG_I/O</b>（I/O 数）<b>均可自行配置</b>；此处维护「OP 料号 ↔ PKG_CODE ↔ PKG_I/O」的对应关系</span></div>
-          <div class="flex acenter gap8 flex-wrap">
-            <span class="small muted">PKG Type</span>
-            <div class="seg" id="ioSeg">${types.map(t => `<button data-iot="${esc(t.id)}" class="${tid === t.id ? 'active' : ''}">${esc(t.name || t.id)}${opUsesIo(t.id) ? '' : ' · 颗数'}</button>`).join('')}</div>
-          </div>
+          <div class="card-title">${icon('database', 19)} ④ 料号 I/O 维护（BGA/LGA 产出口径）</div>
         </div>
         <div class="card-body">
           <div class="notice" style="--nc:${configured ? 'var(--success)' : 'var(--warn)'}">
@@ -154,8 +137,6 @@
             <div>
               <strong>折算公式</strong>：I/O 当量 = <b>颗数 × (PKG_I/O ÷ ${OP_IO_BASE})</b>　　（客户 IO 表原始式：实际结果 = PKG_I/O × Unit ÷ ${OP_IO_BASE}）
               <br><strong>当前 ${esc(tid)}</strong>：${opUsesIo(tid) ? `已配 <b>${rows.filter(r => r.io != null && r.io > 0).length}</b> 个料号，品类加权系数 <b>${fType == null ? '—（未配置，回落 1.0 即等同颗数）' : fType.toFixed(3)}</b>` : '<b>该品类不走 I/O 口径</b>，仍按颗数计量（仅 BGA/LGA 使用 I/O 加权）'}
-              ${missSubs.length ? `<br><span style="color:var(--warn)">提示：产出报表里还有 <b>${missSubs.length}</b> 个料号未配 PKG_I/O（${esc(missSubs.slice(0, 6).join('、'))}${missSubs.length > 6 ? ' …' : ''}），未配的按品类加权系数兜底。</span>` : ''}
-              ${!configured && opUsesIo(tid) ? '<br><span style="color:var(--danger)"><b>尚未配置任何 PKG_I/O</b>：大屏与累计表当前仍按「颗数」显示，补齐配置后自动切换为 I/O 加权当量。</span>' : ''}
             </div>
           </div>
 
@@ -180,12 +161,6 @@
               </tr></thead>
               <tbody>${body}</tbody>
             </table>
-          </div>
-          <div class="sub-note mt8">
-            · <b>OP 料号</b>：产出报表（BE1 Output Report）里的 12 位料号，可从下拉候选里选，也可手工输入；共 ${subPool.length} 个料号在本品类的产出中出现。
-            · <b>PKG_CODE / PKG_I/O</b>：客户《NONLEAD.xlsx》IO sheet 的两个可配置字段；填入客户表里的 PKG_CODE 后，<b>PKG_I/O 会自动带出</b>，也可手工覆盖。
-            · <b>折算系数</b> = PKG_I/O ÷ ${OP_IO_BASE}，作用于该料号的产出数量；<b>周目标</b>同步按「料号产出结构 × 各料号系数」的加权系数折算，保证实际与目标同量纲可比。
-            · 留空 PKG_I/O 的料号按<b>品类加权系数</b>兜底（不丢量）；一个料号都没配时整体回落 1.0（等同颗数口径）。
           </div>
         </div>
       </div>`;
@@ -305,7 +280,7 @@
           <button class="btn btn-sm" id="btnSubFill">${icon('refresh', 16)} 全部填充为系统默认单价 ${base}</button>
           <button class="btn btn-sm" id="btnSubClear">${icon('close', 16)} 清空单价（全部回落兜底）</button>
         </div>`,
-      onOk: () => {
+      onOk: (_m, close) => {
         const rows = document.querySelectorAll('#tblSubs tbody tr[data-s]');
         const out = [], seen = {};
         rows.forEach(r => {
@@ -320,6 +295,7 @@
         t.subs = out;
         render();
         toast('已保存 ' + out.length + ' 个料号（' + out.filter(s => s.price != null).length + ' 个已配单价）', 'success');
+        close();          // 保存成功后关闭弹窗（openDialog 的 onOk 需自行调用 close）
       }
     });
 
@@ -681,10 +657,6 @@
     };
 
     /* ---- ④ 料号 I/O 维护（BGA/LGA 口径） ---- */
-    const ioSeg = document.getElementById('ioSeg');
-    if (ioSeg) ioSeg.querySelectorAll('button').forEach(b => {
-      b.onclick = () => { ioRows = null; ioType = b.dataset.iot; render(); };
-    });
     const ba1 = document.getElementById('btnIoAdd');
     if (ba1) ba1.onclick = () => {
       ioRows = collectIo().concat([{ sub: '', code: '', io: null }]);

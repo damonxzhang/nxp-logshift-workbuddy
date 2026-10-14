@@ -41,26 +41,107 @@
   let typeSel = store.get('wip_types', []);
   const selTypes = () => { const ok = typeSel.filter(t => ALL_TYPES.includes(t)); return ok.length ? ok : ALL_TYPES; };
   const saveSel = () => store.set('wip_types', typeSel);
+  /* 热力矩阵列：不展示 BGA/LGA（LGA）列；其数量仍计入合计 / 排行 / KPI */
+  const heatTypes = () => selTypes().filter(t => t !== 'LGA');
 
-  /* ---------------- 工序流转视图状态（来源 NONLEAD.xlsx） ---------------- */
-  let flowType = store.get('wip_flow', 'BGA'); // 流转路径所选封装类型（BGA / PQFN / QFN / FCCSP），横向展示在热力矩阵上方
+  /* ---------------- 工序显示清单（客户指定名称与顺序）→ 数据工序代码 ---------------- */
+  const STEP_MAP = [
+    ['Plasma', ['PREM_PLS']],
+    ['passwnd', ['PSSWND']],
+    ['mold', ['BMOLD', 'QMOLD', 'FMOLD']],
+    ['detaping', []],
+    ['PMC', ['NLD_PMC']],
+    ['SI', ['NLD_SI']],
+    ['Mark', ['BLMARK', 'QMARK', 'FCMARK']],
+    ['Pre_treat', []],
+    ['HPC', ['NLD_HPC']],
+    ['BallAttach', []],
+    ['FluxClean', ['FLUX_CLEAN']],
+    ['SAW', ['BE_SAW', 'SAW_STAGE']],
+    ['ICOS', ['BFOI_GATE']],
+    ['QA', ['FVI_GATE']],
+    ['Ship', ['BE_DC']]
+  ];
+  /* 联动排行固定站点清单（客户按品类指定名称）→ 数据工序代码 */
+  const RANK_STATIONS = {
+    BGA: [
+      ['PREM_PLS', ['PREM_PLS']],
+      ['PASSWND', ['PSSWND']],
+      ['BMOLD', ['BMOLD']],
+      ['NLD_PMC', ['NLD_PMC']],
+      ['BLMARK', ['BLMARK']],
+      ['NLD_HPC', ['NLD_HPC']],
+      ['BR', ['BR']],
+      ['FLUX_CLEAN', ['FLUX_CLEAN']],
+      ['BE_SAW', ['BE_SAW']],
+      ['BFOI_GATE', ['BFOI_GATE']],
+      ['FVI_GATE', ['FVI_GATE']],
+      ['Ship', ['BE_DC']]
+    ],
+    FCCSP: [
+      ['PREM_PLS', ['PREM_PLS']],
+      ['PASSWND', ['PSSWND']],
+      ['FMOLD', ['FMOLD']],
+      ['NLD_PMC', ['NLD_PMC']],
+      ['FCMARK', ['FCMARK']],
+      ['FPF_REFLOW', ['FPF_REFLOW']],
+      ['FPF_CLEAN', ['FPF_CLEAN']],
+      ['BR', ['BR']],
+      ['FLUX_CLEAN', ['FLUX_CLEAN']],
+      ['BE_SAW', ['BE_SAW']],
+      ['BFOI_GATE', ['BFOI_GATE']],
+      ['FVI_GATE', ['FVI_GATE']],
+      ['Ship', ['BE_DC']]
+    ],
+    QFN: [
+      ['PASSWND', ['PSSWND']],
+      ['QMOLD', ['QMOLD']],
+      ['DE_TAPING', ['DE_TAPING']],
+      ['NLD_PMC', ['NLD_PMC']],
+      ['NLD_SI', ['NLD_SI']],
+      ['QMARK', ['QMARK']],
+      ['BE_SAW', ['BE_SAW']],
+      ['BFOI_GATE', ['BFOI_GATE']],
+      ['FVI_GATE', ['FVI_GATE']],
+      ['Ship', ['BE_DC']]
+    ],
+    PQFN: [
+      ['PREM_PLS', ['PREM_PLS']],
+      ['PASSWND', ['PSSWND']],
+      ['PMOLD', ['PMOLD']],
+      ['DE_TAPING', ['DE_TAPING']],
+      ['NLD_PMC', ['NLD_PMC']],
+      ['NLD_SI', ['NLD_SI']],
+      ['PMARK', ['PMARK']],
+      ['DEFLASH', ['DEFLASH']],
+      ['BE_PSAW', ['BE_PSAW']],
+      ['PINSP', ['PINSP']],
+      ['FVI_GATE', ['FVI_GATE']],
+      ['Ship', ['BE_DC']]
+    ]
+  };
+  const codesOf = name => {
+    const it = STEP_MAP.find(x => x[0] === name) ||
+      Object.values(RANK_STATIONS).flat().find(x => x[0] === name);
+    return it ? it[1] : [name];
+  };
 
   /* ---------------- 聚合 ----------------
-     每个工序：按品类数量 / 金额、批次数、Hold、OTD 逾期 */
+     按上述固定清单聚合（仅 15 行、顺序固定）：数量 / 金额、批次数、Hold、OTD 逾期 */
   function stepAgg() {
     const types = selTypes();
-    const m = {};
-    rows.forEach(r => {
-      if (!types.includes(r[1])) return;
-      const s = m[r[0]] || (m[r[0]] = { step: r[0], qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} });
-      s.qty += r[7]; s.val += valOf(r[7], r[1], r[3]); s.lots++;
-      s.byType[r[1]] = (s.byType[r[1]] || 0) + r[7];
-      if (r[13] > 0) s.hold++;
-      if (r[12] != null && r[12] < 0) s.otd++;
+    return STEP_MAP.map(([name, codes]) => {
+      const s = { step: name, qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} };
+      rows.forEach(r => {
+        if (!codes.includes(r[0]) || !types.includes(r[1])) return;
+        s.qty += r[7]; s.val += valOf(r[7], r[1], r[3]); s.lots++;
+        s.byType[r[1]] = (s.byType[r[1]] || 0) + r[7];
+        if (r[13] > 0) s.hold++;
+        if (r[12] != null && r[12] < 0) s.otd++;
+      });
+      return s;
     });
-    return Object.values(m).sort((a, b) => b.qty - a.qty);
   }
-  const rowsOf = steps => rows.filter(r => steps.includes(r[0]) && selTypes().includes(r[1]));
 
   /* ---------------- 全局汇总 ---------------- */
   function globalAgg() {
@@ -89,22 +170,14 @@
 
   /* ---------------- 一级界面渲染 ---------------- */
   let patrolTimer = null, patrolIdx = -1;
+  let rankType = '';   // 排行联动品类：矩阵品类列头按钮选中值（'' = 全部品类）
 
   function render() {
     const g = globalAgg();
-    const m = RAW.meta || {};
-    const holdLots = rows.filter(r => r[13] > 0);
     const steps = stepAgg();
-    const heatRows = steps.slice(0, 16);
 
     document.getElementById('content').innerHTML = `
       <div id="wipMain">
-      <div class="notice mt16">
-        ${icon('database', 17)} <strong>真实数据</strong> · 来源客户 IT 导出《${esc(m.source || 'BE1 WIP Report-V26.xls')}》在制品快照 ·
-        共 <strong>${(m.lots || rows.length).toLocaleString('en-US')}</strong> 批 · 合计 <strong>${fmtVal((m.totalQty || 0) / 1000)}K</strong> ·
-        抽取于 ${esc(m.extractedAt || '—')}（IT 更新报表后重跑 .extract-wip.py 即可刷新）
-      </div>
-
       <div class="wip-kpis mt16">
         <div class="wip-kpi" style="--wk-accent:#1d4ed8"><div class="wk-label">${icon('layers', 15)} WIP 在制总量</div>
           <div class="wk-value" id="kTotal">0</div><div class="wk-foot">按当前口径 ${unit === 'K' ? '数量（千颗）' : '金额（Earn）'}</div></div>
@@ -113,7 +186,7 @@
         <div class="wip-kpi" style="--wk-accent:#a8620b"><div class="wk-label">${icon('clock', 15)} Earn 占用</div>
           <div class="wk-value" id="kEarn">0</div><div class="wk-foot">按 OP 单价折算（万元）</div></div>
         <div class="wip-kpi ${g.hold ? 'is-danger' : ''}" style="--wk-accent:#cc2f2a"><div class="wk-label"><i class="wk-pulse" style="${g.hold ? '' : 'display:none'}"></i> Hold 暂停</div>
-          <div class="wk-value" id="kHold">0</div><div class="wk-foot">批次 · 见下方跑马灯明细</div></div>
+          <div class="wk-value" id="kHold">0</div><div class="wk-foot">批次</div></div>
         <div class="wip-kpi ${g.otd ? 'is-danger' : ''}" style="--wk-accent:#b3261e"><div class="wk-label">${icon('alert', 15)} OTD 逾期</div>
           <div class="wk-value" id="kOtd">0</div><div class="wk-foot">Shutdown 余量为负（已逾期）</div></div>
       </div>
@@ -134,33 +207,20 @@
         </div>
       </div>
 
-      <div id="wipFlow"></div>
-
       <div class="grid g-23 mt16">
         <section class="card">
           <div class="card-head"><div class="card-title">${icon('grid', 19)} 工序 × PKG Type 热力矩阵
-            <span class="card-sub">颜色深浅 = 该格占该品类在制量的比重 · 悬停查看明细 · 点击进入该工序</span></div></div>
-          <div class="card-body wip-heat"><div class="wh-grid" id="whGrid" style="--wh-cols:${selTypes().length}"></div>
+            <span class="card-sub">颜色深浅 = 该格占该品类在制量的比重 · 点击品类列头联动右侧排行 · 悬停查看明细 · 点击进入该工序</span></div></div>
+          <div class="card-body wip-heat"><div class="wh-grid" id="whGrid" style="--wh-cols:${heatTypes().length}"></div>
             <div class="wh-info" id="whInfo">把鼠标移到任意格子上查看该「工序 × 品类」的在制明细。</div>
           </div>
         </section>
         <section class="card">
           <div class="card-head"><div class="card-title">${icon('activity', 19)} 工序 WIP 排行
-            <span class="card-sub">堆叠条按品类构成 · 自动巡检高亮 · 点击进入</span></div></div>
-          <div class="card-body wip-rank" id="wrList" style="max-height:430px;overflow:auto"></div>
+            <span class="card-sub" id="rankSub">堆叠条按品类构成 · 自动巡检高亮 · 点击进入</span></div></div>
+          <div class="card-body wip-rank" id="wrList" style="max-height:680px;overflow:auto"></div>
         </section>
       </div>
-
-      <section class="card mt16">
-        <div class="card-head"><div class="card-title">${icon('bell', 19)} Hold 暂停批次 · 滚动提醒
-          <span class="card-sub">共 ${holdLots.length} 批 · 悬停暂停滚动 · 数据乱码为源文件原生编码所致</span></div></div>
-        <div class="card-body" style="padding-top:10px;padding-bottom:10px">
-          ${holdLots.length ? `<div class="wip-ticker"><div class="tk-track" style="--tk-dur:${Math.max(24, holdLots.length * 7)}s">${(holdLots.concat(holdLots)).map(r => `
-            <span class="tk-item"><b>${esc(r[6])}</b><span class="tk-days">Hold ${r[13]} 天</span>
-            <span class="tk-step">${esc(r[0])}</span><span>${typeName(r[1])} · ${fmtVal(r[7] / 1000)}K</span></span>`).join('')}</div></div>`
-        : '<div class="small muted">当前无 Hold 批次。</div>'}
-        </div>
-      </section>
       </div>`;
 
     /* KPI 数字滚动 */
@@ -182,27 +242,27 @@
       };
     });
 
-    renderHeat(heatRows, steps);
+    renderHeat(steps);
     renderRank(steps);
-    startPatrol(steps);
-
-    /* 工序流转路径（横向）渲染在热力矩阵上方 */
-    renderFlow();
+    startPatrol();
   }
 
-  /* ---------------- 热力矩阵 ---------------- */
-  function renderHeat(heatRows, steps) {
-    const types = selTypes();
+  /* ---------------- 热力矩阵 ----------------
+     行 = 客户指定 15 个工序（固定顺序、显示名）；悬停 / 点击按映射代码合并取数 */
+  function renderHeat(steps) {
+    const types = heatTypes();
     const colMax = {};
     types.forEach(t => { colMax[t] = Math.max(1e-9, ...steps.map(s => (s.byType[t] || 0))); });
     const grid = document.getElementById('whGrid');
     const info = document.getElementById('whInfo');
 
     const head = `<div class="wh-row" style="animation-delay:0s"><div class="wh-head">工序 \\ 品类</div>
-      ${types.map(t => `<div class="wh-head" style="color:${TYPE_COLOR[t] || 'var(--text-3)'}">${esc(typeName(t))}</div>`).join('')}
+      ${types.map(t => `<div class="wh-head wh-htbtn ${rankType === t ? 'on' : ''}" data-ht="${t}"
+        style="color:${TYPE_COLOR[t] || 'var(--text-3)'}"
+        title="联动右侧「工序 WIP 排行」：仅看 ${esc(typeName(t))}${rankType === t ? '（再点一次恢复全部）' : ''}">${esc(typeName(t))}</div>`).join('')}
       <div class="wh-head">合计（${unitLabel()}）</div></div>`;
 
-    const body = heatRows.map((s, ri) => {
+    const body = steps.map((s, ri) => {
       const delay = (ri * 0.04).toFixed(2);
       const cells = types.map((t, ci) => {
         const q = s.byType[t] || 0;
@@ -225,7 +285,8 @@
       const cell = e.target.closest('.wh-cell[data-qty]');
       if (cell) {
         const step = cell.dataset.step, t = cell.dataset.type, q = +cell.dataset.qty;
-        const sub = rows.filter(r => r[0] === step && r[1] === t);
+        const codes = codesOf(step);
+        const sub = rows.filter(r => codes.includes(r[0]) && r[1] === t);
         const lotN = sub.length;
         const holdN = sub.filter(r => r[13] > 0).length;
         /* Earn 按格子内各料号的实际数量 × 各自单价汇总（不整体乘一个品类价） */
@@ -235,6 +296,18 @@
       }
     };
     grid.onclick = e => {
+      /* 品类列头按钮：联动右侧排行（再点同一列头恢复全部） */
+      const ht = e.target.closest('[data-ht]');
+      if (ht) {
+        rankType = rankType === ht.dataset.ht ? '' : ht.dataset.ht;
+        grid.querySelectorAll('[data-ht]').forEach(h => {
+          const on = h.dataset.ht === rankType;
+          h.classList.toggle('on', on);
+          h.title = `联动右侧「工序 WIP 排行」：仅看 ${typeName(h.dataset.ht)}${on ? '（再点一次恢复全部）' : ''}`;
+        });
+        renderRank(steps);
+        return;
+      }
       const el = e.target.closest('[data-step]');
       if (el) openDrawer(el.dataset.step);
     };
@@ -243,11 +316,30 @@
   /* ---------------- 排行条 ---------------- */
   function renderRank(steps) {
     const types = selTypes();
-    const list = steps.slice(0, 12);
-    const rest = steps.slice(12);
-    const max = Math.max(1e-9, ...list.map(s => s.qty));
+    const rt = types.includes(rankType) ? rankType : '';
+    let list;
+    if (rt) {
+      /* 联动模式：矩阵列头选中某品类时，仅按该品类客户指定的站点清单重算在制（未指定清单的品类沿用 BGA） */
+      const stations = RANK_STATIONS[rt] || RANK_STATIONS.BGA;
+      list = stations.map(([name, codes]) => {
+        const o = { step: name, qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} };
+        rows.forEach(r => {
+          if (!codes.includes(r[0]) || r[1] !== rt) return;
+          o.qty += r[7]; o.val += valOf(r[7], r[1], r[3]); o.lots++;
+          if (r[13] > 0) o.hold++;
+          if (r[12] != null && r[12] < 0) o.otd++;
+        });
+        o.byType[rt] = o.qty;
+        return o;
+      }).sort((a, b) => b.qty - a.qty);   // 站点清单全量显示：无数据的排最后，值显示 0
+    } else {
+      list = steps.slice().sort((a, b) => b.qty - a.qty);   // 排行按数量，矩阵顺序不受影响
+    }
+    const show = rt ? list : list.slice(0, 12);
+    const rest = rt ? [] : list.slice(12);
+    const max = Math.max(1e-9, ...show.map(s => s.qty));
     const el = document.getElementById('wrList');
-    el.innerHTML = list.map((s, i) => {
+    el.innerHTML = show.map((s, i) => {
       const segs = types.map(t => {
         const q = s.byType[t] || 0;
         if (!q) return '';
@@ -260,6 +352,12 @@
         <div class="wr-bar" title="进入 ${esc(s.step)} 二级筛选">${segs}</div></div>`;
     }).join('') + (rest.length ? `<div class="wr-rest">其余 ${rest.length} 个工序合计 ${fmtVal(rest.reduce((a, s) => a + s.val, 0))}${unitLabel()}（${rest.map(s => esc(s.step)).join(' · ')}）</div>` : '');
 
+    /* 联动状态提示 */
+    const sub = document.getElementById('rankSub');
+    if (sub) sub.innerHTML = rt
+      ? `联动筛选：<b style="color:${TYPE_COLOR[rt] || 'inherit'}">${esc(typeName(rt))}</b> · 点击矩阵品类列头切换 / 再点恢复全部`
+      : '堆叠条按品类构成 · 自动巡检高亮 · 点击进入';
+
     /* 条形生长动画：先置 0，下一帧写入目标宽度触发过渡 */
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.querySelectorAll('.wr-seg[data-w]').forEach(sg => { sg.style.width = sg.dataset.w + '%'; });
@@ -270,129 +368,22 @@
     };
   }
 
-  /* ---------------- 自动巡检高亮 ---------------- */
-  function startPatrol(steps) {
+  /* ---------------- 自动巡检高亮 ----------------
+     轮流高亮右侧排行中当前可见的工序（联动筛选下仅巡检可见项），并同步矩阵行 */
+  function startPatrol() {
     if (patrolTimer) clearInterval(patrolTimer);
-    const targets = () => document.querySelectorAll('.wr-item');
     patrolTimer = setInterval(() => {
       if (drawerOpen || document.hidden) return;
-      const els = targets();
+      const els = document.querySelectorAll('.wr-item');
       if (!els.length) return;
       els.forEach(x => x.classList.remove('spot'));
       const hs = document.querySelectorAll('.wh-row[data-step]');
       hs.forEach(x => x.classList.remove('spot'));
-      patrolIdx = (patrolIdx + 1) % steps.length;
-      const step = steps[patrolIdx].step;
+      patrolIdx = (patrolIdx + 1) % els.length;
+      const step = els[patrolIdx].dataset.step;
       els.forEach(x => { if (x.dataset.step === step) x.classList.add('spot'); });
       hs.forEach(x => { if (x.dataset.step === step) x.classList.add('spot'); });
     }, 3500);
-  }
-
-  /* =====================================================================
-     工序流转视图（来源《NONLEAD.xlsx》BGA / PQFN / QFN / FCCSP）
-     竖向工序链：按流程一步步下来；末行多去处 → 二级联动（一级=去处汇总，二级=各去处明细）
-     ===================================================================== */
-  function flowWipOf(code) {
-    return rows.filter(r => r[0] === code && r[1] === flowType);
-  }
-  function flowQty(code) {
-    const rs = flowWipOf(code);
-    return { q: rs.reduce((a, r) => a + r[7], 0) / 1000, n: rs.length };
-  }
-  function flowNode(code, name, m, isEnd) {
-    const hot = m.q >= 50;
-    return `<div class="fl-node" data-step="${esc(code)}" title="进入 ${esc(code)} WIP 明细">
-        <div class="fl-node-body ${hot ? 'hot' : ''}">
-          <div class="fl-code">${esc(code)}</div>
-          <div class="fl-name">${esc(name)}</div>
-          <div class="fl-qrow"><span class="fl-q">${fmtVal(m.q)}K</span><span class="fl-n">${m.n} 批</span></div>
-        </div>
-        ${isEnd ? '' : '<div class="fl-arrow"></div>'}
-      </div>`;
-  }
-  function renderFlow() {
-    const flow = (typeof WIP_FLOW_DATA !== 'undefined' && WIP_FLOW_DATA[flowType]) || null;
-    const el = document.getElementById('wipFlow');
-    if (!flow) { el.innerHTML = '<div class="notice mt16">未找到流转路径数据（wip-flow-data.js）。</div>'; return; }
-    const stepName = c => (window.WIP_FLOW_STEP && WIP_FLOW_STEP[c]) || c;
-    const isCascade = flow.to.length > 1;
-
-    const chain = flow.steps.map(code => flowNode(code, stepName(code), flowQty(code), false)).join('');
-
-    let terminal, leavesRow = '';
-    if (isCascade) {
-      const tot = flow.to.reduce((a, c) => a + flowQty(c).q, 0);
-      const totN = flow.to.reduce((a, c) => a + flowQty(c).n, 0);
-      const leaves = flow.to.map(c => {
-        const m = flowQty(c);
-        return `<div class="fl-leaf" data-step="${esc(c)}" title="进入 ${esc(c)} WIP 明细">
-            <div class="fl-leaf-code">${esc(c)}</div>
-            <div class="fl-leaf-name">${esc(stepName(c))}</div>
-            <div class="fl-leaf-q">${fmtVal(m.q)}K</div>
-            <div class="fl-leaf-n">${m.n} 批</div>
-          </div>`;
-      }).join('');
-      terminal = `<div class="fl-branch" id="flBranch">
-          <div class="fl-branch-head" id="flBranchHead" title="点击展开 / 收起去处明细">
-            <div class="fl-branch-label"><span class="fl-branch-ico"></span> 去处分流 <span class="fl-tag">二级联动</span></div>
-            <div class="fl-branch-meta">分流向 <b>${flow.to.length}</b> 个去处 · <b>${fmtVal(tot)}K</b> · ${totN} 批
-              <span class="fl-chev" id="flChev"></span></div>
-          </div>
-        </div>`;
-      leavesRow = `<div class="fl-leaves" id="flLeaves" hidden><span class="fl-leaves-tag">去处明细（二级）</span>${leaves}</div>`;
-    } else {
-      const c = flow.to[0];
-      terminal = flowNode(c, stepName(c) + '（去处）', flowQty(c), true);
-    }
-
-    const typeBtns = Object.keys(WIP_FLOW_DATA).map(t =>
-      `<button class="chip ${t === flowType ? '' : 'muted'}" data-ft="${t}" style="cursor:pointer;${t === flowType ? 'border-color:#0b6a86;color:#0b6a86;font-weight:700' : ''}">${esc(t)}</button>`).join('');
-
-    el.innerHTML = `
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('activity', 19)} ${esc(flow.name)} 工序流转路径
-            <span class="card-sub">来源《NONLEAD.xlsx》· <b>从左到右</b>按流程一步步下来 · 叠加真实在制量（wip-real-data.js）· 点击任意节点进入该工序 WIP 明细 · 末行多去处即「二级联动」</span></div>
-          <div class="flex gap8 flex-wrap">${typeBtns}</div>
-        </div>
-        <div class="card-body fl-wrap">
-          <div class="fl-scroll">
-            <div class="fl-chain">
-              ${chain}
-              ${terminal}
-            </div>
-            ${leavesRow}
-          </div>
-          <div class="fl-legend">
-            <div class="fl-legend-title">${icon('info', 15)} 说明</div>
-            <ul>
-              <li><strong>横向链条</strong>（从左到右）= 该封装类型「按流程一步步下来」的工序顺序；链条较长时可左右滚动。</li>
-              <li>每个节点显示<strong>真实在制量</strong>（K / 批），点击进入对应工序的二级 WIP 筛选。</li>
-              <li><strong>二级联动</strong>：末行「去处分流」含多个去处时，点击该节点在下方展开各去处的在制明细（再点收起）。</li>
-              <li>PQFN 末行为单一去处（BE_MT），无需展开。</li>
-            </ul>
-          </div>
-        </div>
-      </div>`;
-
-    el.querySelectorAll('[data-ft]').forEach(b => {
-      b.onclick = () => { flowType = b.dataset.ft; store.set('wip_flow', flowType); renderFlow(); };
-    });
-    el.querySelectorAll('[data-step]').forEach(n => {
-      n.onclick = () => { if (n.closest('#flBranchHead')) return; openDrawer(n.dataset.step); };
-    });
-    const bh = el.querySelector('#flBranchHead');
-    const lv = el.querySelector('#flLeaves');
-    const ch = el.querySelector('#flChev');
-    const br = el.querySelector('#flBranch');
-    if (bh && lv) {
-      bh.onclick = () => {
-        const open = lv.hidden;
-        lv.hidden = !open;
-        if (ch) ch.classList.toggle('open', open);
-        if (br) br.classList.toggle('open', open);
-      };
-    }
   }
 
   /* ---------------- 工具 ---------------- */
@@ -414,7 +405,7 @@
 
   function openDrawer(step) {
     try {
-      dr = { step, types: selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, thawOnly: false, kw: '', sort: 'otd', page: 1 };
+      dr = { step, types: rankType ? [rankType] : selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, thawOnly: false, kw: '', sort: 'otd', page: 1 };
       buildDrawer();
       document.getElementById('wipMask').classList.add('open');
       document.getElementById('wipDrawer').classList.add('open');
@@ -429,7 +420,8 @@
 
   function drRows() {
     const kw = dr.kw.trim().toLowerCase();
-    let list = rows.filter(r => r[0] === dr.step
+    const codes = codesOf(dr.step);
+    let list = rows.filter(r => codes.includes(r[0])
       && dr.types.includes(r[1])
       && (!dr.size || r[2] === dr.size)
       && (!dr.outline || r[3] === dr.outline)
@@ -447,7 +439,8 @@
   }
 
   function buildDrawer() {
-    const all = rows.filter(r => r[0] === dr.step);
+    const codes = codesOf(dr.step);
+    const all = rows.filter(r => codes.includes(r[0]));
     const uniq = (arr, i) => Array.from(new Set(arr.map(r => r[i]).filter(x => x !== ''))).sort();
     const sizes = uniq(all, 2), outlines = uniq(all, 3), locs = uniq(all, 9), banks = uniq(all, 15);
     const list = drRows();

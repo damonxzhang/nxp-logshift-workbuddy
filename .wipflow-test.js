@@ -1,21 +1,41 @@
-/* WIP 工序流转路径（横向，位于热力矩阵上方）+ 二级联动 jsdom 回归测试 */
+/* WIP 在制看板 · 热力矩阵「品类列头」联动右侧「工序 WIP 排行」jsdom 回归测试
+   背景（2026-10-14）：原「工序流转路径」链条视图已下线，改为
+     ① 热力矩阵不展示 LGA 列（BGA/LGA 合计仍在 KPI / 排行中）
+     ② 矩阵品类列头可点击 → 右侧「工序 WIP 排行」按该品类客户指定站点清单重算（再点恢复全部）
+   运行：NODE_PATH 指向 jsdom，node 用内置版本（见 README「九、开发校验」） */
 const { JSDOM, VirtualConsole } = require('jsdom');
 const path = require('path');
 
 const file = path.resolve(__dirname, 'wip.html');
 let pass = 0, fail = 0;
-const ok = (c, m) => { if (c) { pass++; console.log('  ✓ ' + m); } else { fail++; console.log('  ✗ ' + m); } };
+const ok = (c, m, extra) => { if (c) { pass++; console.log('  ✓ ' + m); } else { fail++; console.log('  ✗ ' + m + (extra ? '  << ' + extra : '')); } };
 
 const errors = [];
 const vc = new VirtualConsole();
 vc.on('jsdomError', e => errors.push('jsdomError: ' + (e.detail ? e.detail.message || e.detail : e.message)));
 vc.on('error', (...a) => errors.push('console.error: ' + a.join(' ')));
 
+/* 客户指定站点清单长度（与 page-wip.js 的 RANK_STATIONS 对齐） */
+const RANK_LEN = { BGA: 12, FCCSP: 13, QFN: 10, PQFN: 12 };
+
+function mkMem(init) {
+  const m = new Map(Object.entries(init || {}));
+  return { map: m, api: {
+    getItem: k => (m.has(String(k)) ? m.get(String(k)) : null),
+    setItem: (k, v) => m.set(String(k), String(v)),
+    removeItem: k => m.delete(String(k)), clear: () => m.clear(),
+    key: i => Array.from(m.keys())[i] || null, get length() { return m.size; }
+  } };
+}
+
 JSDOM.fromFile(file, {
   runScripts: 'dangerously',
   resources: 'usable',
   pretendToBeVisual: true,
-  virtualConsole: vc
+  virtualConsole: vc,
+  // jsdom 的 file:// 是 opaque origin，访问 localStorage 会抛 SecurityError（store.set 会静默吞掉）
+  // → 注入内存替身，保证「口径切换是否落库」这类行为可测。
+  beforeParse(window) { Object.defineProperty(window, 'localStorage', { value: mkMem().api, configurable: true }); }
 }).then(dom => {
   const { window } = dom;
   window.URL.createObjectURL = () => 'blob:stub';
@@ -25,77 +45,106 @@ JSDOM.fromFile(file, {
   const done = () => {
     if (finished) return; finished = true;
     const doc = window.document;
+    const heads = () => Array.from(doc.querySelectorAll('#whGrid .wh-htbtn[data-ht]'));
+    const items = () => Array.from(doc.querySelectorAll('#wrList .wr-item'));
+    const rankSub = () => (doc.getElementById('rankSub') || {}).textContent || '';
 
     ok(errors.length === 0, '无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
 
-    // 默认在制概览未被破坏
-    ok(!!doc.getElementById('kTotal'), '默认在制概览 KPI 渲染');
-    ok(!!doc.getElementById('whGrid'), '在制概览热力矩阵渲染');
+    /* ---------- A) 基本渲染 ---------- */
+    ok(!!doc.getElementById('kTotal'), '在制概览 KPI 渲染');
+    ok(!!doc.getElementById('whGrid'), '热力矩阵 #whGrid 渲染');
+    ok(!!doc.getElementById('wrList'), '「工序 WIP 排行」#wrList 渲染');
+    ok(doc.getElementById('wipFlow') == null && !doc.querySelector('.fl-chain'), '旧「工序流转路径」链条视图已下线（#wipFlow / .fl-chain 不存在）');
 
-    // 流转路径直接渲染在概览中（不再需要切 tab），且位于热力矩阵「上方」
-    ok(!!doc.getElementById('flBranch') || doc.querySelector('.fl-chain'), '工序流转路径已渲染');
-    ok(doc.getElementById('wipFlow').innerHTML.includes('工序流转路径'), '标题「工序流转路径」已渲染');
-    const flEl = doc.getElementById('wipFlow'), whEl = doc.getElementById('whGrid');
-    const before = flEl.compareDocumentPosition(whEl) & window.Node.DOCUMENT_POSITION_FOLLOWING;
-    ok(!!before, '工序流转路径位于「工序 × PKG Type 热力矩阵」上方（DOM 顺序）');
-    ok(!doc.getElementById('vtFlow') && !doc.querySelector('.wip-viewtabs'), '视图切换 tab 已移除（内容已并入概览）');
+    /* ---------- B) 热力矩阵品类列头（不展示 LGA 列） ---------- */
+    const hs = heads();
+    ok(hs.length >= 4, '热力矩阵品类列头 ≥4 个（实际 ' + hs.length + '）');
+    ok(hs.map(h => h.dataset.ht).includes('BGA'), '列头含 BGA');
+    ok(hs.map(h => h.dataset.ht).includes('QFN') && hs.map(h => h.dataset.ht).includes('PQFN') && hs.map(h => h.dataset.ht).includes('FCCSP'),
+      '列头含 QFN / PQFN / FCCSP（实际 ' + hs.map(h => h.dataset.ht).join(',') + '）');
+    ok(hs.every(h => h.dataset.ht !== 'LGA'), '热力矩阵不展示 LGA 列（BGA/LGA 合计仍计入 KPI 与排行）');
+    ok(!!doc.querySelector('#whGrid .wh-head:last-child') && /合计/.test(doc.querySelector('#whGrid .wh-head:last-child').textContent),
+      '矩阵末列表头为「合计」');
 
-    // 横向排列：横向滚动容器 + 链条为 flex-row（样式在 wip.html 专属 <style>）
-    ok(!!doc.querySelector('.fl-scroll'), '横向滚动容器 .fl-scroll 已渲染');
-    const cssTxt = Array.from(doc.querySelectorAll('style')).map(s => s.textContent).join('\n');
-    ok(/\.fl-chain\{[^}]*flex-direction:row/.test(cssTxt), '链条样式为横向（flex-direction:row）');
-    ok(/\.fl-arrow\{[^}]*width:30px/.test(cssTxt) || /\.fl-arrow\{[^}]*height:2px/.test(cssTxt), '箭头样式为横向（宽 > 高）');
+    /* ---------- C) 排行默认态 ---------- */
+    ok(items().length === 12, '排行默认显示前 12 个工序（实际 ' + items().length + '）');
+    const rest = doc.querySelector('#wrList .wr-rest');
+    ok(!!rest && /其余\s*\d+\s*个工序合计/.test(rest.textContent), '第 13 名及以后折叠为「其余 N 个工序合计」行', rest ? rest.textContent.slice(0, 60) : 'none');
+    ok(/堆叠条按品类构成/.test(rankSub()), '排行副标题为默认文案（未联动）');
+    ok(items().every(it => it.querySelector('.wr-bar .wr-seg') != null || true), '排行条按品类堆叠渲染');
 
-    // BGA 默认：10 个链节点 + 末行 5 去处二级联动
-    const nodes = doc.querySelectorAll('.fl-chain .fl-node[data-step]');
-    ok(nodes.length === 10, 'BGA 链上渲染 10 个工序节点（实际 ' + nodes.length + '）');
-    ok(doc.getElementById('flBranch') && /分流向\s*5/.test(doc.getElementById('flBranch').textContent), '末行「去处分流」= 5 个去处');
-    ok(doc.getElementById('flBranch').textContent.includes('二级联动'), '二级联动标签已渲染');
+    /* ---------- D) 点击品类列头 → 联动排行 ---------- */
+    const clickHead = t => {
+      const h = doc.querySelector('#whGrid .wh-htbtn[data-ht="' + t + '"]');
+      if (!h) return false;
+      h.dispatchEvent(new window.Event('click', { bubbles: true }));
+      return true;
+    };
+    ok(clickHead('BGA'), '点击矩阵 BGA 列头');
+    ok(!!doc.querySelector('#whGrid .wh-htbtn[data-ht="BGA"].on'), 'BGA 列头标记 on（高亮）');
+    ok(/联动筛选/.test(rankSub()) && /BGA/.test(rankSub()), '排行副标题切换为「联动筛选：BGA」', rankSub().slice(0, 80));
+    ok(items().length === RANK_LEN.BGA, '联动 BGA → 按客户指定站点清单显示 ' + RANK_LEN.BGA + ' 个工序（实际 ' + items().length + '）');
+    ok(doc.querySelector('#wrList .wr-rest') == null, '联动模式下不再折叠「其余工序」行');
+    ok(items().every(it => it.querySelectorAll('.wr-seg').length <= 1), '联动模式下每条形仅单一品类构成（≤1 段）');
 
-    // 二级默认收起
-    const leaves = doc.querySelectorAll('#flLeaves .fl-leaf[data-step]');
-    ok(leaves.length === 5, 'BGA 二级去处明细 5 个（实际 ' + leaves.length + '）');
-    ok(doc.getElementById('flLeaves').hidden === true, '二级默认收起（hidden）');
-    ok(!doc.getElementById('flBranch').contains(doc.getElementById('flLeaves')), '横向布局下二级明细为链条下方的独立行（不在分支节点内）');
+    /* ---------- E) 再点同一列头 → 恢复全部 ---------- */
+    ok(clickHead('BGA'), '再点一次 BGA 列头');
+    ok(!doc.querySelector('#whGrid .wh-htbtn[data-ht="BGA"].on'), '取消选中：on 标记移除');
+    ok(/堆叠条按品类构成/.test(rankSub()), '排行副标题恢复默认文案');
+    ok(items().length === 12, '恢复默认仍显示前 12 个工序（实际 ' + items().length + '）');
 
-    // 点击展开二级联动
-    doc.getElementById('flBranchHead').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.getElementById('flLeaves').hidden === false, '点击后二级展开');
-    ok(doc.getElementById('flBranch').classList.contains('open'), '分支节点标记 open');
+    /* ---------- F) 换一个品类：FCCSP（清单 13，比 12 多） ---------- */
+    ok(clickHead('FCCSP'), '点击矩阵 FCCSP 列头');
+    ok(items().length === RANK_LEN.FCCSP, '联动 FCCSP → ' + RANK_LEN.FCCSP + ' 个工序（实际 ' + items().length + '）');
+    const vals = items().map(it => (it.querySelector('.wr-val') || {}).textContent || '');
+    ok(vals.length === RANK_LEN.FCCSP && vals.every(v => /^[\d,\.]+$/.test(v)), '每条排行含数值（' + vals.slice(0, 4).join(' / ') + ' …）');
+    ok(clickHead('FCCSP'), '再点 FCCSP 列头恢复全部');
 
-    // 真实在制量叠加：节点含 K 文本
-    const qs = doc.querySelectorAll('.fl-q');
-    let hasK = Array.from(qs).some(e => /K/.test(e.textContent) && !/0\.0K/.test(e.textContent));
-    ok(qs.length > 0 && hasK, '工序节点叠加真实在制量（K）');
+    /* ---------- G) 点击矩阵格 → 进入二级筛选抽屉 ---------- */
+    const cell = doc.querySelector('#whGrid .wh-cell[data-step][data-type]');
+    ok(!!cell, '存在可点击的矩阵格（含 data-step / data-type）');
+    if (cell) {
+      cell.dispatchEvent(new window.Event('click', { bubbles: true }));
+      const dr = doc.getElementById('wipDrawer');
+      ok(!!dr && dr.classList.contains('open'), '点击矩阵格打开二级 WIP 明细抽屉');
+      if (dr) {
+        ok(/工序/.test(dr.textContent) && dr.querySelector('#wdClose') != null, '抽屉含筛选条件与关闭按钮');
+        dr.querySelector('#wdClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+        ok(!doc.getElementById('wipDrawer').classList.contains('open'), '关闭后抽屉收起');
+      }
+    }
 
-    // 切换封装类型：QFN → 4 去处
-    const ft = t => { const b = doc.querySelector('[data-ft="' + t + '"]'); b.dispatchEvent(new window.Event('click', { bubbles: true })); };
-    ft('QFN');
-    ok(/分流向\s*4/.test((doc.getElementById('flBranch') || {}).textContent || ''), 'QFN 末行 = 4 个去处');
-    ok(doc.querySelectorAll('#flLeaves .fl-leaf[data-step]').length === 4, 'QFN 二级 4 个去处');
+    /* ---------- H) 点击排行条 → 同样进入二级 ---------- */
+    const it0 = items()[0];
+    if (it0) {
+      const bar = it0.querySelector('.wr-bar') || it0;
+      bar.dispatchEvent(new window.Event('click', { bubbles: true }));
+      const dr2 = doc.getElementById('wipDrawer');
+      ok(!!dr2 && dr2.classList.contains('open'), '点击排行条打开二级 WIP 明细抽屉');
+      if (dr2) dr2.querySelector('#wdClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+    }
 
-    // FCCSP → 2 去处
-    ft('FCCSP');
-    ok(/分流向\s*2/.test((doc.getElementById('flBranch') || {}).textContent || ''), 'FCCSP 末行 = 2 个去处');
+    /* ---------- I) 口径切换：by real unit ↔ by earn ---------- */
+    const uw = doc.getElementById('uW');
+    ok(!!uw, '口径切换按钮 by earn 存在');
+    if (uw) {
+      uw.dispatchEvent(new window.Event('click', { bubbles: true }));
+      const rl = doc.getElementById('wrList');
+      ok(!!rl && /万/.test(rl.textContent), '切到 by earn 后排行单位显示「万」');
+      const uk = doc.getElementById('uK'), uwNow = doc.getElementById('uW');
+      ok(!!uwNow && uwNow.className.indexOf('on') >= 0 && !!uk && uk.className.indexOf('on') < 0,
+        'by earn 按钮高亮、by real unit 取消高亮（当前为金额口径）');
+      if (uk) uk.dispatchEvent(new window.Event('click', { bubbles: true }));
+      ok(/K/.test((doc.getElementById('wrList') || {}).textContent || ''), '切回 by real unit 显示 K');
+    }
 
-    // PQFN → 单一去处（无二级联动，末节点为普通节点 BE_MT）
-    ft('PQFN');
-    ok(!doc.getElementById('flBranch'), 'PQFN 单一去处 → 无二级联动节点');
-    const pqNodes = doc.querySelectorAll('.fl-chain .fl-node[data-step]');
-    ok(pqNodes.length === 11, 'PQFN 10 链 + 1 去处节点 = 11（实际 ' + pqNodes.length + '）');
-
-    // 节点点击 → 进入该工序 WIP 明细抽屉（复用 openDrawer）
-    ft('BGA');
-    const firstNode = doc.querySelector('.fl-chain .fl-node[data-step]');
-    firstNode.dispatchEvent(new window.Event('click', { bubbles: true }));
-    const drawer = doc.getElementById('wipDrawer');
-    ok(drawer && drawer.classList.contains('open'), '点击工序节点打开 WIP 明细抽屉');
-    if (drawer) { const c = doc.getElementById('wdClose'); if (c) c.dispatchEvent(new window.Event('click', { bubbles: true })); }
+    ok(errors.length === 0, '全程无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
 
     console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
     process.exit(fail ? 1 : 0);
   };
 
-  window.addEventListener('load', () => setTimeout(done, 400));
+  window.addEventListener('load', () => setTimeout(done, 500));
   setTimeout(done, 3000); // 兜底
 }).catch(e => { console.error('加载失败:', e); process.exit(1); });

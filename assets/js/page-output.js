@@ -1,11 +1,10 @@
 /* ============ OP 专属大屏：Output（OP）周维度累计追踪 ============
    权威规格：《Output 大屏（周维度追踪）需求提示词》+ 客户补充口径。
    界面：年份 / 周别 / 视角部门 / PKG Type 筛选 → 累计对比图 → 数据刷新。
-   图表排布（10-13 客户确认 BGA/LGA 单独成图）：默认「双部门 3×2」= LEAD / NON-LEAD 两个部门 ×
-     （**颗数** / **BGA·LGA 标准 I/O 当量** / 金额）三种口径，行 = 口径、列 = 部门，
-     同一行共用 Y 轴上限以便横向比高低；可切「单部门」回到单列三张。
-     BGA/LGA 因计算方法与其他品类不同（客户 IO 表 I/O 加权），**不与颗数口径混在同一张图**，单独占一行。
-   周维度累计表已拆分为独立页面 op-table.html（本屏只保留筛选与三行累计对比曲线）。
+   图表排布（2026-10-14 客户确认）：默认「双部门 2×2」= LEAD / NON-LEAD 两个部门 ×
+     （**颗数** / 金额）两种口径，行 = 口径、列 = 部门，同一行共用 Y 轴上限以便横向比高低；可切「单部门」回到两张。
+     BGA/LGA 不做单独图表：仅在 LEAD 视图按颗数（不计 ÷225）并入两张主图；NON-LEAD / PLATING 主图不含 BGA/LGA。
+   周维度累计表已拆分为独立页面 op-table.html（本屏只保留筛选与两张累计对比曲线）。
    PKG Type 维护、每周目标数量、料号 I/O 维护、预警分口径统一在独立配置页 op-config.html 完成
    （「部门可见范围」配置域已下线，部门固定 LEAD / NON-LEAD / PLATING，可见范围用引擎内置默认）。 */
 (function () {
@@ -42,11 +41,12 @@
   }
   applyDeptScope();
 
-  /* ---------------- 视图模式（10-08 客户确认） ----------------
-     dual（默认）：LEAD + NON-LEAD 两个部门 ×（颗数 / BGA·LGA 标准 I/O 当量 / 金额）= 3×2 排布
-     single：单一视角部门，单列三张（颗数 / I/O 当量 / 金额）
-     注：BGA/LGA 走 I/O 加权口径（客户《NONLEAD.xlsx》IO sheet：PKG_I/O × Unit ÷ 255），
-        与其它品类（颗数）**量纲不同、不可同图**，故单独成图一行 */
+  /* ---------------- 视图模式（2026-10-14 客户确认） ----------------
+     dual（默认）：LEAD + NON-LEAD 两个部门 ×（颗数 / 金额）= 2×2 排布
+     single：单一视角部门，单列两张（颗数 / 金额）
+     注：BGA/LGA 不再单独成图（10-13 的「I/O 当量单独成图」已撤销）。
+         BGA/LGA 仅在 LEAD 视图按颗数（不计 ÷225）并入两张主图；
+         NON-LEAD / PLATING 主图不含 BGA/LGA。 */
   const DUAL_DEPTS = ['LEAD', 'NON-LEAD'];
   let viewMode = store.get('op_view_mode', 'dual') === 'single' ? 'single' : 'dual';
   const saveViewMode = () => store.set('op_view_mode', viewMode);
@@ -89,6 +89,26 @@
   }
   recalc();
 
+  /* 按部门生成「有效 byType」：LEAD 的 BGA/LGA 改用「颗数口径」字段（qty*），
+     绕过 ÷225 I/O 折算；其余部门原样。供主图序列与达标判定（makePanel 内）使用。 */
+  function makeEffWeek(d) {
+    if (d !== 'LEAD') return week;
+    const byType = {};
+    Object.keys(week.byType).forEach(id => {
+      const t = week.byType[id];
+      if (opUsesIo(id) && t.qtyTotalCum) {
+        byType[id] = Object.assign({}, t, {
+          goalCum: t.qtyGoalCum.slice(),
+          totalCum: t.qtyTotalCum.slice(),
+          subCum: t.qtySubCum || t.subCum,
+          weekGoal: t.qtyWeekGoal != null ? t.qtyWeekGoal : t.weekGoal,
+          ioMode: false
+        });
+      } else byType[id] = t;
+    });
+    return Object.assign({}, week, { byType });
+  }
+
   function badge(status) {
     const info = opStatusInfo(status);
     return `<span class="badge ${info.badge}">${info.label}</span>`;
@@ -96,10 +116,10 @@
 
   /* 本周红灯 / 黄灯统计（用于图表标记与筛选标签告警）
      wipK：WIP 抵扣量（K）—— 判定口径为 (累计实际 + WIP) vs 累计目标 */
-  function redDaysOf(ids, wipK) {
+  function redDaysOf(ids, wipK, w) {
     const marks = [];
     for (let i = 0; i <= lastIdx; i++) {
-      const st = opAggStatus(ids, i, week, null, wipK);
+      const st = opAggStatus(ids, i, w || week, null, wipK);
       if (st.status === 'over') marks.push(i);
     }
     return marks;
@@ -120,56 +140,60 @@
       : '';
 
     /* ---------------- 图表面板 ----------------
-       dual   → 行=口径（数量 / I/O 当量 / 金额），列=部门（LEAD / NON-LEAD），3×2 排布
-       single → 单一视角部门：数量 / I/O 当量 / 金额 上下三张
-       2026-10-13 客户要求：BGA/LGA 走 I/O 加权口径，**不与其它品类混在同一张图**，
-       故把 I/O 口径单独拆成一行（单独成图），数量图只留颗数口径品类。 */
+       dual   → 行=口径（数量 / 金额），列=部门（LEAD / NON-LEAD），2×2 排布
+       single → 单一视角部门：数量 / 金额 上下两张
+       2026-10-14 客户要求：BGA/LGA 不再单独成图；仅在 LEAD 视图按颗数（不计 ÷225）
+       并入「数量 / 金额」两张主图；NON-LEAD / PLATING 主图不含 BGA/LGA。 */
     const isDual = viewMode === 'dual';
     const panelDepts = isDual ? DUAL_DEPTS : [dept];
+    /* BGA/LGA 并入规则（2026-10-14）：仅 LEAD 并入（按颗数、不计 ÷225），
+       NON-LEAD / PLATING 主图不含 BGA/LGA（仅留在 LEAD 视图 + 周维度累计表明细）。 */
+    const bgInMain = d => d === 'LEAD';
     function makePanel(d, kind) {
       const base = isDual ? idsForDept(d) : ids;
-      /* I/O 口径品类单独成图；数量图只保留颗数口径品类（两者互不混排） */
-      const pids = kind === 'io' ? base.filter(id => opUsesIo(id)) : base.filter(id => !opUsesIo(id));
+      /* BGA/LGA：LEAD 全含（按颗数）；其余部门剔除（主图不出现） */
+      const pids = bgInMain(d) ? base.slice() : base.filter(id => !opUsesIo(id));
       if (!pids.length) return null;
-      const srs = kind === 'earn' ? earnSeries(base) : goalSeries(pids);
+      /* LEAD 的 BGA/LGA 以「颗数口径」并入（用 qty* 字段绕过 ÷225 I/O 折算） */
+      const effWeek = makeEffWeek(d);
+      const srs = kind === 'earn' ? earnSeries(pids, effWeek) : goalSeries(pids, effWeek);
       /* WIP（10-08 客户口径修正）：**不画进图表** —— WIP 是实时快照、没有逐日历史，
          画成曲线会被误读成按天数据。它只在**报警判定**时算进去：
          数量口径判定 = (累计实际 total + WIP) vs 累计目标 goal。
          这里只把抵扣量取出来传给 opAggStatus / opTypeAlarm，图里保持两条线。 */
       let wip = null;
       const wo = opWipCfg(cfg);
-      if ((kind === 'goal' || kind === 'io') && d === 'NON-LEAD' && wo.on && wo.spec) {
+      if (kind === 'goal' && d === 'NON-LEAD' && wo.on && wo.spec) {
         const k = opWipDeductK(pids, cfg, wo);
         if (k > 0) wip = { spec: wo.spec, k: k, scope: wo.scope, excludeHold: wo.excludeHold };
       }
-      const wipK = ((kind === 'goal' || kind === 'io') && wip) ? wip.k : 0;
-      /* 达标状态 / 红灯天数：数量图与 I/O 图各按各自品类算；金额图沿用原口径（全部品类、wipK=0） */
-      const stIds = kind === 'earn' ? base : pids;
+      const wipK = (kind === 'goal' && wip) ? wip.k : 0;
       return {
-        key: kind + '-' + d, dept: d, kind, ids: stIds, series: srs,
-        redDays: redDaysOf(stIds, wipK),
-        st: opAggStatus(stIds, focusIdx, week, null, wipK),
+        key: kind + '-' + d, dept: d, kind, ids: pids, series: srs,
+        redDays: redDaysOf(pids, wipK, effWeek),
+        st: opAggStatus(pids, focusIdx, effWeek, null, wipK),
         gap: gapAt(srs, focusIdx),
         gapWithWip: wipK ? gapAt(srs, focusIdx, wipK) : null,
-        em: earnMeta(stIds),
+        em: earnMeta(pids, effWeek),
         wip
       };
     }
     const panels = [];
-    ['goal', 'io', 'earn'].forEach(kind => panelDepts.forEach(d => {
+    ['goal', 'earn'].forEach(kind => panelDepts.forEach(d => {
       const p = makePanel(d, kind);
       if (p) panels.push(p);
     }));
     /* 同一行（同一口径）共用 Y 轴上限，两个部门可直接横向比高低 */
     const maxByKind = {};
-    ['goal', 'io', 'earn'].forEach(kind => {
+    ['goal', 'earn'].forEach(kind => {
       maxByKind[kind] = Math.max(1, ...panels.filter(p => p.kind === kind).map(p => chartMax(p.series)));
     });
 
     const panelCard = p => {
-      const isG = p.kind === 'goal', isIo = p.kind === 'io', isE = p.kind === 'earn';
+      const isG = p.kind === 'goal', isE = p.kind === 'earn';
       const overN = (p.em.prog || []).filter(x => x && (x.status === 'critical' || x.status === 'over')).length;
-      const deptTag = isDual ? `<span class="chip">${icon('users', 14)} ${esc(p.dept)} · ${isE ? '全部品类' : p.ids.length + ' 类'}</span> ` : '';
+      const bgIn = p.ids.indexOf('BGA/LGA') >= 0;   // 本图是否含 BGA/LGA（仅 LEAD 视图）
+      const deptTag = isDual ? `<span class="chip">${icon('users', 14)} ${esc(p.dept)} · ${p.ids.length} 类${bgIn ? '（含 BGA/LGA）' : ''}</span> ` : '';
       const gapTxt = p.gap != null
         ? ` · ${focusLabel}差额 <strong class="${p.gap < 0 ? 'red-inline' : 'green-inline'}">${p.gap >= 0 ? '+' : ''}${p.gap}${isE ? '万' : 'K'}</strong>`
         : '';
@@ -177,36 +201,28 @@
       const earnTag = (isE && p.em.mode === 'progressive')
         ? ` · 递进式 ±${p.em.pct}%${overN ? ` · <span class="red-inline">超差 ${overN} 天</span>` : ''}`
         : '';
-      /* WIP（10-08 修正）：**图里不画**，只在报警判定时把「已产出 + 在制」合起来跟目标比。
-         这里用一行浅色提示说明判定口径，明确标注工序与「实时快照」。 */
+      /* WIP（10-08 修正）：**图里不画**，只在报警判定时把「已产出 + 在制」合起来跟目标比。 */
       const wipTag = p.wip
         ? `<div class="small muted mt8" style="grid-column:1/-1">${icon('database', 13)} 报警判定已计入 WIP 抵扣：<strong>${esc(p.wip.spec)} ${p.wip.k}K</strong>
             （${p.wip.scope === 'all' ? '该工序全部' : '跟随筛选'} · 实时快照，不参与绘图）—— 判定口径 = (累计实际 + 在制) vs 累计目标</div>`
         : '';
-      /* 口径说明（2026-10-13）：BGA/LGA 已从数量图拆出、单独成图，三张图各表一种口径，互不混排。 */
-      const ioTypesOf = ids => ids.filter(id => opUsesIo(id));
-      const ioNotCfg = ids => { const w = week.byType[ids[0]]; return w && w.ioConfigured === false; };
+      /* 口径说明（2026-10-14）：BGA/LGA 不再单独成图，仅在 LEAD 视图按颗数并入两张主图 */
       let caliberTag = '';
       if (isG) {
-        caliberTag = `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
-          —— BGA/LGA 走 I/O 加权口径，已单独成图（见下一行）；本周目标与实际同量纲可直接比。</div>`;
-      } else if (isIo) {
-        const b = week.byType[p.ids[0]];
-        caliberTag = `<div class="small muted mt8">${icon('database', 13)} <strong>本图口径：标准 I/O 当量</strong>（${p.ids.map(esc).join('、')}）——
-          I/O 当量 = 颗数 × (PKG_I/O ÷ ${OP_IO_BASE})，<b>周目标已按「料号产出结构 × 各料号 PKG_I/O」加权同步折算</b>，与实际同量纲可比；
-          PKG_CODE / PKG_I/O 由客户在 <a href="op-config.html">OP 配置页 · ④ 料号 I/O 维护</a> 配置。${ioNotCfg(p.ids) ? '<b style="color:var(--warn)">当前尚未配置 PKG_I/O，实际等同颗数。</b>' : (b && b.ioFactor != null ? ` 当前品类加权系数 <b>${Number(b.ioFactor).toFixed(3)}</b>。` : '')}</div>`;
+        caliberTag = bgIn
+          ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数（K）</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
+          —— 其中 <b>BGA/LGA 按颗数并入（不计 ÷225 I/O 当量）</b>；本周目标与实际同量纲可直接比。</div>`
+          : `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数（K）</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
+          —— 不含 BGA/LGA（仅 LEAD 视图合并）；本周目标与实际同量纲可直接比。</div>`;
       } else {
-        const ioIds = ioTypesOf(p.ids);
-        caliberTag = ioIds.length
-          ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含全部 ${p.ids.length} 个品类；其中 <b>${ioIds.map(esc).join('、')}</b> 的数量已按 I/O 加权折算，故金额随之按「I/O 当量 × 单价」计算（其数量曲线见上一行独立图）。</div>`
-          : '';
+        caliberTag = bgIn
+          ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含全部 ${p.ids.length} 个品类；其中 <b>BGA/LGA 按颗数（不计 ÷225）× 单价</b>计算。</div>`
+          : `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含 ${p.ids.length} 个品类（不含 BGA/LGA，仅 LEAD 视图合并）。</div>`;
       }
-      const title = isIo
-        ? `${icon('layers', 20)} ${esc(p.ids.join('、'))} · 累计 goal vs total 曲线对比（标准 I/O 当量）`
-        : `${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K · 颗数）' : '累计 Earn 目标 vs 实际（万元）'}`;
+      const title = `${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K · 颗数）' : '累计 Earn 目标 vs 实际（万元）'}`;
       return `<div class="card op-chart-card">
           <div class="card-head">
-            <div class="card-title">${isDual && isIo ? esc(p.dept) + ' · ' : ''}${title}
+            <div class="card-title">${title}
               <span class="card-sub">${deptTag}目标（虚线）vs 实际（实线）· 悬停看当日明细 · 点击图表查看「周维度累计表」 · ${badge(p.st.status)}${gapTxt}${redTxt}${earnTag}</span></div>
             <div class="legend">${p.series.map(legendItem).join('')}
               ${p.redDays.length ? '<span class="lg"><i class="sw-bad"></i>超标红灯区间</span>' : ''}</div>
@@ -242,7 +258,7 @@
             </div>
             <div class="fi">
               <label class="field-label">图表视图</label>
-              <div class="seg" id="segView" title="双部门 3×2：LEAD / NON-LEAD ×（颗数 / BGA·LGA 标准 I/O 当量 / 金额）；单部门：当前视角部门单列三张。注：BGA/LGA 量纲与其他品类不同，已单独成图">
+              <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（颗数 / 金额）；单部门：当前视角部门两张。注：BGA/LGA 仅在 LEAD 视图按颗数（不计 ÷225）并入两张主图，其余部门主图不含 BGA/LGA">
                 <button data-v="dual" class="${isDual ? 'active' : ''}">BE</button>
                 <button data-v="single" class="${isDual ? '' : 'active'}">单部门</button>
               </div>
@@ -266,7 +282,7 @@
       <div class="grid ${isDual ? 'g-2 op-chart-grid' : ''} op-chart-stack mt16" id="chartStack">
         ${panels.map(panelCard).join('')}
       </div>
-      ${isDual ? `<div class="sub-note mt8">3×2 排布：行 = 口径（<b>颗数</b> / <b>BGA·LGA 标准 I/O 当量</b> / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。<b>BGA/LGA 因计算方法与其他品类不同（I/O 加权），已单独成图，不与颗数口径混排</b>。</div>` : `<div class="sub-note mt8">上排 = 颗数口径，下排 = BGA/LGA 标准 I/O 当量口径，末排 = 金额（万元）；<b>BGA/LGA 因计算方法与其他品类不同，已单独成图</b>。</div>`}
+      ${isDual ? `<div class="sub-note mt8">2×2 排布：行 = 口径（<b>颗数</b> / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。<b>BGA/LGA 仅在 LEAD 视图按颗数（不计 ÷225 I/O 当量）并入两张主图；其余部门主图不含 BGA/LGA</b>。</div>` : `<div class="sub-note mt8">上图 = 颗数口径${dept === 'LEAD' ? '（含 BGA/LGA，按颗数不计 ÷225）' : '（不含 BGA/LGA）'}，下图 = 金额（万元）${dept === 'LEAD' ? '（含 BGA/LGA）' : '（不含 BGA/LGA）'}；<b>BGA/LGA 仅在 LEAD 视图合并</b>。</div>`}
 
       <div class="card mt16 no-print">
         <div class="card-head"><div class="card-title">${icon('refresh', 19)} 数据刷新
@@ -289,7 +305,7 @@
          不改变图内折线本身。 */
       const tipGap = p => i => {
         const srs = p.series, unit = p.kind === 'earn' ? '万' : 'K';
-        const unitTxt = p.kind === 'io' ? ' I/O当量' : (unit === 'K' ? 'K' : ' 万');
+        const unitTxt = unit === 'K' ? 'K' : ' 万';
         const wip = p.wip;
         const g0 = srs[0].data[i], t0 = srs[1].data[i];
         const wipLine = wip
@@ -319,7 +335,7 @@
           const el = document.getElementById('pc_' + p.key);
           if (!el) return;
           const unit = p.kind === 'earn' ? '万' : 'K';
-          const yUnit = p.kind === 'io' ? ' I/O当量' : ' ' + unit;
+          const yUnit = ' ' + unit;
           const cw = el.clientWidth || BASE_CW;
           lineChart(el, {
             series: p.series, labels: wdLabel, height: Math.round(H * vwFor(cw) / cw), vw: vwFor(cw),
@@ -385,11 +401,12 @@
   /* 两条线：目标线（虚线·蓝色）与实际线（实线·绿色）。
      注意：目标与实际天然存在出入，两条线不会重合——贴合说明当日基本达标，
        实际线在目标线下方 = 欠产（缺口），在上方 = 超额。 */
-  function goalSeries(ids) {
-    const goal = wdLabel.map((_, i) => ids.reduce((s, id) => s + (week.byType[id] ? week.byType[id].goalCum[i] : 0), 0));
+  function goalSeries(ids, w) {
+    w = w || week;
+    const goal = wdLabel.map((_, i) => ids.reduce((s, id) => s + (w.byType[id] ? w.byType[id].goalCum[i] : 0), 0));
     const total = wdLabel.map((_, i) => {
       let any = false, v = 0;
-      ids.forEach(id => { const t = week.byType[id]; if (t && t.totalCum[i] != null) { v += t.totalCum[i]; any = true; } });
+      ids.forEach(id => { const t = w.byType[id]; if (t && t.totalCum[i] != null) { v += t.totalCum[i]; any = true; } });
       return any ? v : null;
     });
     return [
@@ -400,11 +417,11 @@
   /* Earn 目标序列按配置页口径生成（even 周目标均摊 / progressive 递进式 ±5%） */
   let earnInfo = null;
   /* Earn 口径元信息（模式 / pct / 逐日基准 / 逐日判定），供卡片副标题与红字提示使用 */
-  function earnMeta(ids) {
-    return opEarnSeriesCfg(ids, week, OPTypeStore.all(), cfg);
+  function earnMeta(ids, w) {
+    return opEarnSeriesCfg(ids, w || week, OPTypeStore.all(), cfg);
   }
-  function earnSeries(ids) {
-    const e = earnMeta(ids);
+  function earnSeries(ids, w) {
+    const e = earnMeta(ids, w);
     earnInfo = e;
     return [
       { name: '累计 Earn 目标（虚线）', color: '#8b5cf6', dash: true, width: 2.2, data: e.goalCum },
@@ -456,7 +473,7 @@
       viewMode = v; saveViewMode();
       render();
       toast(v === 'dual'
-        ? '已切换：双部门 3×2（LEAD / NON-LEAD × 颗数 / BGA·LGA I/O 当量 / 金额）'
+        ? '已切换：双部门 2×2（LEAD / NON-LEAD × 颗数 / 金额）'
         : '已切换：单部门视图（' + dept + '）', 'primary');
     });
 

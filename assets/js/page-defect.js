@@ -24,8 +24,13 @@
   let drillDev = null; // 三级：选中机台名（Mold机台），从二级树状图点进去
   let drillCode = null; // 四级：从三级「同料号跨机台 PPM（反查）」操作列点入的料号（PkgCode）
   let activeCats = D.cats.map(c => c.key); // 自定义勾选的次品项
-  let deptFilter = 'ALL'; // 数据范围筛选：看全部(ALL) / 按部门(LEAD|NON-LEAD|PLATING)；正式上线时按登录账号所属部门自动锁定，演示先用按钮手动切换
-  let paretoRange = store.get('defect_pareto', 'latest'); // 帕累托图时间口径：latest / w13 / w26 / all
+  // 部门：不暴露为筛选控件，由登录账号所属部门自动过滤（登录部门不在 LEAD/NON-LEAD/PLATING 域时展示全部）
+  let deptFilter = loginDefectDept();
+  // 工序：用户可筛选维度（默认 3 个：MOLD / MARK / ICOS，取自各类别 station 字段）
+  let stepFilter = 'ALL';
+  const STEP_ORDER = ['MOLD', 'MARK', 'ICOS'];
+  const STATIONS = STEP_ORDER.filter(s => D.cats.some(c => c.station === s));
+  const setStepFilter = s => { stepFilter = s; activeCats = visibleCats().map(c => c.key); render(); };
 
   // 次品类别 → 部门 归属（与「次品项配置（主数据）」一致；演示默认，用户可在配置页改部门）
   const DEFECT_DEPT_MAP = {
@@ -36,16 +41,19 @@
     'ICOS BMD12': 'PLATING'
   };
   const catDeptOf = k => DEFECT_DEPT_MAP[k] || 'ALL';
-  // 当前范围可见的次品类别（部门筛选后的集合）
-  const visibleCats = () => (deptFilter === 'ALL' ? D.cats : D.cats.filter(c => catDeptOf(c.key) === deptFilter));
+  // 登录账号所属部门 → 次品数据域（演示态：演示账号部门多为职能部门，不在 LEAD/NON-LEAD/PLATING 域，故默认展示全部）
+  function loginDefectDept() {
+    const d = (typeof CurrentUser !== 'undefined' && CurrentUser.dept) ? CurrentUser.dept() : '';
+    return (d === 'LEAD' || d === 'NON-LEAD' || d === 'PLATING') ? d : 'ALL';
+  }
+  // 当前范围可见的次品类别（部门自动域 ∩ 工序筛选后的集合；部门/工序为 ALL 时不做该维度过滤）
+  const visibleCats = () => D.cats.filter(c => (deptFilter === 'ALL' || catDeptOf(c.key) === deptFilter) && (stepFilter === 'ALL' || c.station === stepFilter));
   // 范围感知的周合计 PPM（部门范围=该部门各类别合计；看全部=全厂合计，等价于 weeklyTotalPPM）
   function weeklyScopePPM(i) {
     const o = D.output[i]; if (!o) return null;
     let td = 0; visibleCats().forEach(c => { td += (D.counts[c.key][i] || 0); });
     return td / o * 1e6;
   }
-  // 切换数据范围：重置勾选为该范围全部类别并刷新（一级/二级/三级联动不受影响）
-  function setDeptFilter(d) { deptFilter = d; activeCats = visibleCats().map(c => c.key); render(); }
 
   // ---------- 计算 ----------
   const fmt = n => (n == null ? '—' : Math.round(n).toLocaleString());
@@ -229,190 +237,6 @@
       tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
     });
     el.addEventListener('mouseleave', hideTip);
-  }
-
-  // ---------- L1 补充：类别 × 周 PPM 热力图（16 类别 × 实产周 网格，一眼看全高位点） ----------
-  // 注：类别级 PPM 全量最大约 580，远低于「周合计」红线 2000 / 预警线 3000；故按类别自身量程分档着色。
-  function heatBand(v) {
-    if (v == null) return '#eef2f7';
-    if (v < 100) return '#c8e6c9';
-    if (v < 250) return '#fff3b0';
-    if (v < 400) return '#ffd089';
-    return '#f4978e';
-  }
-  function heatLegend() {
-    const items = [['#c8e6c9', '<100'], ['#fff3b0', '100–250'], ['#ffd089', '250–400'], ['#f4978e', '≥400'], ['#eef2f7', '无数据']];
-    return items.map(([c, t]) => `<span class="flex acenter gap5" style="font-size:11.5px;color:var(--text-2)"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${c};border:1px solid rgba(0,0,0,.08)"></span>${t} PPM</span>`).join('');
-  }
-  function ensureHeatTip() {
-    let t = document.getElementById('defectHeatTip');
-    if (!t) {
-      t = document.createElement('div');
-      t.id = 'defectHeatTip';
-      t.style.cssText = 'position:fixed;z-index:92;display:none;max-width:230px;background:#fff;border:1px solid var(--line,#e1e7f0);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.16);padding:9px 11px;font-size:12px;color:var(--text);pointer-events:none;line-height:1.6';
-      document.body.appendChild(t);
-    }
-    return t;
-  }
-  /* ---------- L1 展现形式 2：帕累托图（类别次品贡献排序 + 累计占比 80/20） ----------
-     与折线（时间趋势）、热力图（类别×周矩阵）互补：回答「先压哪几个类别最有效」。 */
-  const PA_RANGES = [{ k: 'latest', t: '最新周' }, { k: 'w13', t: '近 13 周' }, { k: 'w26', t: '近 26 周' }, { k: 'all', t: '52 周合计' }];
-  const shortNum = v => (v == null ? '—' : Math.abs(v) >= 10000 ? (v / 1000).toFixed(0) + 'K' : Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'K' : String(Math.round(v)));
-  function paretoData() {
-    const disp = dispIdx();
-    let idxs;
-    if (paretoRange === 'w13') idxs = disp.slice(-13);
-    else if (paretoRange === 'w26') idxs = disp.slice(-26);
-    else if (paretoRange === 'all') idxs = disp.slice();
-    else idxs = [latestIdx];
-    const rows = visibleCats().map(c => {
-      let n = 0, o = 0;
-      idxs.forEach(i => { n += (D.counts[c.key][i] || 0); o += (D.output[i] || 0); });
-      return { key: c.key, name: c.name, station: c.station, n, out: o, ppm: o ? n / o * 1e6 : null, idxs: idxs.slice() };
-    }).filter(r => r.out > 0 && r.n > 0).sort((a, b) => b.n - a.n);
-    const totN = rows.reduce((a, r) => a + r.n, 0);
-    let acc = 0;
-    rows.forEach(r => { acc += r.n; r.share = totN ? r.n / totN * 100 : 0; r.acc = totN ? acc / totN * 100 : 0; });
-    let k80 = rows.findIndex(r => r.acc >= 80); if (k80 < 0) k80 = rows.length - 1;
-    return { rows, totN, idxs, k80, top5n: rows.slice(0, 5).reduce((a, r) => a + r.n, 0) };
-  }
-  function paretoL1(el) {
-    const d = paretoData();
-    const rangeLabel = PA_RANGES.find(r => r.k === paretoRange).t + '（' + d.idxs.length + ' 个实产周）';
-    if (!d.rows.length) { el.innerHTML = '<div class="sub-note">当前数据范围 / 时间口径下无次品记录。</div>'; return; }
-    const W = 960, H = 318, padL = 54, padR = 54, padT = 20, padB = 96;
-    const plotH = H - padT - padB, plotW = W - padL - padR, n = d.rows.length;
-    const slot = plotW / n, bw = Math.min(34, slot * 0.58);
-    const maxN = d.rows[0].n || 1;
-    const yL = v => padT + plotH - (v / maxN) * plotH;
-    const yR = p => padT + plotH - (p / 100) * plotH;
-    const xC = i => padL + slot * i + slot / 2;
-    let s = '';
-    [0, .25, .5, .75, 1].forEach(t => {
-      const y = padT + plotH * (1 - t);
-      s += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line,#e1e7f0)" stroke-width=".8"/>` +
-        `<text x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" font-size="9.5" fill="var(--text-2)" text-anchor="end">${shortNum(maxN * t)}</text>` +
-        `<text x="${(W - padR + 8).toFixed(1)}" y="${(y + 3.5).toFixed(1)}" font-size="9.5" fill="#7c3aed" text-anchor="start">${Math.round(t * 100)}%</text>`;
-    });
-    d.rows.forEach((r, i) => {
-      const col = catColor(r.key), y = yL(r.n), x = xC(i) - bw / 2;
-      const tip = `${r.name}（${r.station}）\n次品 ${fmt(r.n)} · 结料 ${fmt(r.out)} · ${Math.round(r.ppm)} PPM\n占比 ${r.share.toFixed(1)}% · 累计 ${r.acc.toFixed(1)}%\n点击进入二级 · 机台树`;
-      s += `<rect class="pbar" data-k="${esc(r.key)}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1.5, padT + plotH - y).toFixed(1)}" fill="${col}" rx="2"><title>${esc(tip)}</title></rect>` +
-        `<text x="${xC(i).toFixed(1)}" y="${(y - 5).toFixed(1)}" font-size="9" fill="var(--text)" text-anchor="middle">${shortNum(r.n)}</text>` +
-        `<text class="pbar" data-k="${esc(r.key)}" transform="rotate(-38 ${xC(i).toFixed(1)} ${(padT + plotH + 13).toFixed(1)})" x="${xC(i).toFixed(1)}" y="${(padT + plotH + 13).toFixed(1)}" font-size="10.5" fill="var(--text)" text-anchor="end"><title>${esc(tip)}</title>${esc(r.name)}</text>`;
-    });
-    const pts = d.rows.map((r, i) => `${xC(i).toFixed(1)},${yR(r.acc).toFixed(1)}`).join(' ');
-    s += `<polyline points="${pts}" fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linejoin="round" opacity=".85"/>`;
-    d.rows.forEach((r, i) => { s += `<circle cx="${xC(i).toFixed(1)}" cy="${yR(r.acc).toFixed(1)}" r="2.6" fill="#0f172a" opacity=".85"/>`; });
-    s += `<line x1="${padL}" y1="${yR(80).toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${yR(80).toFixed(1)}" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="6 3"/>` +
-      `<text x="${(W - padR - 4).toFixed(1)}" y="${(yR(80) - 6).toFixed(1)}" font-size="9.5" fill="#7c3aed" text-anchor="end">80% 参考线</text>` +
-      `<text x="${padL}" y="12" font-size="9.5" fill="var(--text-2)">柱：次品数（左轴）· 黑线：累计占比（右轴）</text>`;
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${s}</svg>`;
-    el.querySelectorAll('.pbar').forEach(b => { b.onclick = () => { drillCat = b.dataset.k; drillDev = null; drillWeek = null; drillCode = null; render(); }; });
-  }
-
-  /* ---------- L1 展现形式 3：小倍数趋势矩阵（Small Multiples，一格一类别） ----------
-     解决「16 条线挤在一张图看不清单类别走势」：每格独立量程的迷你趋势 + 最新/峰值/均值。 */
-  function smallMultiples(el) {
-    const cats = visibleCats(), disp = dispIdx();
-    if (!cats.length) { el.innerHTML = '<div class="sub-note">当前数据范围下无类别。</div>'; return; }
-    const SW = 132, SH = 34;
-    const cells = cats.map(c => {
-      const vals = disp.map(i => catPPM(c.key, i));
-      const nz = vals.filter(v => v != null);
-      const lastV = nz.length ? nz[nz.length - 1] : null;
-      const maxV = nz.length ? Math.max.apply(null, nz) : 0;
-      const avgV = nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : null;
-      const pk = nz.length ? nz.indexOf(maxV) : -1;
-      const px = i => (disp.length > 1 ? (i / (disp.length - 1)) * (SW - 4) + 2 : SW / 2);
-      const py = v => SH - 3 - (maxV > 0 ? (v / maxV) * (SH - 8) : 0);
-      let d = '', started = false, lastPt = null;
-      vals.forEach((v, i) => {
-        if (v == null) return;
-        d += (started ? ' L' : 'M') + px(i).toFixed(1) + ',' + py(v).toFixed(1);
-        started = true; lastPt = { x: px(i), y: py(v), i, v };
-      });
-      const col = catColor(c.key);
-      const on = activeCats.includes(c.key);
-      const lbl = nz.length ? `${weekLabel(disp[disp.length - 1])} ${Math.round(lastV)} PPM（峰值 ${Math.round(maxV)} · ${weekLabel(disp[pk])}）` : '该类别无实产周数据';
-      const svg = started
-        ? `<polyline points="${d.replace(/[ML]/g, '').trim().split('L').join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>` +
-          (pk >= 0 ? `<circle cx="${px(pk).toFixed(1)}" cy="${py(maxV).toFixed(1)}" r="2.4" fill="#dc2626"><title>峰值 ${Math.round(maxV)} PPM · ${weekLabel(disp[pk])}</title></circle>` : '') +
-          (lastPt ? `<circle cx="${lastPt.x.toFixed(1)}" cy="${lastPt.y.toFixed(1)}" r="2.4" fill="${col}" stroke="#fff" stroke-width="1"><title>最新 ${Math.round(lastV)} PPM</title></circle>` : '')
-        : `<line x1="2" y1="${SH - 3}" x2="${SW - 2}" y2="${SH - 3}" stroke="var(--line,#e1e7f0)" stroke-width="1.4"/>`;
-      return `<div class="dp-sm ${on ? '' : 'off'}" data-sm="${esc(c.key)}" title="${esc(c.name)}（${esc(c.station)}）· ${esc(lbl)} · 均值 ${avgV == null ? '—' : Math.round(avgV)} PPM\n点击进入二级 · 机台树">
-          <div class="dp-sm-hd"><i style="background:${col}"></i><span>${esc(c.name)}</span></div>
-          <svg class="dp-sm-svg" viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none">${svg}</svg>
-          <div class="dp-sm-ft"><b style="color:${col}">${lastV == null ? '—' : Math.round(lastV)}</b><span>峰 ${maxV ? Math.round(maxV) : '—'} · 均 ${avgV == null ? '—' : Math.round(avgV)}</span></div>
-        </div>`;
-    }).join('');
-    el.innerHTML = `<div class="dp-sms">${cells}</div>`;
-    el.querySelectorAll('[data-sm]').forEach(n => { n.onclick = () => { drillCat = n.dataset.sm; drillDev = null; drillWeek = null; drillCode = null; render(); }; });
-  }
-
-  function heatmapL1(el, cats) {
-    cats = cats || D.cats;
-    const disp = dispIdx(), nC = disp.length;
-    const W = 960, padL = 120, padT = 26, padR = 10, padB = 30;
-    const cellH = 18, cellW = (W - padL - padR) / nC;
-    const H = padT + cats.length * cellH + padB;
-    const latestJ = disp.indexOf(latestIdx);
-    let s = '';
-    disp.forEach((oi, j) => {
-      if (j % 4 === 0 || j === nC - 1) {
-        s += `<text x="${(padL + j * cellW + cellW / 2).toFixed(1)}" y="${padT - 8}" font-size="9" fill="var(--text-2)" text-anchor="middle">${D.weeks[oi].replace('WW', '')}</text>`;
-      }
-    });
-    cats.forEach((c, ri) => {
-      const y = padT + ri * cellH;
-      s += `<text x="${padL - 8}" y="${(y + cellH / 2 + 3.6).toFixed(1)}" font-size="10.5" fill="var(--text)" text-anchor="end">${esc(c.name)}</text>`;
-      disp.forEach((oi, j) => {
-        const v = catPPM(c.key, oi);
-        const x = padL + j * cellW;
-        const col = heatBand(v);
-        const hi = v != null && v >= 400;
-        s += `<rect class="hcell" data-k="${esc(c.key)}" data-i="${oi}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH}" fill="${col}" stroke="${hi ? '#c0392b' : 'rgba(255,255,255,.6)'}" stroke-width="${hi ? 0.9 : 0.4}"/>`;
-      });
-    });
-    if (latestJ >= 0) {
-      const x = padL + latestJ * cellW + cellW / 2;
-      s += `<line x1="${x.toFixed(1)}" y1="${padT - 4}" x2="${x.toFixed(1)}" y2="${(padT + cats.length * cellH).toFixed(1)}" stroke="var(--primary)" stroke-width="1.4" stroke-dasharray="3 3"/>` +
-        `<text x="${x.toFixed(1)}" y="${(padT + cats.length * cellH + 14).toFixed(1)}" font-size="9.5" fill="var(--primary)" text-anchor="middle">最新</text>`;
-    }
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;overflow:visible">${s}</svg>`;
-    const tip = ensureHeatTip();
-    const hide = () => { tip.style.display = 'none'; };
-    el.addEventListener('mousemove', e => {
-      const r = el.getBoundingClientRect(); if (!r.width) return;
-      const cx = (e.clientX - r.left) / r.width * W, cy = (e.clientY - r.top) / r.height * H;
-      if (cx < padL || cx > W - padR || cy < padT || cy > padT + cats.length * cellH) { hide(); return; }
-      const j = Math.max(0, Math.min(nC - 1, Math.floor((cx - padL) / cellW)));
-      const ri = Math.max(0, Math.min(cats.length - 1, Math.floor((cy - padT) / cellH)));
-      const c = cats[ri], oi = disp[j], v = catPPM(c.key, oi);
-      tip.innerHTML = `<div style="font-weight:700;margin-bottom:3px"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${heatBand(v)};margin-right:5px"></span>${esc(c.name)} <span style="color:var(--text-2);font-weight:400;font-size:11px">${esc(c.station)}</span></div>` +
-        `<div style="font-size:12px">周 <b>${weekLabel(oi)}</b> · PPM <b style="color:var(--text)">${v == null ? '—' : Math.round(v)}</b></div>` +
-        `<div style="font-size:11px;color:var(--primary);margin-top:4px">点击进入二级 · ${esc(c.station)} 机台树（带该周上下文）</div>`;
-      tip.style.display = 'block';
-      let lx = e.clientX + 14, ly = e.clientY + 14;
-      const tw = tip.offsetWidth, th = tip.offsetHeight;
-      if (lx + tw > window.innerWidth - 8) lx = e.clientX - tw - 14;
-      if (ly + th > window.innerHeight - 8) ly = e.clientY - th - 14;
-      tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
-    });
-    el.addEventListener('mouseleave', hide);
-    /* 热力图单元格点击 = 先进入二级（机台树），不再直接跳三级 Package 明细；
-       所点周作为二级的上下文周（若该周无设备明细，则回落到最近的可用周）。 */
-    el.querySelectorAll('.hcell').forEach(rc => {
-      rc.onclick = () => {
-        drillCat = rc.dataset.k;
-        drillDev = null;
-        drillWeek = null;
-        drillCode = null;
-        const av = devWeeksAvail(), w = +rc.dataset.i;
-        devWeek = av.includes(w) ? w : (av.length ? av[av.length - 1] : latestIdx);
-        render();
-      };
-    });
   }
 
   // ---------- L2：设备维度（机台 PPM 条形 + 机台×料号 透视表，参考客户 -M 透视表） ----------
@@ -734,23 +558,13 @@
     return `<div class="crumb">${lk(1, '一级')} › ${lk(2, '二级（' + esc(c.name) + '）')} › 三级 · ${D.weeks[drillWeek]} Package 明细</div>`;
   }
 
-  function reqNoteHtml() {
-    return `<div class="card mt24">
-      <div class="card-head"><div class="card-title">${icon('alert', 19)} 数据口径与需求要点</div></div>
-      <div class="card-body">
-        <ul style="margin:0;padding-left:18px;line-height:2;font-size:14px;color:var(--text-2)">
-          <li><b style="color:var(--primary)">真实数据</b>：客户原始资料 <code>BGA WK2601-2652 PPM Yield trend.xlsx</code> — trend 矩阵(16 类别×52周) + 各周 -M 原始/透视 + -abnormal 明细，本页无任何演示数据。</li>
-          <li><b style="color:var(--primary)">PPM 公式</b>：次品数 ÷ IQC Output(ICOS 结料数量) × 100 万；仅统计 IQC 完成品。</li>
-          <li><b style="color:var(--primary)">阈值</b>：红线 2000 PPM（良率目标 0.998）/ 预警线 3000 PPM（CWAAY 0.997）。</li>
-          <li><b style="color:var(--primary)">最新周</b>：${D.weeks[latestIdx]}（当前）；WW41–WW51 为未来周（无 -M 透视），趋势图仅绘实产周。</li>
-          <li><b style="color:var(--primary)">四种展现形式</b>：① 折线趋势（16 类 × 52 周多系列，看走势）② 帕累托图（类别次品贡献排序 + 累计占比 80/20，看「先压哪几类」）③ 小倍数趋势矩阵（一格一类别、各自独立量程，看单类别走势）④ 类别 × 周热力图（看高位点位置）。四者数据同源、点击均下钻同一二级。</li>
-          <li><b style="color:var(--primary)">四级钻取</b>：① 类别 PPM 概览（折线 / 帕累托 / 小倍数 / 热力图）→ ② 选中类别 设备维度<b>机台树状图</b>（可切换周，热力图点击会带上所点周）→ ③ <b>点击机台节点</b>进入该机台「机台 × 料号」透视（产出 / 次品数 / PPM + 同料号跨机台反查）→ ④ 末列「<b>操作 · 四级分析</b>」进入该料号的<b>跨机台 PPM 分析页</b>（各机台 PPM / 次品占比 / 与本机差值 / 结论判定）。另可从折线<b>数据点</b>直接下钻至该周 Package 明细（产出 / BE Reject / 良率）。</li>
-        </ul>
-      </div>
-    </div>`;
-  }
-
   function render() {
+    // 部门按登录账号自动过滤（非用户筛选控件）；每次渲染同步当前登录部门，切换演示身份重载后自动生效
+    deptFilter = loginDefectDept();
+    // 一级悬停浮窗（defectL1Tip / defectHeatTip 挂在 document.body，重渲染 #content 时不会被销毁）
+    // 每次重建页面先隐藏，避免浮层停留在二级 / 三级 / 四级页面上。
+    ['defectL1Tip', 'defectHeatTip'].forEach(id => { const t = document.getElementById(id); if (t) t.style.display = 'none'; });
+
     const stage = document.getElementById('content');
     const latestPPM = weeklyScopePPM(latestIdx);
     const latestOut = D.output[latestIdx];
@@ -767,33 +581,26 @@
       <div class="si"><div class="si-label">近52周超2000周数</div><div class="si-value" style="color:${br.length ? 'var(--warn)' : 'var(--success)'}">${br.length}</div></div>
     </div>`;
 
-    const banner = latestPPM != null && latestPPM >= RED
-      ? `<div class="notice" style="--nc:var(--danger)"><strong>⚠ 本周总 PPM ${latestPPM.toFixed(0)} 超红线 2000</strong> — 已触发红屏 / 弹窗预警<button class="btn btn-sm" id="alarmBtn" style="margin-left:10px">查看预警清单</button></div>`
-      : `<div class="notice" style="--nc:var(--success)">✓ 本周总 PPM ${latestPPM == null ? '—' : latestPPM.toFixed(0)} < 2000（达标，良率 0.998）${br.length ? ` · 近 52 周有 <b>${br.length}</b> 周曾超红线` : ''}<button class="btn btn-sm btn-ghost" id="alarmBtn" style="margin-left:10px">查看预警清单</button></div>`;
-
     let body = '';
     if (drillCat == null) {
       const chips = visibleCats().map(c => `<label class="legck" data-def="${esc(c.key)}" style="display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border:1px solid ${activeCats.includes(c.key) ? 'var(--primary)' : 'var(--line,#e1e7f0)'};border-radius:999px;cursor:pointer;font-size:12.5px;color:var(--text);user-select:none;background:${activeCats.includes(c.key) ? 'rgba(37,99,235,.07)' : 'transparent'}"><input type="checkbox" ${activeCats.includes(c.key) ? 'checked' : ''} style="accent-color:var(--primary);margin:0;cursor:pointer"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${catColor(c.key)}"></i>${esc(c.name)}</label>`).join('');
-      const scopeTitle = deptFilter === 'ALL' ? '16 类别' : visibleCats().length + ' 类别（' + deptFilter + '）';
-      const scopeHint = deptFilter === 'ALL' ? '展示全部 16 类次品（默认）' : deptFilter + ' 部门 · ' + visibleCats().length + ' 类';
-      const pa = paretoData();
-      const paLabel = PA_RANGES.find(r => r.k === paretoRange).t;
-      const paBtns = PA_RANGES.map(r => `<button data-pa="${r.k}" class="${paretoRange === r.k ? 'active' : ''}">${r.t}</button>`).join('');
+      const vcats = visibleCats();
+      const scopeTitle = vcats.length + ' 类别' + (stepFilter !== 'ALL' ? '（' + stepFilter + '）' : '') + (deptFilter !== 'ALL' ? ' · ' + deptFilter : '');
+      const scopeHint = (stepFilter === 'ALL' ? '全部工序' : '按工序「' + stepFilter + '」筛选') + ' · 部门按登录账号自动筛选';
       body = `<div class="card mt16">
         <div class="card-head">
           <div class="card-title">${icon('layers', 19)} 一级 · BGA Top Defect PPM Trend（${scopeTitle} × 52 周 · 真实数据）</div>
         </div>
         <div class="card-body">
           <div class="dp-scope">
-            <span class="dp-scope-lbl">数据范围</span>
-            <div class="seg" id="deptSeg">
-              <button data-dept="ALL" class="${deptFilter === 'ALL' ? 'active' : ''}">看全部</button>
-              <button data-dept="LEAD" class="${deptFilter === 'LEAD' ? 'active' : ''}">LEAD</button>
-              <button data-dept="NON-LEAD" class="${deptFilter === 'NON-LEAD' ? 'active' : ''}">NON-LEAD</button>
-              <button data-dept="PLATING" class="${deptFilter === 'PLATING' ? 'active' : ''}">PLATING</button>
+            <span class="dp-scope-lbl">工序筛选</span>
+            <div class="seg" id="stepSeg">
+              <button data-step="ALL" class="${stepFilter === 'ALL' ? 'active' : ''}">看全部</button>
+              ${STATIONS.map(st => `<button data-step="${esc(st)}" class="${stepFilter === st ? 'active' : ''}">${esc(st)}</button>`).join('')}
             </div>
             <span class="dp-scope-hint">${scopeHint}</span>
           </div>
+          <div class="dp-note">注：<b>部门不作为筛选条件</b>，系统将根据<b>登录用户所属部门</b>自动筛选并展示对应数据；本页仅以「工序」作为用户可筛选维度。</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px" id="defChips">${chips}</div>
           <div class="flex between acenter mt8">
             <div class="flex gap8">
@@ -805,45 +612,6 @@
           </div>
           <div id="procChart"></div>
           <div class="sub-note mt8">纵轴 PPM = 次品数 ÷ IQC Output × 100 万；横轴按时间序仅绘实产周（${D.output.filter(o => o != null).length} 周，WW41–WW51 未来周不显示）；标签标注各线峰值与最新周值。</div>
-        </div>
-      </div>
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('layers', 19)} 一级 · 类别次品贡献帕累托 · 前 N 类压降优先（${scopeTitle} · 真实数据）</div>
-          <div class="seg" id="paSeg">${paBtns}</div>
-        </div>
-        <div class="card-body">
-          <div class="flex acenter gap8 flex-wrap" style="margin-bottom:8px">
-            <span class="chip">${icon('filter', 14)} 口径 ${paLabel} · ${pa.idxs.length} 个实产周</span>
-            ${pa.rows.length ? `<span class="chip">${icon('layers', 14)} 次品合计 <b>${fmt(pa.totN)}</b></span>
-            <span class="chip">${icon('alert', 14)} 前 <b>${pa.k80 + 1}</b> 类已覆盖 <b>80%</b> 次品</span>
-            <span class="chip">${icon('target', 14)} Top 5 占比 <b>${(pa.totN ? pa.top5n / pa.totN * 100 : 0).toFixed(1)}%</b></span>` : '<span class="chip">当前口径无次品记录</span>'}
-            <span class="flex-1"></span><span class="sub-note">点击柱 / 类别名进入该类别二级 · 机台树</span>
-          </div>
-          <div id="paretoChart"></div>
-          <div class="sub-note mt8">柱 = 该类别在所选口径下的<b>次品数</b>（左轴），黑线 = <b>累计占比</b>（右轴 0–100%），紫色虚线为 80% 参考线。用于回答「不良集中在哪几个类别、压哪几个性价比最高」；与上方折线（看趋势）、下方热力图（看类别×周位置）互补。</div>
-        </div>
-      </div>
-
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('grid', 19)} 一级 · 小倍数趋势矩阵 · 每类一格独立量程（${scopeTitle} × 实产周 · 真实数据）</div>
-          <span class="sub-note">红点 = 该类别历史峰值 · 实心点 = 最新实产周 · 淡化格 = 已在图例中取消勾选</span>
-        </div>
-        <div class="card-body">
-          <div id="smChart"></div>
-          <div class="sub-note mt8">每格一个类别的迷你趋势（<b>各自独立量程</b>，只比自身高低，适合看单类别走势与突变周）；底部为最新 / 峰值 / 均值 PPM。点击任意小格进入该类别二级 · 机台树。</div>
-        </div>
-      </div>
-
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('grid', 19)} 一级 · 类别 × 周 PPM 热力图（${scopeTitle} × 52 周 · 真实数据）</div>
-        </div>
-        <div class="card-body">
-          <div id="heatChart"></div>
-          <div class="flex acenter gap8 mt10" style="flex-wrap:wrap">${heatLegend()}</div>
-          <div class="sub-note mt8">每个色块 = 某类别在某周的 PPM；绿 → 黄 → 橙 → 红 表示 PPM 升高，<b>红框</b>=该类别周 PPM 处于高位（≥400）。蓝色虚线 = 最新周（最右）。<b>点击色块进入该类别的二级 · 机台树</b>（自动带上所点周作为上下文周，不再直接跳三级）。注：类别级 PPM 远低于 2000 总红线，2000 / 3000 红线适用于<b>周合计</b>口径。</div>
         </div>
       </div>`;
     } else if (drillDev == null && drillWeek == null) {
@@ -895,18 +663,7 @@
       const cur = across.find(a => a.d === drillDev) || null;
       const rank = across.findIndex(a => a.d === drillDev);
       const maxP = peak ? peak.ppm : 0;
-      const hotN = across.filter(a => a.ppm >= DEV_WARN).length;
       const ratio = (peak && low && low.ppm > 0) ? peak.ppm / low.ppm : null;
-      let vText, vColor, vTip;
-      if (!across.length) { vText = '无跨机台数据'; vColor = 'var(--text-2)'; vTip = '本周该类别 -M 明细中未检索到该料号的机台记录。'; }
-      else if (across.length === 1) { vText = '仅本机台生产'; vColor = 'var(--text-2)'; vTip = '本周只有 1 台机台生产该料号，无法做跨机对比；若 PPM 偏高，建议结合该机台的报修 / 换模记录排查。'; }
-      else if (cur && peak && cur.d === peak.d && peak.ppm >= DEV_WARN && hotN <= Math.max(1, Math.ceil(across.length / 3))) {
-        vText = '机台特异性'; vColor = 'var(--danger)';
-        vTip = '本机台 PPM 为全部机台最高且明显跑赢其余机台 → 不良大概率来自该机台（参数 / 模具 / 保养状态），而非料号本身。建议：查该机台近 24h 报修与换模记录，优先设备侧根因。';
-      } else if (hotN >= Math.max(2, Math.ceil(across.length * 0.6))) {
-        vText = '料号 / 物料共性'; vColor = 'var(--primary)';
-        vTip = '多数机台在该料号上 PPM 都偏高 → 不良更可能来自料号 / 物料批次 / 来料或设计，而非单一机台。建议：查同批次物料、来料检验与工程变更。';
-      } else { vText = '跨机平稳'; vColor = 'var(--text)'; vTip = '各机台 PPM 差异不大，未见明显机台聚集，暂不需要机台侧专项排查。'; }
       const selOpts = avail.map(i => `<option value="${i}"${i === devWeek ? ' selected' : ''}>${weekLabel(i)}</option>`).join('');
       const rowsHtml = across.map(a => {
         const isMe = a.d === drillDev;
@@ -946,10 +703,6 @@
           ${across.length ? `<table class="table"><thead><tr><th>机台</th><th class="num">ICOS结料数量</th><th class="num">次品数</th><th class="num">PPM</th><th class="num">占该料号次品</th><th class="num">相对本机</th><th>PPM 对比</th></tr></thead><tbody>${rowsHtml}
             <tr style="background:#eef3fa"><td style="font-weight:700">合计 / 加权</td><td class="num" style="font-weight:700">${fmt(totOut)}</td><td class="num" style="font-weight:700">${fmt(totN)}</td><td class="num" style="font-weight:700">${Math.round(wppm)}</td><td class="num">100.0%</td><td class="num">—</td><td></td></tr>
           </tbody></table>` : '<div class="notice" style="--nc:var(--warn)">本周该类别下未检索到该料号的跨机台记录。</div>'}
-          <div class="sub-note mt8" style="border-left:3px solid ${vColor};padding-left:10px">
-            <b>分析结论：<span style="color:${vColor}">${vText}</span></b><br>${esc(vTip)}
-          </div>
-          <div class="sub-note mt8">口径：仅统计<b>本周实际生产过该料号</b>的 Mold 机台（未生产不列入）；PPM = 次品数 ÷ ICOS结料数量 × 100 万；机台级关注线 ≥ ${DEV_RED} 红 / ≥ ${DEV_WARN} 橙。「占该料号次品」= 该机台次品数 ÷ 该料号本周次品总数，用于定位主要贡献机台。<b>表格上方两图与表格同源</b>：左图柱高 = 各机台 PPM（虚线为 ${DEV_WARN} 预警线 / ${DEV_RED} 红线，本机台描边高亮），右图环宽 = 各机台次品数占比（含机台图例），可一眼定位主要贡献机台与离群机台。点击顶部面包屑或「返回三级」回到机台 × 料号透视。</div>
         </div>
       </div>`;
     } else if (drillDev != null) {
@@ -984,7 +737,6 @@
             <span class="sub-note">切换周可直接对比同一机台的历史料号构成</span>
           </div>
           ${devPivotTable(drillCat, devWeek, drillDev)}
-          <div class="sub-note mt8">与客户 -M 透视表同口径：料号 = PkgCode，PPM = 次品数 ÷ ICOS结料数量 × 100 万；列出该机台本周全部料号（含 0 次品行），≥ ${DEV_WARN} PPM 标红；空 PkgCode 批次不计入。新增「<b>同料号跨机台 PPM（反查）</b>」列：针对每个料号，反查其在<b>同周 + 同类别</b>下、跨全部 Mold 机台的 PPM 分布（悬停看各机台明细）；可判断不良是<b>机台特异性</b>（本机最高）还是<b>料号/物料共性</b>（他机更高）。<b>末列「操作」→「四级分析」</b>可直接进入该料号的<b>跨机台 PPM 分析页</b>（各机台 PPM / 次品占比 / 与本机差值 / 结论判定）。点击顶部面包屑返回二级树状图。</div>
         </div>
       </div>`;
     } else {
@@ -998,13 +750,10 @@
       </div>`;
     }
 
-    stage.innerHTML = kpis + banner + crumbHtml() + body + reqNoteHtml();
+    stage.innerHTML = kpis + crumbHtml() + body;
 
     if (drillCat == null) {
       lineChartL1(document.getElementById('procChart'));
-      paretoL1(document.getElementById('paretoChart'));
-      smallMultiples(document.getElementById('smChart'));
-      heatmapL1(document.getElementById('heatChart'), visibleCats());
     }
     else if (drillDev == null && drillWeek == null) {
       if (D.device) devTreeChart(document.getElementById('devChart'), drillCat, devWeek);
@@ -1020,8 +769,7 @@
     });
     const ckA = stage.querySelector('#ckAllBtn'); if (ckA) ckA.onclick = () => { activeCats = visibleCats().map(c => c.key); render(); };
     const ckN = stage.querySelector('#ckNoneBtn'); if (ckN) ckN.onclick = () => { activeCats = []; render(); };
-    const ds = stage.querySelector('#deptSeg'); if (ds) ds.querySelectorAll('button').forEach(b => { b.onclick = () => setDeptFilter(b.dataset.dept); });
-    const ps = stage.querySelector('#paSeg'); if (ps) ps.querySelectorAll('button').forEach(b => { b.onclick = () => { paretoRange = b.dataset.pa; store.set('defect_pareto', paretoRange); render(); }; });
+    const ss = stage.querySelector('#stepSeg'); if (ss) ss.querySelectorAll('button').forEach(b => { b.onclick = () => setStepFilter(b.dataset.step); });
     stage.querySelectorAll('[data-l4]').forEach(b => { b.onclick = () => { drillCode = b.dataset.l4; drillDev = b.dataset.l4dev || drillDev; render(); }; });
     const b4 = stage.querySelector('#l4Back'); if (b4) b4.onclick = () => { drillCode = null; render(); };
     [['#devSel', '#devPrev', '#devNext'], ['#devSel3', '#devPrev3', '#devNext3'], ['#devSel4', '#devPrev4', '#devNext4']].forEach(([sid, pid, nid]) => {
@@ -1042,26 +790,6 @@
       else { drillWeek = null; drillCode = null; } // 回到三级（保留机台）
       render();
     }; });
-    const ab = stage.querySelector('#alarmBtn'); if (ab) ab.onclick = () => openAlarm(br);
-  }
-
-  function openAlarm(br) {
-    let mask = document.getElementById('defectAlarmMask');
-    if (!mask) {
-      mask = document.createElement('div');
-      mask.id = 'defectAlarmMask';
-      mask.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:80';
-      mask.innerHTML = `<div style="background:#fff;border:1px solid var(--line,#e1e7f0);border-radius:14px;width:min(520px,92vw);max-height:80vh;overflow:auto;padding:18px">
-        <div class="flex between acenter" style="font-weight:700;margin-bottom:12px"><span>PPM 超红线（≥2000）预警清单</span><button id="defectAlarmClose" style="border:0;background:#eef2f8;color:#1d2836;font-size:18px;width:28px;height:28px;border-radius:8px;cursor:pointer">×</button></div>
-        <div id="defectAlarmBody"></div></div>`;
-      document.body.appendChild(mask);
-      mask.addEventListener('click', e => { if (e.target === mask) mask.style.display = 'none'; });
-      mask.querySelector('#defectAlarmClose').onclick = () => { mask.style.display = 'none'; };
-    }
-    mask.querySelector('#defectAlarmBody').innerHTML = br.length
-      ? br.map(a => `<div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:13px;background:#f7f9fc"><span>周 ${esc(a.w)}</span><span style="color:var(--danger);font-weight:700">${a.p.toFixed(0)} PPM</span></div>`).join('')
-      : '<div style="padding:8px 10px;font-size:13px;background:#f7f9fc;border-radius:8px">近 52 周总 PPM 均未突破红线 2000，良率达标。</div>';
-    mask.style.display = 'flex';
   }
 
   render();

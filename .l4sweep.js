@@ -10,7 +10,7 @@ JSDOM.fromFile(path.resolve(__dirname, 'defect.html'), { runScripts: 'dangerousl
   setTimeout(() => {
     const click = el => { if (el) el.dispatchEvent(new w.Event('click', { bubbles: true })); return !!el; };
     let views = 0, multi = 0, single = 0, zeroN = 0, maxDevs = 0;
-    const cells = Array.from(doc.querySelectorAll('#heatChart .hcell')).filter((_, i) => i % 6 === 0).slice(0, 12);
+    const cells = Array.from(doc.querySelectorAll('#procChart .dser')).slice(0, 12);
     cells.forEach(cell => {
       click(cell);
       if (!click(doc.querySelector('#devChart .dnode'))) return;

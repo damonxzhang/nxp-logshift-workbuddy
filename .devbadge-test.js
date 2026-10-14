@@ -137,8 +137,11 @@ async function pageTests() {
   await sleep(400);
   const stillL2 = !!doc.getElementById('devChart');
   if (!stillL2) {
-    const strip = doc.querySelector('.stat-strip');
-    ok(!!strip && /近 24h 报修/.test(strip.textContent) && /近 24h 换模/.test(strip.textContent), '三级 stat-strip 含近 24h 报修 / 换模');
+    /* 页面上有多个 .stat-strip（顶部全局 KPI 条 + 三级卡片内的设备角标条），
+       必须按内容定位「含近 24h 报修」的那一条，不能用 querySelector 取第一个。 */
+    const strips = Array.from(doc.querySelectorAll('.stat-strip'));
+    const strip = strips.find(s => /近 24h 报修/.test(s.textContent) && /近 24h 换模/.test(s.textContent));
+    ok(!!strip, '三级 stat-strip 含近 24h 报修 / 换模（共 ' + strips.length + ' 条 KPI 条）');
     const sis = Array.from(doc.querySelectorAll('.stat-strip .si'));
     const repSi = sis.find(s => /近 24h 报修/.test(s.textContent));
     const molSi = sis.find(s => /近 24h 换模/.test(s.textContent));

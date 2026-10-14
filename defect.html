@@ -6,23 +6,13 @@
   <title>次品管理 · 质量预警 · 统一监控与交接中心</title>
   <link rel="stylesheet" href="assets/css/style.css?v=20261008r">
   <style>
-    /* 次品管理 · 数据范围（部门筛选）专属样式，不污染全局 style.css */
-    .dp-scope{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 0 14px;padding:10px 12px;border:1px dashed var(--border,#e1e7f0);border-radius:10px;background:var(--bg,#f2f5fa)}
+    /* 次品管理 · 数据范围 / 工序筛选专属样式，不污染全局 style.css */
+    .dp-scope{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 0 10px;padding:10px 12px;border:1px dashed var(--border,#e1e7f0);border-radius:10px;background:var(--bg,#f2f5fa)}
     .dp-scope-lbl{font-size:13px;font-weight:600;color:var(--text-2,#475569);white-space:nowrap}
     .dp-scope .seg{box-shadow:none}
     .dp-scope-hint{font-size:12.5px;color:var(--text-3,#64748b)}
-    /* 一级展现形式 3：小倍数趋势矩阵（Small Multiples）专属样式 */
-    .dp-sms{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px}
-    .dp-sm{border:1px solid var(--border,#e1e7f0);border-radius:10px;padding:8px 10px 7px;background:#fff;cursor:pointer;
-      transition:transform .12s,border-color .12s,box-shadow .12s}
-    .dp-sm:hover{border-color:var(--primary,#2563eb);transform:translateY(-2px);box-shadow:0 6px 16px rgba(37,99,235,.13)}
-    .dp-sm.off{opacity:.36}
-    .dp-sm-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text,#1f2937);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .dp-sm-hd i{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
-    .dp-sm-svg{display:block;width:100%;height:36px;margin:5px 0 3px;overflow:visible}
-    .dp-sm-ft{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:11px;color:var(--text-3,#64748b)}
-    .dp-sm-ft b{font-size:16px;font-weight:800;line-height:1}
+    .dp-note{font-size:12.5px;color:var(--text-2,#475569);line-height:1.7;margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--primary,#2563eb);background:rgba(37,99,235,.06);border-radius:0 8px 8px 0}
+    .dp-note b{color:var(--text,#1f2937)}
     /* 四级 · 料号跨机台分析：并排两图（柱状 PPM + 环形次品占比）专属样式 */
     .l4-2col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:2px 0 14px}
     @media (max-width:1080px){.l4-2col{grid-template-columns:1fr}}
@@ -44,8 +34,8 @@
 </div>
 <script src="assets/js/common.js?v=20261013c"></script>
 <script src="assets/js/data.js?v=20261008r"></script>
-<script src="assets/js/defect-real-data.js?v=20261009a"></script>
+<script src="assets/js/defect-real-data.js?v=20261014a"></script>
 <script src="assets/js/device-events.js?v=20261009a"></script>
-<script src="assets/js/page-defect.js?v=20261013h"></script>
+<script src="assets/js/page-defect.js?v=20261014f"></script>
 </body>
 </html>

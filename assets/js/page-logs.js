@@ -94,7 +94,6 @@
             <div class="seg" id="segDept" style="min-width:230px" title="切换部门查看各自的生产日志（LEAD / NON-LEAD 数据相互独立）">
               ${DEPTS.map(x => `<button data-d="${esc(x)}" class="${x === dept ? 'active' : ''}">${esc(x)}</button>`).join('')}
             </div>
-            <span class="chip">${icon('file', 14)} 生产日志 · 只读静态展示（按标注不含创建 / 交接入口）</span>
             <div class="flex acenter gap12 flex-wrap logs-meta">
               <span class="log-from">From：${esc(s.shift)} - ${esc(s.cls)} - ${esc(s.owner)}</span>
               <span class="log-from">Date：${esc(s.date)}</span>

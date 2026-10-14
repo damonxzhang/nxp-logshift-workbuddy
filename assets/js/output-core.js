@@ -116,12 +116,12 @@ function opSubRatios(typeId, types) {
 /* =========================================================================
    料号 I/O 加权口径（BGA/LGA 专有 —— 计算方法与其他 PKG Type 不同）
    -------------------------------------------------------------------------
-   客户《NONLEAD.xlsx》IO sheet：实际结果 = PKG_I/O × Unit（实际数量）÷ 255
+   客户《NONLEAD.xlsx》IO sheet：实际结果 = PKG_I/O × Unit（实际数量）÷ 225
      · PKG_I/O：该封装料号的 I/O（焊球 / 引脚）数，**由客户自行配置**
      · PKG_CODE：客户封装代码，**由客户自行配置**
      · 恒为 BGA / LGA 两类 → 对应 OP 的 PKG Type「BGA/LGA」（OP 里 BGA 与 LGA 合并计量）
    因此 OP 大屏里 BGA/LGA 的产出、目标统一折算成「标准 I/O 当量」：
-       I/O 当量 = 颗数 × (PKG_I/O ÷ 255)
+       I/O 当量 = 颗数 × (PKG_I/O ÷ 225)
    而 QFN / PQFN / FCCSP **仍按颗数**计量，口径不同（图上会分别标注）。
    料号 ↔ (PKG_CODE, PKG_I/O) 的映射在 OP 配置页「④ 料号 I/O 维护」由客户维护；
    一个料号都没配时回落系数 1.0（即等同颗数口径），并在界面上给出醒目提示。
@@ -129,8 +129,8 @@ function opSubRatios(typeId, types) {
 
 /* 走 I/O 加权口径的 PKG Type（其余品类仍按颗数） */
 const OP_IO_TYPES = ['BGA/LGA'];
-/* 折算基数：客户 IO 表中固定 255（由 io-real-data.js 带出） */
-const OP_IO_BASE = (typeof IO_REAL_DATA !== 'undefined' && IO_REAL_DATA && IO_REAL_DATA.base) ? Number(IO_REAL_DATA.base) || 255 : 255;
+/* 折算基数：客户 IO 表中固定 225（由 io-real-data.js 带出；2026-10-14 客户修正：原 255 有误） */
+const OP_IO_BASE = (typeof IO_REAL_DATA !== 'undefined' && IO_REAL_DATA && IO_REAL_DATA.base) ? Number(IO_REAL_DATA.base) || 225 : 225;
 function opUsesIo(typeId) { return OP_IO_TYPES.indexOf(typeId) >= 0; }
 /* 客户 IO 表候选池（PKG_CODE + PKG_I/O），配置页「一键带入」用 */
 function opIoCandidates() {
@@ -181,7 +181,7 @@ const OP_IO_STORE = {
   }
 };
 
-/* 单料号 I/O 折算系数 = PKG_I/O ÷ 255；未配置返回 null */
+/* 单料号 I/O 折算系数 = PKG_I/O ÷ 225；未配置返回 null */
 function opIoFactorOf(typeId, subId) {
   if (!opUsesIo(typeId)) return null;
   const rec = OP_IO_STORE.map(typeId)[subId];
@@ -593,7 +593,7 @@ function genOpWeek(year, weekNo) {
     });
 
     /* ---------- BGA/LGA：口径换成「标准 I/O 当量」 ----------
-       实际 = Σ(料号累计颗数 × PKG_I/O ÷ 255)（料号未配 I/O → 用品类加权系数兜底）
+       实际 = Σ(料号累计颗数 × PKG_I/O ÷ 225)（料号未配 I/O → 用品类加权系数兜底）
        目标 = 周目标(颗) × 品类加权系数
        原「颗数」口径完整保留在 qtyGoalCum / qtyTotalCum / qtyWeekGoal，供明细与对账使用。 */
     const out = { goalCum, totalCum, weekGoal, subCum };

@@ -1,4 +1,4 @@
-/* 次品管理 · 数据范围（部门筛选）jsdom 回归测试 */
+/* 次品管理 · 一级工序筛选 + 部门自动过滤（非用户控件）jsdom 回归测试 */
 const { JSDOM, VirtualConsole } = require('jsdom');
 const path = require('path');
 
@@ -28,50 +28,57 @@ JSDOM.fromFile(file, {
     const content = () => doc.getElementById('content');
     const txt = () => content().textContent || '';
     const chips = () => doc.querySelectorAll('#defChips .legck');
-    const segBtns = () => doc.querySelectorAll('#deptSeg button');
-    const clickDept = d => {
-      const b = Array.from(segBtns()).find(x => x.dataset.dept === d);
+    const stepBtns = () => doc.querySelectorAll('#stepSeg button');
+
+    ok(errors.length === 0, '无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
+
+    // 部门不再作为用户筛选控件
+    ok(doc.getElementById('deptSeg') == null, '部门筛选工具栏（#deptSeg）已移除（部门不作筛选条件）');
+    ok(/部门不作为筛选条件/.test(doc.getElementById('content').textContent), '页面含备注：部门不作为筛选条件');
+    ok(/根据登录用户所属部门.*自动筛选/.test(doc.getElementById('content').textContent), '页面含备注：按登录用户所属部门自动筛选');
+
+    // 工序筛选工具栏
+    ok(doc.getElementById('stepSeg') != null, '工序筛选工具栏（#stepSeg）已渲染');
+    const allBtn = Array.from(stepBtns()).find(x => x.dataset.step === 'ALL');
+    ok(allBtn != null, '工序筛选含「看全部」按钮');
+    // 工序选项：统一为 MOLD / MARK / ICOS 三个（见 defect-real-data.js 的 station 字段与 defect-config-core.js 的工序种子）
+    const stationBtns = Array.from(stepBtns()).filter(x => x.dataset.step !== 'ALL');
+    ok(stationBtns.length === 3, '工序筛选含 3 个工序维度按钮 MOLD / MARK / ICOS（实际 ' + stationBtns.length + '）');
+    ok(JSON.stringify(stationBtns.map(x => x.dataset.step)) === JSON.stringify(['MOLD', 'MARK', 'ICOS']),
+      '工序按钮顺序与名称 = MOLD / MARK / ICOS（实际 ' + stationBtns.map(x => x.dataset.step).join(' / ') + '）');
+
+    // 默认：看全部工序 + 部门自动(演示态 ALL) → 16 类
+    ok(chips().length === 16, '默认渲染 16 类次品（实际 ' + chips().length + '）');
+    ok(doc.querySelector('#procChart svg') != null, '一级折线图渲染');
+    ok(doc.querySelector('#heatChart') == null, '一级热力图已移除（容器不存在）');
+
+    // 点击「MOLD」→ 5 类
+    const clickStep = st => {
+      const b = Array.from(stepBtns()).find(x => x.dataset.step === st);
       if (!b) return false;
       b.dispatchEvent(new window.Event('click', { bubbles: true }));
       return true;
     };
-    const uniqHeatK = () => new Set(Array.from(doc.querySelectorAll('#heatChart .hcell')).map(r => r.dataset.k)).size;
+    ok(clickStep('MOLD'), '点击「MOLD」工序');
+    ok(chips().length === 5, 'MOLD 只剩 5 类（实际 ' + chips().length + '）');
+    ok(Array.from(stepBtns()).find(x => x.dataset.step === 'MOLD').className.indexOf('active') >= 0, 'MOLD 按钮高亮(active)');
+    ok(doc.querySelectorAll('#procChart .dser').length === 5, '折线图仅 5 条系列（随工序收缩）');
+    ok(txt().includes('5 类别（MOLD）'), '一级趋势卡标题显示「5 类别（MOLD）」');
 
-    ok(errors.length === 0, '无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
+    // 点击「MARK」→ 10 类
+    ok(clickStep('MARK'), '点击「MARK」工序');
+    ok(chips().length === 10, 'MARK 范围 10 类（实际 ' + chips().length + '）');
+    ok(txt().includes('10 类别（MARK）'), '标题显示「10 类别（MARK）」');
 
-    // 数据范围工具栏
-    ok(doc.getElementById('deptSeg') != null, '数据范围工具栏（#deptSeg）已渲染');
-    ok(segBtns().length === 4, '工具栏含 4 个按钮（看全部/LEAD/NON-LEAD/PLATING）');
-
-    // 默认：看全部 → 16 类
-    ok(chips().length === 16, '默认「看全部」渲染 16 类次品（实际 ' + chips().length + '）');
-    ok(doc.querySelector('#procChart svg') != null, '一级折线图渲染');
-    ok(doc.querySelector('#heatChart svg') != null, '一级热力图渲染');
-
-    // LEAD → 7 类
-    ok(clickDept('LEAD'), '点击 LEAD 按钮');
-    ok(chips().length === 7, 'LEAD 范围只剩 7 类（实际 ' + chips().length + '）');
-    ok(/LEAD 部门 · 7 类/.test(txt()), '范围提示显示「LEAD 部门 · 7 类」');
-    ok(Array.from(segBtns()).find(x => x.dataset.dept === 'LEAD').className.indexOf('active') >= 0, 'LEAD 按钮高亮(active)');
-    ok(doc.querySelectorAll('#procChart .dser').length === 7, '折线图仅 7 条系列');
-    ok(uniqHeatK() === 7, '热力图仅 7 行类别');
-    ok(txt().includes('7 类别（LEAD）'), '一级趋势卡标题显示「7 类别（LEAD）」');
-
-    // NON-LEAD → 8 类
-    ok(clickDept('NON-LEAD'), '点击 NON-LEAD 按钮');
-    ok(chips().length === 8, 'NON-LEAD 范围剩 8 类（实际 ' + chips().length + '）');
-    ok(/NON-LEAD 部门 · 8 类/.test(txt()), '范围提示显示「NON-LEAD 部门 · 8 类」');
-
-    // PLATING → 1 类
-    ok(clickDept('PLATING'), '点击 PLATING 按钮');
-    ok(chips().length === 1, 'PLATING 范围剩 1 类（实际 ' + chips().length + '）');
-    ok(/PLATING 部门 · 1 类/.test(txt()), '范围提示显示「PLATING 部门 · 1 类」');
+    // 点击「ICOS」→ 1 类
+    ok(clickStep('ICOS'), '点击「ICOS」工序');
+    ok(chips().length === 1, 'ICOS 范围 1 类（实际 ' + chips().length + '）');
 
     // 回到看全部
-    ok(clickDept('ALL'), '点击「看全部」按钮');
+    ok(clickStep('ALL'), '点击「看全部」按钮');
     ok(chips().length === 16, '回到看全部恢复 16 类（实际 ' + chips().length + '）');
 
-    // 一级→二级 联动不受影响（范围切换后仍可下钻）
+    // 一级→二级 联动不受影响（工序切换后仍可下钻）
     const dser = doc.querySelector('#procChart .dser');
     ok(dser != null, '折线图系列存在（用于下钻）');
     if (dser) dser.dispatchEvent(new window.Event('click', { bubbles: true }));
@@ -83,7 +90,8 @@ JSDOM.fromFile(file, {
     ok(crumb != null, '面包屑返回入口存在');
     if (crumb) crumb.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(chips().length === 16, '返回一级后恢复 16 类（联动闭环正常）');
-    ok(doc.getElementById('deptSeg') != null, '返回一级后数据范围工具栏仍存在');
+    ok(doc.getElementById('stepSeg') != null, '返回一级后工序筛选工具栏仍存在');
+    ok(doc.getElementById('deptSeg') == null, '返回一级后部门筛选工具栏仍不存在');
 
     ok(errors.length === 0, '全程无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
 

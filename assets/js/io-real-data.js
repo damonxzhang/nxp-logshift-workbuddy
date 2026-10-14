@@ -1,15 +1,15 @@
 /* ============ 真实数据：客户《NONLEAD.xlsx》IO sheet ============
    由 .extract-io.py 自动生成，请勿手工编辑；客户更新 IO 表后重跑脚本即可。
    列：PKG_TYPE / PKG_CODE / PKG_I/O（用户可以配置）/ Unit（实际数量）/ 实际结果
-   口径：实际结果 = PKG_I/O × Unit ÷ 255（101 行全部校验一致）
-   用途：BGA/LGA 的产出按「I/O 加权当量」计量 —— 颗数 × (PKG_I/O ÷ 255)；
+   口径：实际结果 = PKG_I/O × Unit ÷ 225（101 行全部校验一致）
+   用途：BGA/LGA 的产出按「I/O 加权当量」计量 —— 颗数 × (PKG_I/O ÷ 225)；
          其余 PKG Type（QFN / PQFN / FCCSP）仍按颗数计量。
          料号 ↔ PKG_CODE / PKG_I/O 的对应关系由客户在 OP 配置页「料号 I/O 维护」配置。 */
 const IO_REAL_DATA = {
   "source": "NONLEAD.xlsx · IO sheet（客户导出）",
   "extractedAt": "2026-10-13",
-  "formula": "实际结果 = PKG_I/O × Unit ÷ 255",
-  "base": 255.0,
+  "formula": "实际结果 = PKG_I/O × Unit ÷ 225",
+  "base": 225.0,
   "rows": 101,
   "codes": [
     {
@@ -17,707 +17,707 @@ const IO_REAL_DATA = {
       "code": "5289",
       "io": 225.0,
       "unit": 1000.0,
-      "actual": 882.3529
+      "actual": 1000
     },
     {
       "pkg": "BGA",
       "code": "5296",
       "io": 256.0,
       "unit": 1001.0,
-      "actual": 1004.9255
+      "actual": 1138.9156
     },
     {
       "pkg": "BGA",
       "code": "5268",
       "io": 196.0,
       "unit": 1002.0,
-      "actual": 770.1647
+      "actual": 872.8533
     },
     {
       "pkg": "BGA",
       "code": "5253",
       "io": 208.0,
       "unit": 1003.0,
-      "actual": 818.1333
+      "actual": 927.2178
     },
     {
       "pkg": "BGA",
       "code": "5316",
       "io": 289.0,
       "unit": 1004.0,
-      "actual": 1137.8667
+      "actual": 1289.5822
     },
     {
       "pkg": "LGA",
       "code": "007J",
       "io": 44.0,
       "unit": 1005.0,
-      "actual": 173.4118
+      "actual": 196.5333
     },
     {
       "pkg": "BGA",
       "code": "5220",
       "io": 196.0,
       "unit": 1006.0,
-      "actual": 773.2392
+      "actual": 876.3378
     },
     {
       "pkg": "BGA",
       "code": "5246",
       "io": 256.0,
       "unit": 1007.0,
-      "actual": 1010.949
+      "actual": 1145.7422
     },
     {
       "pkg": "BGA",
       "code": "5235",
       "io": 289.0,
       "unit": 1008.0,
-      "actual": 1142.4
+      "actual": 1294.72
     },
     {
       "pkg": "LGA",
       "code": "009A",
       "io": 60.0,
       "unit": 1009.0,
-      "actual": 237.4118
+      "actual": 269.0667
     },
     {
       "pkg": "BGA",
       "code": "5332",
       "io": 81.0,
       "unit": 1010.0,
-      "actual": 320.8235
+      "actual": 363.6
     },
     {
       "pkg": "BGA",
       "code": "5371",
       "io": 208.0,
       "unit": 1011.0,
-      "actual": 824.6588
+      "actual": 934.6133
     },
     {
       "pkg": "BGA",
       "code": "5096",
       "io": 144.0,
       "unit": 1012.0,
-      "actual": 571.4824
+      "actual": 647.68
     },
     {
       "pkg": "LGA",
       "code": "008V",
       "io": 40.0,
       "unit": 1013.0,
-      "actual": 158.902
+      "actual": 180.0889
     },
     {
       "pkg": "LGA",
       "code": "6420",
       "io": 71.0,
       "unit": 1014.0,
-      "actual": 282.3294
+      "actual": 319.9733
     },
     {
       "pkg": "BGA",
       "code": "5345",
       "io": 121.0,
       "unit": 1015.0,
-      "actual": 481.6275
+      "actual": 545.8444
     },
     {
       "pkg": "LGA",
       "code": "007A",
       "io": 48.0,
       "unit": 1016.0,
-      "actual": 191.2471
+      "actual": 216.7467
     },
     {
       "pkg": "BGA",
       "code": "5365",
       "io": 473.0,
       "unit": 1017.0,
-      "actual": 1886.4353
+      "actual": 2137.96
     },
     {
       "pkg": "BGA",
       "code": "5343",
       "io": 404.0,
       "unit": 1018.0,
-      "actual": 1612.8314
+      "actual": 1827.8756
     },
     {
       "pkg": "BGA",
       "code": "00VG",
       "io": 404.0,
       "unit": 1019.0,
-      "actual": 1614.4157
+      "actual": 1829.6711
     },
     {
       "pkg": "BGA",
       "code": "5327",
       "io": 457.0,
       "unit": 1020.0,
-      "actual": 1828.0
+      "actual": 2071.7333
     },
     {
       "pkg": "BGA",
       "code": "5284",
       "io": 400.0,
       "unit": 1021.0,
-      "actual": 1601.5686
+      "actual": 1815.1111
     },
     {
       "pkg": "LGA",
       "code": "00HS",
       "io": 41.0,
       "unit": 1022.0,
-      "actual": 164.3216
+      "actual": 186.2311
     },
     {
       "pkg": "LGA",
       "code": "00HZ",
       "io": 64.0,
       "unit": 1023.0,
-      "actual": 256.7529
+      "actual": 290.9867
     },
     {
       "pkg": "BGA",
       "code": "0049",
       "io": 196.0,
       "unit": 1024.0,
-      "actual": 787.0745
+      "actual": 892.0178
     },
     {
       "pkg": "BGA",
       "code": "5377",
       "io": 452.0,
       "unit": 1025.0,
-      "actual": 1816.8627
+      "actual": 2059.1111
     },
     {
       "pkg": "BGA",
       "code": "002J",
       "io": 196.0,
       "unit": 1026.0,
-      "actual": 788.6118
+      "actual": 893.76
     },
     {
       "pkg": "BGA",
       "code": "5380",
       "io": 529.0,
       "unit": 1027.0,
-      "actual": 2130.5216
+      "actual": 2414.5911
     },
     {
       "pkg": "BGA",
       "code": "5381",
       "io": 169.0,
       "unit": 1028.0,
-      "actual": 681.302
+      "actual": 772.1422
     },
     {
       "pkg": "BGA",
       "code": "6436",
       "io": 48.0,
       "unit": 1029.0,
-      "actual": 193.6941
+      "actual": 219.52
     },
     {
       "pkg": "BGA",
       "code": "004I",
       "io": 347.0,
       "unit": 1030.0,
-      "actual": 1401.6078
+      "actual": 1588.4889
     },
     {
       "pkg": "LGA",
       "code": "00B6",
       "io": 41.0,
       "unit": 1031.0,
-      "actual": 165.7686
+      "actual": 187.8711
     },
     {
       "pkg": "LGA",
       "code": "00B7",
       "io": 63.0,
       "unit": 1032.0,
-      "actual": 254.9647
+      "actual": 288.96
     },
     {
       "pkg": "BGA",
       "code": "004Q",
       "io": 257.0,
       "unit": 1033.0,
-      "actual": 1041.102
+      "actual": 1179.9156
     },
     {
       "pkg": "BGA",
       "code": "004J",
       "io": 473.0,
       "unit": 1034.0,
-      "actual": 1917.9686
+      "actual": 2173.6978
     },
     {
       "pkg": "BGA",
       "code": "007B",
       "io": 144.0,
       "unit": 1035.0,
-      "actual": 584.4706
+      "actual": 662.4
     },
     {
       "pkg": "BGA",
       "code": "0076",
       "io": 416.0,
       "unit": 1036.0,
-      "actual": 1690.102
+      "actual": 1915.4489
     },
     {
       "pkg": "BGA",
       "code": "00A9",
       "io": 256.0,
       "unit": 1037.0,
-      "actual": 1041.0667
+      "actual": 1179.8756
     },
     {
       "pkg": "BGA",
       "code": "0073",
       "io": 369.0,
       "unit": 1038.0,
-      "actual": 1502.0471
+      "actual": 1702.32
     },
     {
       "pkg": "BGA",
       "code": "0074",
       "io": 489.0,
       "unit": 1039.0,
-      "actual": 1992.4353
+      "actual": 2258.0933
     },
     {
       "pkg": "BGA",
       "code": "009F",
       "io": 206.0,
       "unit": 1040.0,
-      "actual": 840.1569
+      "actual": 952.1778
     },
     {
       "pkg": "BGA",
       "code": "005P",
       "io": 289.0,
       "unit": 1041.0,
-      "actual": 1179.8
+      "actual": 1337.1067
     },
     {
       "pkg": "LGA",
       "code": "00RY",
       "io": 48.0,
       "unit": 1042.0,
-      "actual": 196.1412
+      "actual": 222.2933
     },
     {
       "pkg": "BGA",
       "code": "0099",
       "io": 206.0,
       "unit": 1043.0,
-      "actual": 842.5804
+      "actual": 954.9244
     },
     {
       "pkg": "BGA",
       "code": "00A1",
       "io": 130.0,
       "unit": 1044.0,
-      "actual": 532.2353
+      "actual": 603.2
     },
     {
       "pkg": "BGA",
       "code": "00AD",
       "io": 121.0,
       "unit": 1045.0,
-      "actual": 495.8627
+      "actual": 561.9778
     },
     {
       "pkg": "BGA",
       "code": "00BR",
       "io": 364.0,
       "unit": 1046.0,
-      "actual": 1493.1137
+      "actual": 1692.1956
     },
     {
       "pkg": "BGA",
       "code": "00BC",
       "io": 121.0,
       "unit": 1047.0,
-      "actual": 496.8118
+      "actual": 563.0533
     },
     {
       "pkg": "BGA",
       "code": "00BE",
       "io": 64.0,
       "unit": 1048.0,
-      "actual": 263.0275
+      "actual": 298.0978
     },
     {
       "pkg": "BGA",
       "code": "00G5",
       "io": 516.0,
       "unit": 1049.0,
-      "actual": 2122.6824
+      "actual": 2405.7067
     },
     {
       "pkg": "BGA",
       "code": "00G6",
       "io": 516.0,
       "unit": 1050.0,
-      "actual": 2124.7059
+      "actual": 2408
     },
     {
       "pkg": "BGA",
       "code": "007Z",
       "io": 292.0,
       "unit": 1051.0,
-      "actual": 1203.498
+      "actual": 1363.9644
     },
     {
       "pkg": "BGA",
       "code": "00H0",
       "io": 529.0,
       "unit": 1052.0,
-      "actual": 2182.3843
+      "actual": 2473.3689
     },
     {
       "pkg": "BGA",
       "code": "00D0",
       "io": 356.0,
       "unit": 1053.0,
-      "actual": 1470.0706
+      "actual": 1666.08
     },
     {
       "pkg": "BGA",
       "code": "00FP",
       "io": 169.0,
       "unit": 1054.0,
-      "actual": 698.5333
+      "actual": 791.6711
     },
     {
       "pkg": "BGA",
       "code": "00F8",
       "io": 121.0,
       "unit": 1055.0,
-      "actual": 500.6078
+      "actual": 567.3556
     },
     {
       "pkg": "BGA",
       "code": "00LM",
       "io": 100.0,
       "unit": 1056.0,
-      "actual": 414.1176
+      "actual": 469.3333
     },
     {
       "pkg": "BGA",
       "code": "5055",
       "io": 324.0,
       "unit": 1057.0,
-      "actual": 1343.0118
+      "actual": 1522.08
     },
     {
       "pkg": "BGA",
       "code": "00CJ",
       "io": 252.0,
       "unit": 1058.0,
-      "actual": 1045.5529
+      "actual": 1184.96
     },
     {
       "pkg": "BGA",
       "code": "00L5",
       "io": 400.0,
       "unit": 1059.0,
-      "actual": 1661.1765
+      "actual": 1882.6667
     },
     {
       "pkg": "BGA",
       "code": "00BN",
       "io": 624.0,
       "unit": 1060.0,
-      "actual": 2593.8824
+      "actual": 2939.7333
     },
     {
       "pkg": "BGA",
       "code": "00M8",
       "io": 289.0,
       "unit": 1061.0,
-      "actual": 1202.4667
+      "actual": 1362.7956
     },
     {
       "pkg": "BGA",
       "code": "00MM",
       "io": 272.0,
       "unit": 1062.0,
-      "actual": 1132.8
+      "actual": 1283.84
     },
     {
       "pkg": "BGA",
       "code": "5298",
       "io": 400.0,
       "unit": 1063.0,
-      "actual": 1667.451
+      "actual": 1889.7778
     },
     {
       "pkg": "BGA",
       "code": "00NA",
       "io": 292.0,
       "unit": 1064.0,
-      "actual": 1218.3843
+      "actual": 1380.8356
     },
     {
       "pkg": "BGA",
       "code": "00NJ",
       "io": 208.0,
       "unit": 1065.0,
-      "actual": 868.7059
+      "actual": 984.5333
     },
     {
       "pkg": "BGA",
       "code": "00PB",
       "io": 176.0,
       "unit": 1066.0,
-      "actual": 735.749
+      "actual": 833.8489
     },
     {
       "pkg": "BGA",
       "code": "00RJ",
       "io": 364.0,
       "unit": 1067.0,
-      "actual": 1523.0902
+      "actual": 1726.1689
     },
     {
       "pkg": "BGA",
       "code": "00PP",
       "io": 361.0,
       "unit": 1068.0,
-      "actual": 1511.9529
+      "actual": 1713.5467
     },
     {
       "pkg": "BGA",
       "code": "00RV",
       "io": 141.0,
       "unit": 1069.0,
-      "actual": 591.0941
+      "actual": 669.9067
     },
     {
       "pkg": "BGA",
       "code": "00RD",
       "io": 169.0,
       "unit": 1070.0,
-      "actual": 709.1373
+      "actual": 803.6889
     },
     {
       "pkg": "BGA",
       "code": "00TA",
       "io": 196.0,
       "unit": 1071.0,
-      "actual": 823.2
+      "actual": 932.96
     },
     {
       "pkg": "BGA",
       "code": "00TD",
       "io": 393.0,
       "unit": 1072.0,
-      "actual": 1652.1412
+      "actual": 1872.4267
     },
     {
       "pkg": "BGA",
       "code": "00PE",
       "io": 296.0,
       "unit": 1073.0,
-      "actual": 1245.5216
+      "actual": 1411.5911
     },
     {
       "pkg": "BGA",
       "code": "00WY",
       "io": 269.0,
       "unit": 1074.0,
-      "actual": 1132.9647
+      "actual": 1284.0267
     },
     {
       "pkg": "BGA",
       "code": "00V0",
       "io": 196.0,
       "unit": 1075.0,
-      "actual": 826.2745
+      "actual": 936.4444
     },
     {
       "pkg": "BGA",
       "code": "00ZN",
       "io": 485.0,
       "unit": 1076.0,
-      "actual": 2046.5098
+      "actual": 2319.3778
     },
     {
       "pkg": "BGA",
       "code": "00YT",
       "io": 257.0,
       "unit": 1077.0,
-      "actual": 1085.4471
+      "actual": 1230.1733
     },
     {
       "pkg": "BGA",
       "code": "00V5",
       "io": 289.0,
       "unit": 1078.0,
-      "actual": 1221.7333
+      "actual": 1384.6311
     },
     {
       "pkg": "BGA",
       "code": "010R",
       "io": 400.0,
       "unit": 1079.0,
-      "actual": 1692.549
+      "actual": 1918.2222
     },
     {
       "pkg": "BGA",
       "code": "011P",
       "io": 184.0,
       "unit": 1080.0,
-      "actual": 779.2941
+      "actual": 883.2
     },
     {
       "pkg": "BGA",
       "code": "010W",
       "io": 144.0,
       "unit": 1081.0,
-      "actual": 610.4471
+      "actual": 691.84
     },
     {
       "pkg": "BGA",
       "code": "0115",
       "io": 169.0,
       "unit": 1082.0,
-      "actual": 717.0902
+      "actual": 812.7022
     },
     {
       "pkg": "BGA",
       "code": "010Z",
       "io": 169.0,
       "unit": 1083.0,
-      "actual": 717.7529
+      "actual": 813.4533
     },
     {
       "pkg": "BGA",
       "code": "010N",
       "io": 594.0,
       "unit": 1084.0,
-      "actual": 2525.0824
+      "actual": 2861.76
     },
     {
       "pkg": "BGA",
       "code": "0117",
       "io": 975.0,
       "unit": 1085.0,
-      "actual": 4148.5294
+      "actual": 4701.6667
     },
     {
       "pkg": "BGA",
       "code": "0137",
       "io": 112.0,
       "unit": 1086.0,
-      "actual": 476.9882
+      "actual": 540.5867
     },
     {
       "pkg": "BGA",
       "code": "013C",
       "io": 64.0,
       "unit": 1087.0,
-      "actual": 272.8157
+      "actual": 309.1911
     },
     {
       "pkg": "BGA",
       "code": "5305",
       "io": 121.0,
       "unit": 1088.0,
-      "actual": 516.2667
+      "actual": 585.1022
     },
     {
       "pkg": "BGA",
       "code": "5320",
       "io": 247.0,
       "unit": 1089.0,
-      "actual": 1054.8353
+      "actual": 1195.48
     },
     {
       "pkg": "BGA",
       "code": "6434",
       "io": 139.0,
       "unit": 1090.0,
-      "actual": 594.1569
+      "actual": 673.3778
     },
     {
       "pkg": "BGA",
       "code": "5385",
       "io": 186.0,
       "unit": 1091.0,
-      "actual": 795.7882
+      "actual": 901.8933
     },
     {
       "pkg": "BGA",
       "code": "5229",
       "io": 160.0,
       "unit": 1092.0,
-      "actual": 685.1765
+      "actual": 776.5333
     },
     {
       "pkg": "BGA",
       "code": "008G",
       "io": 552.0,
       "unit": 1093.0,
-      "actual": 2366.0235
+      "actual": 2681.4933
     },
     {
       "pkg": "BGA",
       "code": "0007",
       "io": 169.0,
       "unit": 1094.0,
-      "actual": 725.0431
+      "actual": 821.7156
     },
     {
       "pkg": "BGA",
       "code": "0123",
       "io": 437.0,
       "unit": 1095.0,
-      "actual": 1876.5294
+      "actual": 2126.7333
     },
     {
       "pkg": "BGA",
       "code": "000O",
       "io": 361.0,
       "unit": 1096.0,
-      "actual": 1551.5922
+      "actual": 1758.4711
     },
     {
       "pkg": "BGA",
       "code": "000Q",
       "io": 90.0,
       "unit": 1097.0,
-      "actual": 387.1765
+      "actual": 438.8
     },
     {
       "pkg": "BGA",
       "code": "000T",
       "io": 437.0,
       "unit": 1098.0,
-      "actual": 1881.6706
+      "actual": 2132.56
     },
     {
       "pkg": "BGA",
       "code": "0012",
       "io": 324.0,
       "unit": 1099.0,
-      "actual": 1396.3765
+      "actual": 1582.56
     },
     {
       "pkg": "BGA",
       "code": "001F",
       "io": 169.0,
       "unit": 1100.0,
-      "actual": 729.0196
+      "actual": 826.2222
     }
   ],
   "byPkg": {

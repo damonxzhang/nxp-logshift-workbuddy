@@ -11,63 +11,21 @@
   const DEPTS = (typeof DEFECT_DEPARTMENTS !== 'undefined' && DEFECT_DEPARTMENTS.length) ? DEFECT_DEPARTMENTS : ['LEAD', 'NON-LEAD', 'PLATING'];
 
   let cfg = DefectCfgStore.all();
-  let tab = 'items';                       // items | equip
   let fDept = 'ALL';                       // ALL | LEAD | NON-LEAD | PLATING
   let fProc = 'ALL';                       // ALL | <process>
 
-  const TABS = [
-    { key: 'items', label: '① 次品项主数据', icon: 'layers' },
-    { key: 'equip', label: '② 设备与工序维护', icon: 'server' }
-  ];
-
   function render() {
-    const realKeys = (typeof DEFECT_REAL !== 'undefined' && DEFECT_REAL.cats) ? DEFECT_REAL.cats.map(c => c.key) : [];
-    const cfgKeys = cfg.items.map(i => i.code);
-    const matched = realKeys.filter(k => cfgKeys.indexOf(k) >= 0).length;
-    const realTotal = realKeys.length || 16;
-
     document.getElementById('content').innerHTML = `
-      <div class="notice mt16" style="--nc:var(--primary)">
-        ${icon('settings', 19)}
-        <div><strong>次品项配置（主数据）：</strong>按<strong>部门 / 工序</strong>维护次品项的<strong>名称与代码</strong>，并配置<strong>次品项与设备（机台）的绑定关系</strong>。
-        保存后写入本地配置仓库，作为次品管理大屏的缺陷项主数据。
-        ${canEdit ? '' : '<br><span class="badge b-warn">只读</span> 当前角色无编辑权限，仅可查看配置（切换为管理员身份即可编辑）。'}</div>
-      </div>
-
-      <div class="card mt16 no-print">
-        <div class="card-head">
-          <div class="card-title">${icon('settings', 19)} 配置域
-            <span class="card-sub">共 2 类 · 保存后立即写入本地配置仓库</span></div>
-          <div class="flex acenter gap8">
-            <div class="seg" id="segTab">
-              ${TABS.map(t => `<button data-t="${t.key}" class="${tab === t.key ? 'active' : ''}">${icon(t.icon, 15)} ${t.label}</button>`).join('')}
-            </div>
-            ${canEdit ? `<button class="btn btn-sm" id="btnResetAll">${icon('refresh', 16)} 恢复默认配置</button>` : ''}
-          </div>
-        </div>
-      </div>
-
-      <div id="tabBody" class="mt16">${tabBody()}</div>`;
+      <div id="tabBody" class="mt16">${viewItems()}</div>
+    `;
 
     bind();
-  }
-
-  function tabBody() {
-    return tab === 'items' ? viewItems() : viewEquip();
   }
 
   /* =========================================================
      ① 次品项主数据
      ========================================================= */
   function viewItems() {
-    const realKeys = (typeof DEFECT_REAL !== 'undefined' && DEFECT_REAL.cats) ? DEFECT_REAL.cats.map(c => c.key) : [];
-    const cfgKeys = cfg.items.map(i => i.code);
-    const matched = realKeys.filter(k => cfgKeys.indexOf(k) >= 0).length;
-    const realTotal = realKeys.length || 16;
-    const matchNote = realKeys.length
-      ? `已配置 <b>${matched} / ${realTotal}</b> 项代码与真实缺陷类别一致；其余为可扩展的自定义次品项。`
-      : '当前未加载真实缺陷数据，所有配置项均为自定义主数据。';
-
     const procOpts = ['<option value="ALL"' + (fProc === 'ALL' ? ' selected' : '') + '>全部工序</option>']
       .concat(cfg.processes.map(p => `<option value="${esc(p)}"${fProc === p ? ' selected' : ''}>${esc(p)}</option>`)).join('');
 
@@ -93,7 +51,6 @@
     }).join('') : `<tr><td colspan="${canEdit ? 6 : 6}" class="center muted">当前筛选条件下无次品项，点击「新增次品项」添加。</td></tr>`;
 
     return `
-      <div class="cfg-note mb12">${icon('alert', 15)} ${matchNote} 部门固定为 <b>LEAD / NON-LEAD / PLATING</b>（项目口径，不可编辑）；工序与设备池可在「② 设备与工序维护」中增删。</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title">${icon('layers', 19)} 次品项主数据
@@ -135,12 +92,12 @@
     const editing = (gi != null && cfg.items[gi]);
     const it = editing ? Object.assign({}, cfg.items[gi]) : { code: '', name: '', dept: DEPTS[0], process: cfg.processes[0] || '', equip: [] };
     const procOpts = cfg.processes.map(p => `<option value="${esc(p)}"${p === it.process ? ' selected' : ''}>${esc(p)}</option>`).join('') ||
-      `<option value="">（请先在「② 设备与工序维护」添加工序）</option>`;
+      `<option value="">（暂无可用工序）</option>`;
     const deptOpts = DEPTS.map(d => `<option value="${d}"${d === it.dept ? ' selected' : ''}>${d}</option>`).join('');
     const eqChips = cfg.equipPool.map(e => {
       const on = it.equip.indexOf(e) >= 0;
       return `<span class="eq-chip${on ? ' on' : ''}" data-eq="${esc(e)}">${esc(e)}${on ? ' ✓' : ''}</span>`;
-    }).join('') || '<span class="muted small">设备池为空，请先在「② 设备与工序维护」添加机台</span>';
+    }).join('') || '<span class="muted small">设备池为空</span>';
 
     openDialog({
       title: editing ? '编辑次品项' : '新增次品项',
@@ -170,7 +127,7 @@
             <div class="small muted mt8">绑定的设备即该次品项可归因的机台；次品管理大屏下钻到机台维度时，可据此关联定位责任设备。</div>
           </div>
         </div>`,
-      onOk: () => {
+      onOk: (_m, close) => {
         const code = getVal('itCode').trim();
         const name = getVal('itName').trim();
         const dept = getVal('itDept');
@@ -178,7 +135,7 @@
         const equip = Array.from(document.querySelectorAll('#dlgEquip .eq-chip.on')).map(el => el.dataset.eq);
         if (!code) { toast('请填写次品项代码', 'warn'); return; }
         if (!name) { toast('请填写次品项名称', 'warn'); return; }
-        if (!proc) { toast('请选择工序（可到「② 设备与工序维护」添加）', 'warn'); return; }
+        if (!proc) { toast('请选择工序', 'warn'); return; }
         if (!editing) {
           if (cfg.items.some(i => i.code === code)) { toast('代码「' + code + '」已存在，请使用唯一代码', 'danger'); return; }
           cfg.items.push({ code, name, dept: DEPTS.indexOf(dept) >= 0 ? dept : DEPTS[0], process: proc, equip });
@@ -190,6 +147,7 @@
         }
         DefectCfgStore.save(cfg);
         render();
+        close();          // 保存成功后关闭弹窗（openDialog 的 onOk 需自行调用 close）
       }
     });
 
@@ -200,72 +158,9 @@
   }
 
   /* =========================================================
-     ② 设备与工序维护
-     ========================================================= */
-  function viewEquip() {
-    const eqChips = cfg.equipPool.map(e => {
-      const used = cfg.items.filter(i => i.equip.indexOf(e) >= 0).length;
-      return `<span class="eq-pool" data-eq="${esc(e)}">${esc(e)}
-        ${canEdit ? `<button class="eq-x" data-rm="${esc(e)}" title="删除${used ? '（将从 ' + used + ' 个次品项移除绑定）' : ''}">×</button>` : ''}
-        ${used ? `<i class="eq-used">绑 ${used}</i>` : ''}</span>`;
-    }).join('') || '<span class="muted small">设备池为空，请在下方添加机台。</span>';
-
-    const procChips = cfg.processes.map(p => {
-      const used = cfg.items.filter(i => i.process === p).length;
-      return `<span class="eq-pool" data-proc="${esc(p)}">${esc(p)}
-        ${canEdit ? `<button class="eq-x" data-rmproc="${esc(p)}" title="删除${used ? '（被 ' + used + ' 个次品项使用）' : ''}">×</button>` : ''}
-        ${used ? `<i class="eq-used">用 ${used}</i>` : ''}</span>`;
-    }).join('') || '<span class="muted small">工序为空，请在下方添加。</span>';
-
-    return `
-      <div class="cfg-note mb12">${icon('alert', 15)} <strong>部门固定为 LEAD / NON-LEAD / PLATING</strong>（项目口径，不可编辑）。本页维护<b>设备池（机台）</b>与<b>工序</b>，二者供「① 次品项主数据」中的设备绑定与工序归类使用。</div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">${icon('server', 19)} 设备池（机台）
-            <span class="card-sub">次品项可绑定的设备清单 · 共 ${cfg.equipPool.length} 台</span></div>
-          ${canEdit ? `<div class="flex acenter gap8">
-            <input class="input lang" id="addEquip" placeholder="新增机台代码，如 BMD-31" style="width:200px;font-family:'JetBrains Mono',Consolas,monospace">
-            <button class="btn btn-sm btn-primary" id="btnAddEquip">${icon('plus', 16)} 添加</button>
-          </div>` : '<span class="chip">只读</span>'}
-        </div>
-        <div class="card-body">
-          <div class="flex acenter gap8" style="flex-wrap:wrap">${eqChips}</div>
-          <div class="sub-note mt10">标「绑 N」表示该设备已被 N 个次品项绑定；删除设备会同步从相关次品项移除该绑定。</div>
-        </div>
-      </div>
-
-      <div class="card mt16">
-        <div class="card-head">
-          <div class="card-title">${icon('layers', 19)} 工序（Process）
-            <span class="card-sub">次品项的工序归类 · 共 ${cfg.processes.length} 项</span></div>
-          ${canEdit ? `<div class="flex acenter gap8">
-            <input class="input" id="addProc" placeholder="新增工序，如 电镀/PLATING" style="width:200px">
-            <button class="btn btn-sm btn-primary" id="btnAddProc">${icon('plus', 16)} 添加</button>
-          </div>` : '<span class="chip">只读</span>'}
-        </div>
-        <div class="card-body">
-          <div class="flex acenter gap8" style="flex-wrap:wrap">${procChips}</div>
-          <div class="sub-note mt10">标「用 N」表示该工序已被 N 个次品项使用；被使用的工序需先改派次品项后方可删除。</div>
-        </div>
-      </div>`;
-  }
-
-  /* =========================================================
      事件绑定
      ========================================================= */
   function bind() {
-    const st = document.getElementById('segTab');
-    if (st) st.querySelectorAll('button').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
-
-    const bra = document.getElementById('btnResetAll');
-    if (bra) bra.onclick = () => {
-      DefectCfgStore.reset();
-      cfg = DefectCfgStore.all();
-      fDept = 'ALL'; fProc = 'ALL';
-      toast('已恢复默认配置', 'success'); render();
-    };
-
     // ① 次品项
     const sd = document.getElementById('segDept');
     if (sd) sd.querySelectorAll('button').forEach(b => b.onclick = () => { fDept = b.dataset.d; render(); });
@@ -293,40 +188,6 @@
       toast('已删除次品项「' + it.name + '」（' + it.code + '）', 'success'); render();
     });
 
-    // ② 设备与工序
-    const bae = document.getElementById('btnAddEquip');
-    if (bae) bae.onclick = () => {
-      const v = getVal('addEquip').trim();
-      if (!v) { toast('请填写机台代码', 'warn'); return; }
-      if (cfg.equipPool.indexOf(v) >= 0) { toast('设备「' + v + '」已存在', 'warn'); return; }
-      cfg.equipPool.push(v); DefectCfgStore.save(cfg);
-      toast('已添加设备 ' + v, 'success'); render();
-    };
-    const bap = document.getElementById('btnAddProc');
-    if (bap) bap.onclick = () => {
-      const v = getVal('addProc').trim();
-      if (!v) { toast('请填写工序名称', 'warn'); return; }
-      if (cfg.processes.indexOf(v) >= 0) { toast('工序「' + v + '」已存在', 'warn'); return; }
-      cfg.processes.push(v); DefectCfgStore.save(cfg);
-      toast('已添加工序 ' + v, 'success'); render();
-    };
-    // 设备删除
-    document.querySelectorAll('.eq-x[data-rm]').forEach(b => b.onclick = () => {
-      const eq = b.dataset.rm;
-      const used = cfg.items.filter(i => i.equip.indexOf(eq) >= 0).length;
-      cfg.equipPool = cfg.equipPool.filter(x => x !== eq);
-      cfg.items.forEach(i => { i.equip = i.equip.filter(x => x !== eq); });
-      DefectCfgStore.save(cfg);
-      toast(used ? `已删除设备 ${eq}，并从 ${used} 个次品项移除绑定` : `已删除设备 ${eq}`, 'success'); render();
-    });
-    document.querySelectorAll('.eq-x[data-rmproc]').forEach(b => b.onclick = () => {
-      const p = b.dataset.rmproc;
-      const used = cfg.items.filter(i => i.process === p).length;
-      if (used) { toast(`工序「${p}」已被 ${used} 个次品项使用，请先在「① 次品项主数据」中改派后再删除`, 'warn'); return; }
-      cfg.processes = cfg.processes.filter(x => x !== p);
-      DefectCfgStore.save(cfg);
-      toast(`已删除工序 ${p}`, 'success'); render();
-    });
   }
 
   render();

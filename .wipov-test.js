@@ -134,8 +134,8 @@ function mockRect(win) {
   ok(errs.length === 0, '大屏渲染无 JS 异常', errs.join(' | '));
 
   const cards = Array.from(doc.querySelectorAll('.op-chart-card'));
-  /* 2026-10-13：BGA/LGA 走 I/O 加权口径，已从数量图拆出单独成图 → 行数由 2 变 3，共 6 张 */
-  ok(cards.length === 6, '双部门 3×2 六张图（颗数 / I/O当量 / 金额 × LEAD/NON-LEAD）：' + cards.length);
+  /* 2026-10-14：BGA/LGA 撤销单独成图，改为并入 LEAD 两张主图 → 行数回到 2，共 4 张（2×2） */
+  ok(cards.length === 4, '双部门 2×2 四张图（颗数 / 金额 × LEAD/NON-LEAD）：' + cards.length);
   const nlCard = cards.find(c => /NON-LEAD/.test(c.textContent) && /累计 goal vs total/.test(c.textContent) && /颗数/.test(c.textContent));
   ok(!!nlCard, '找到 NON-LEAD 数量图');
   const nlTxt = nlCard ? nlCard.textContent : '';

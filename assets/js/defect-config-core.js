@@ -13,26 +13,26 @@
   // 设备池（机台）：取自客户真实 -M 透视的设备清单（均为 Mold 机台），用户可增删
   const DEFECT_EQUIP_SEED = ['BMD-02', 'BMD-07', 'BMD-09', 'BMD-14', 'BMD-17', 'BMD-19', 'BMD-21', 'BMD-22', 'QMD-12'];
 
-  // 工序（Process）：取自真实缺陷类别的 station 字段
-  const DEFECT_PROCESS_SEED = ['印字/MARK', 'ICOS', '来料/IQC', '注塑/MOLD', '切割/SAW'];
+  // 工序（Process）：默认仅 3 个，用户可按需扩展
+  const DEFECT_PROCESS_SEED = ['MOLD', 'MARK', 'ICOS'];
 
   // 次品项主数据种子：代码/名称 与真实 16 类别一一对应；部门映射与设备绑定为演示默认值
   const DEFECT_ITEMS_SEED = [
-    { code: 'MMS AL01', name: '少球', dept: 'LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL02', name: '共面性', dept: 'LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL03', name: '锡球变形(大/小球)', dept: 'LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL06', name: '印字缺陷', dept: 'LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MOLD BMD2', name: '外来物', dept: 'LEAD', process: '注塑/MOLD', equip: DEFECT_EQUIP_SEED.slice() },
-    { code: 'MOLD BMD3', name: '未充满', dept: 'LEAD', process: '注塑/MOLD', equip: DEFECT_EQUIP_SEED.slice() },
-    { code: 'SAW SS7', name: 'SAW污染(外来物/粉尘)', dept: 'LEAD', process: '切割/SAW', equip: [] },
-    { code: 'MMS AL05', name: '印字面外来物', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL07', name: '印字/表面划伤', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL08', name: '印字/污染', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL09', name: '印字/其它(overkill)', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL11', name: '外来物少球', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MMS AL12', name: '球损伤', dept: 'NON-LEAD', process: '印字/MARK', equip: [] },
-    { code: 'MOLD BMD9', name: '压痕/划痕', dept: 'NON-LEAD', process: '注塑/MOLD', equip: DEFECT_EQUIP_SEED.slice() },
-    { code: 'IQC&Supplier', name: 'substrate issue', dept: 'NON-LEAD', process: '来料/IQC', equip: [] },
+    { code: 'MMS AL01', name: '少球', dept: 'LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL02', name: '共面性', dept: 'LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL03', name: '锡球变形(大/小球)', dept: 'LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL06', name: '印字缺陷', dept: 'LEAD', process: 'MARK', equip: [] },
+    { code: 'MOLD BMD2', name: '外来物', dept: 'LEAD', process: 'MOLD', equip: DEFECT_EQUIP_SEED.slice() },
+    { code: 'MOLD BMD3', name: '未充满', dept: 'LEAD', process: 'MOLD', equip: DEFECT_EQUIP_SEED.slice() },
+    { code: 'SAW SS7', name: 'SAW污染(外来物/粉尘)', dept: 'LEAD', process: 'MOLD', equip: [] },
+    { code: 'MMS AL05', name: '印字面外来物', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL07', name: '印字/表面划伤', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL08', name: '印字/污染', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL09', name: '印字/其它(overkill)', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL11', name: '外来物少球', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MMS AL12', name: '球损伤', dept: 'NON-LEAD', process: 'MARK', equip: [] },
+    { code: 'MOLD BMD9', name: '压痕/划痕', dept: 'NON-LEAD', process: 'MOLD', equip: DEFECT_EQUIP_SEED.slice() },
+    { code: 'IQC&Supplier', name: 'substrate issue', dept: 'NON-LEAD', process: 'MOLD', equip: [] },
     { code: 'ICOS BMD12', name: '其它(ICOS overkill)', dept: 'PLATING', process: 'ICOS', equip: [] }
   ];
 
@@ -48,7 +48,7 @@
   }
 
   const DefectCfgStore = {
-    KEY: 'defect_cfg',
+    KEY: 'defect_cfg_v2',
     raw() {
       try { return store.get(this.KEY, null); } catch (e) { return null; }
     },

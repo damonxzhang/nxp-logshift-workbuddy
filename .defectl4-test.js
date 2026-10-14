@@ -47,12 +47,12 @@ function loadPage(file, wait) {
 
     console.log('\n【defect.html · 一级 → 二级】');
     ok(errors.length === 0, 'defect 无 JS 运行时错误' + (errors.length ? ' -> ' + errors.join(' | ') : ''));
-    ok(doc.querySelector('#heatChart svg') != null, '一级热力图已渲染');
-    const hcell = doc.querySelector('#heatChart .hcell');
-    ok(hcell != null, '热力图单元格存在');
-    ok(click(hcell), '点击热力图单元格');
-    ok(/二级 ·/.test(txt()), '热力图点击进入「二级」（实际标题含二级）');
-    ok(!/三级 ·[^·]{0,30}Package 明细/.test(txt()), '不再直接跳到三级「Package 明细」页');
+    ok(doc.querySelector('#procChart svg') != null, '一级折线图已渲染');
+    const dser = doc.querySelector('#procChart .dser');
+    ok(dser != null, '折线图系列存在');
+    ok(click(dser), '点击折线系列');
+    ok(/二级 ·/.test(txt()), '折线点击进入「二级」（实际标题含二级）');
+    ok(!/三级 ·[^·]{0,30}Package 明细/.test(txt()), '不直接跳到三级「Package 明细」页');
     ok(/机台树状图/.test(txt()) || /未加载设备维度数据/.test(txt()), '二级机台树区域已渲染');
 
     console.log('\n【defect.html · 二级 → 三级 → 四级】');
@@ -76,8 +76,15 @@ function loadPage(file, wait) {
     const h4 = Array.from(doc.querySelectorAll('#content table.table thead th')).map(t => t.textContent.trim());
     ok(h4.includes('机台') && h4.includes('PPM') && h4.includes('占该料号次品') && h4.includes('相对本机'),
       '四级表含 机台 / PPM / 占该料号次品 / 相对本机 等维度列');
-    ok(/分析结论/.test(txt()), '四级页给出「分析结论」');
-    ok(/机台特异性|料号 \/ 物料共性|跨机平稳|仅本机台生产|无跨机台数据/.test(txt()), '结论落在四种判定之一');
+    /* 2026-10-14：四级页「分析结论」块与三级「口径说明」按客户要求精简下线，
+       改为校验四级页的核心数据承载（6 项 KPI 条 + 跨机台明细表 + 两图）仍在。 */
+    /* 注意：页面上有多个 .stat-strip（顶部全局 KPI 条 + 四级卡片内的指标条），必须按内容定位 */
+    const l4strip = Array.from(doc.querySelectorAll('#content .stat-strip')).find(s => /料号加权 PPM/.test(s.textContent));
+    ok(!!l4strip && /涉及机台数/.test(l4strip.textContent) && /本机台排名/.test(l4strip.textContent),
+      '四级页 KPI 条含 料号加权 PPM / 涉及机台数 / 本机台排名 等指标');
+    ok(!/分析结论/.test(txt()), '四级页「分析结论」块已按精简口径下线（不再渲染）');
+    ok(/最新|无跨机台记录|跨机台/.test(txt()) || doc.querySelector('#content table.table') != null,
+      '四级页仍渲染跨机台明细表 / 无记录提示');
     ok(/#l4Back|返回三级/.test(doc.getElementById('content').innerHTML) || doc.getElementById('l4Back') != null, '四级页有「返回三级」入口');
     ok(/四级 ·/.test(doc.querySelector('.crumb').textContent || ''), '面包屑显示四级层级');
 
