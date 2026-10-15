@@ -1257,9 +1257,10 @@ table.table input.input.num.t-th.input-bad {
 /* ---- 二级界面：工序详情抽屉 ---- */
 .wip-mask {
   position: fixed; inset: 0; background: rgba(15,23,42,.4); z-index: 60;
-  opacity: 0; transition: opacity .25s; backdrop-filter: blur(1.5px);
+  opacity: 0; transition: opacity .25s, visibility .25s; backdrop-filter: blur(1.5px);
+  pointer-events: none; visibility: hidden;
 }
-.wip-mask.open { opacity: 1; }
+.wip-mask.open { opacity: 1; pointer-events: auto; visibility: visible; }
 .wip-drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(96vw, 1180px); z-index: 61;
   background: var(--bg, #f6f8fb); box-shadow: -18px 0 50px rgba(15,23,42,.25);

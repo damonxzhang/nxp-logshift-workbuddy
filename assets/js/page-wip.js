@@ -170,7 +170,7 @@
 
   /* ---------------- 一级界面渲染 ---------------- */
   let patrolTimer = null, patrolIdx = -1;
-  let rankType = '';   // 排行联动品类：矩阵品类列头按钮选中值（'' = 全部品类）
+  let rankType = 'BGA';   // 排行联动品类：矩阵品类列头按钮选中值（'' = 全部品类）；默认联动 BGA
 
   function render() {
     const g = globalAgg();

@@ -141,8 +141,7 @@ function renderShell(page) {
     const cls = ['nav-item'];
     if (n.key === page) cls.push('active');
     if (!n.href) cls.push('off');
-    const tag = n.tag ? `<span class="nav-tag ${n.tagCls || 't-plain'}">${n.tag}</span>` : '';
-    const inner = `<span class="nav-icon">${icon(n.icon, 20)}</span><span class="nav-text">${n.label}</span>${tag}`;
+    const inner = `<span class="nav-icon">${icon(n.icon, 20)}</span><span class="nav-text">${n.label}</span>`;
     return n.href
       ? `<a href="${n.href}" class="${cls.join(' ')}" title="${n.label}">${inner}</a>`
       : `<span class="${cls.join(' ')}" role="button" tabindex="0"
