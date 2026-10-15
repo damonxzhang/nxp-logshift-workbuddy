@@ -19,14 +19,23 @@
   const rows = RAW.rows || [];
   if (!rows.length) { document.getElementById('content').innerHTML = '<div class="notice mt16">未找到 WIP 数据（wip-real-data.js），请重跑 .extract-wip.py。</div>'; return; }
 
-  /* 品类调色板（与 OP 大屏一致；WIP 原始口径区分 BGA / LGA） */
-  const TYPE_COLOR = { BGA: '#1d4ed8', LGA: '#0b8a5a', QFN: '#8b5cf6', PQFN: '#0b6a86', FCCSP: '#a8620b' };
-  const typeName = t => (t === 'LGA' ? 'BGA/LGA' : t);
-  /* 单价口径：OP 配置里 BGA / LGA 合为「BGA/LGA」一类，两原始品类共用同一单价 */
-  const PRICE_KEY = { BGA: 'BGA/LGA', LGA: 'BGA/LGA' };
-  const priceOf = t => opPriceOf(PRICE_KEY[t] || t);           // 元/粒（大分类兜底价）
+  /* 品类配置（WipTypeStore · 客户可在 wip-config.html 自行配置）：
+     数据里出现但未配置的品类自动按默认样式补齐（不入库，配置页编辑保存后生效） */
+  const TCFG = (() => {
+    const list = WipTypeStore.all();
+    const have = {};
+    list.forEach(c => { have[c.key] = 1; });
+    rows.forEach(r => { if (r[1] && !have[r[1]]) { have[r[1]] = 1; list.push(WipTypeStore.defaultOf(r[1])); } });
+    return list;
+  })();
+  const cfgOf = t => TCFG.find(c => c.key === t) || WipTypeStore.defaultOf(t);
+  const TYPE_COLOR = {};
+  TCFG.forEach(c => { TYPE_COLOR[c.key] = c.color; });
+  const typeName = t => (cfgOf(t).name || t);
+  /* 单价口径：品类配置的 priceKey 对应 OP 配置里的 PKG Type id（如 BGA / LGA 共用「BGA/LGA」价） */
+  const priceOf = t => opPriceOf(cfgOf(t).priceKey || t);      // 元/粒（大分类兜底价）
   /* 小分类（封装料号）单价：料号价 → 大分类兜底价。行内无料号时退回大分类价 */
-  const priceOfSub = (t, sub) => (sub ? opSubPriceOf(PRICE_KEY[t] || t, String(sub).trim()) : priceOf(t));
+  const priceOfSub = (t, sub) => (sub ? opSubPriceOf(cfgOf(t).priceKey || t, String(sub).trim()) : priceOf(t));
 
   /* 数量→口径值：unit='K' 千颗 | '万' Earn 万元（按料号单价折算，逐行乘单价后求和） */
   let unit = store.get('wip_unit', 'K');
@@ -41,8 +50,8 @@
   let typeSel = store.get('wip_types', []);
   const selTypes = () => { const ok = typeSel.filter(t => ALL_TYPES.includes(t)); return ok.length ? ok : ALL_TYPES; };
   const saveSel = () => store.set('wip_types', typeSel);
-  /* 热力矩阵列：不展示 BGA/LGA（LGA）列；其数量仍计入合计 / 排行 / KPI */
-  const heatTypes = () => selTypes().filter(t => t !== 'LGA');
+  /* 热力矩阵列：按品类配置的「矩阵显示」开关过滤（默认 LGA 不显示列头）；其数量仍计入合计 / 排行 / KPI */
+  const heatTypes = () => selTypes().filter(t => cfgOf(t).showInHeat !== false);
 
   /* ---------------- 工序显示清单（客户指定名称与顺序）→ 数据工序代码 ---------------- */
   const STEP_MAP = [
@@ -62,67 +71,12 @@
     ['QA', ['FVI_GATE']],
     ['Ship', ['BE_DC']]
   ];
-  /* 联动排行固定站点清单（客户按品类指定名称）→ 数据工序代码 */
-  const RANK_STATIONS = {
-    BGA: [
-      ['PREM_PLS', ['PREM_PLS']],
-      ['PASSWND', ['PSSWND']],
-      ['BMOLD', ['BMOLD']],
-      ['NLD_PMC', ['NLD_PMC']],
-      ['BLMARK', ['BLMARK']],
-      ['NLD_HPC', ['NLD_HPC']],
-      ['BR', ['BR']],
-      ['FLUX_CLEAN', ['FLUX_CLEAN']],
-      ['BE_SAW', ['BE_SAW']],
-      ['BFOI_GATE', ['BFOI_GATE']],
-      ['FVI_GATE', ['FVI_GATE']],
-      ['Ship', ['BE_DC']]
-    ],
-    FCCSP: [
-      ['PREM_PLS', ['PREM_PLS']],
-      ['PASSWND', ['PSSWND']],
-      ['FMOLD', ['FMOLD']],
-      ['NLD_PMC', ['NLD_PMC']],
-      ['FCMARK', ['FCMARK']],
-      ['FPF_REFLOW', ['FPF_REFLOW']],
-      ['FPF_CLEAN', ['FPF_CLEAN']],
-      ['BR', ['BR']],
-      ['FLUX_CLEAN', ['FLUX_CLEAN']],
-      ['BE_SAW', ['BE_SAW']],
-      ['BFOI_GATE', ['BFOI_GATE']],
-      ['FVI_GATE', ['FVI_GATE']],
-      ['Ship', ['BE_DC']]
-    ],
-    QFN: [
-      ['PASSWND', ['PSSWND']],
-      ['QMOLD', ['QMOLD']],
-      ['DE_TAPING', ['DE_TAPING']],
-      ['NLD_PMC', ['NLD_PMC']],
-      ['NLD_SI', ['NLD_SI']],
-      ['QMARK', ['QMARK']],
-      ['BE_SAW', ['BE_SAW']],
-      ['BFOI_GATE', ['BFOI_GATE']],
-      ['FVI_GATE', ['FVI_GATE']],
-      ['Ship', ['BE_DC']]
-    ],
-    PQFN: [
-      ['PREM_PLS', ['PREM_PLS']],
-      ['PASSWND', ['PSSWND']],
-      ['PMOLD', ['PMOLD']],
-      ['DE_TAPING', ['DE_TAPING']],
-      ['NLD_PMC', ['NLD_PMC']],
-      ['NLD_SI', ['NLD_SI']],
-      ['PMARK', ['PMARK']],
-      ['DEFLASH', ['DEFLASH']],
-      ['BE_PSAW', ['BE_PSAW']],
-      ['PINSP', ['PINSP']],
-      ['FVI_GATE', ['FVI_GATE']],
-      ['Ship', ['BE_DC']]
-    ]
-  };
+  /* 排行联动站点清单：读品类配置（客户可在 wip-config.html 维护）；未配置清单的品类沿用 BGA */
+  const bgaStations = () => { const c = cfgOf('BGA'); return (c && c.stations && c.stations.length) ? c.stations : []; };
+  const stationsOf = t => { const c = cfgOf(t); return (c && c.stations && c.stations.length) ? c.stations : bgaStations(); };
   const codesOf = name => {
     const it = STEP_MAP.find(x => x[0] === name) ||
-      Object.values(RANK_STATIONS).flat().find(x => x[0] === name);
+      TCFG.reduce((a, c) => a.concat(c.stations || []), []).find(x => x[0] === name);
     return it ? it[1] : [name];
   };
 
@@ -319,8 +273,8 @@
     const rt = types.includes(rankType) ? rankType : '';
     let list;
     if (rt) {
-      /* 联动模式：矩阵列头选中某品类时，仅按该品类客户指定的站点清单重算在制（未指定清单的品类沿用 BGA） */
-      const stations = RANK_STATIONS[rt] || RANK_STATIONS.BGA;
+      /* 联动模式：矩阵列头选中某品类时，仅按该品类配置的站点清单重算在制（未配置清单的品类沿用 BGA） */
+      const stations = stationsOf(rt);
       list = stations.map(([name, codes]) => {
         const o = { step: name, qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} };
         rows.forEach(r => {

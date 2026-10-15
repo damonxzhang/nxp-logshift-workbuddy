@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WIP 品类配置 · 统一监控与岗位交接中心</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=20261014a">
+  <style>
+    /* WIP 品类配置页专属样式（不污染全局 style.css） */
+    .wt-heat-on { display:inline-flex; align-items:center; gap:5px; color:#0d6b4b; font-weight:600; }
+    .wt-heat-off { display:inline-flex; align-items:center; gap:5px; color:var(--text-3); }
+    .st-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .st-row input { height:32px; border:1px solid var(--border); border-radius:8px; padding:0 10px; font-size:13px; }
+    .st-row .st-name { flex:0 0 150px; }
+    .st-row .st-codes { flex:1; font-family:'JetBrains Mono',Consolas,monospace; }
+    .st-row .st-rm { border:0; background:transparent; color:var(--text-3); font-size:17px; cursor:pointer;
+      width:24px; height:24px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; }
+    .st-row .st-rm:hover { background:#fdecea; color:var(--danger); }
+  </style>
+</head>
+<body data-page="wipcfg">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<script src="assets/js/common.js?v=20261015c"></script>
+<script src="assets/js/data.js?v=20261008r"></script>
+<script src="assets/js/wip-real-data.js?v=20261008r"></script>
+<script src="assets/js/output-core.js?v=20261014d"></script>
+<script src="assets/js/wip-type-store.js?v=20261015a"></script>
+<script src="assets/js/page-wip-config.js?v=20261015c"></script>
+</body>
+</html>

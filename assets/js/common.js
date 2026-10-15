@@ -64,6 +64,7 @@ const NAV_GROUPS = [
       { key: 'optable', href: 'op-table.html', label: '周维度累计表', icon: 'layers', tag: 'P2', tagCls: 't-red' },
       { key: 'opcfg', href: 'op-config.html', label: 'OP 目标与权限配置', icon: 'settings', tag: '配置', tagCls: 't-purple' },
       { key: 'wip', href: 'wip.html', label: 'WIP 在制品看板', icon: 'layers', tag: 'P2', tagCls: 't-red' },
+      { key: 'wipcfg', href: 'wip-config.html', label: 'WIP 品类配置', icon: 'settings', tag: '配置', tagCls: 't-purple' },
       { key: 'defect', href: 'defect.html', label: '次品管理 · 质量预警', icon: 'alert', tag: 'P2', tagCls: 't-red' },
       { key: 'defectcfg', href: 'defect-config.html', label: '次品项配置（主数据）', icon: 'settings', tag: '配置', tagCls: 't-purple' },
       { key: 'logs', href: 'logs.html', label: '日志管理 · 生产日志', icon: 'file', tag: '新增', tagCls: 't-purple' }
@@ -79,15 +80,12 @@ const NAV_GROUPS = [
   {
     label: '平台底座 · 各屏共用',
     items: [
-      { key: 'systems', href: 'systems.html', label: '子系统接入与底座', icon: 'server' },
-      { key: 'ingest', href: 'ingest.html', label: '采集调度与调用日志', icon: 'refresh' },
       { key: 'users', href: 'users.html', label: '用户与权限管理', icon: 'users' }
     ]
   },
   {
     label: '分析与归档',
     items: [
-      { key: 'analytics', href: 'analytics.html', label: '异常根因智能分析', icon: 'search' },
       { key: 'monthly', href: 'monthly.html', label: '自动月报', icon: 'file' },
       { key: 'archive', href: 'archive.html', label: '历史日志归档', icon: 'download' }
     ]
@@ -109,6 +107,7 @@ const PAGE_TITLES = {
   optable: ['周维度累计表', '各 PKG Type 逐日累计目标/实际 · 达标/临界/超标着色 · Excel 导出'],
   opcfg: ['OP 目标与权限配置', 'PKG Type 维护（含黄/红阈值与料号单价）· 每周目标数量 · 预警分口径/夏令时'],
   wip: ['WIP 在制品看板', '按 PKG Type × 工序呈现在制（数量 / Earn 口径）· 二级钻取筛选 · 指标报警配置'],
+  wipcfg: ['WIP 品类配置', '维护热力矩阵品类列头：显示名 / 单价口径 / 矩阵显示 / 排行站点清单'],
   defect: ['次品管理 · 质量预警', '类别 PPM 趋势 → 机台树 → 机台×料号 / Package 明细（产量/次品数/PPM）· 红线 2000 PPM（良率 0.998）· 真实数据三级下钻'],
   defectcfg: ['次品项配置（主数据）', '按部门 / 工序维护次品项（名称 + 代码）及其与设备（机台）的绑定关系 · 次品管理大屏的缺陷项主数据'],
   logs: ['日志管理 · 生产日志', '交接班生产日志 · LEAD / NON-LEAD 分部门查看 · 班次回看 · 只读静态展示'],
