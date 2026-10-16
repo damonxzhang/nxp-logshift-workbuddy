@@ -275,8 +275,8 @@
     if (rt) {
       /* 联动模式：矩阵列头选中某品类时，仅按该品类配置的站点清单重算在制（未配置清单的品类沿用 BGA） */
       const stations = stationsOf(rt);
-      list = stations.map(([name, codes]) => {
-        const o = { step: name, qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {} };
+      list = stations.map(([name, codes, warn]) => {
+        const o = { step: name, qty: 0, val: 0, lots: 0, hold: 0, otd: 0, byType: {}, warn: warn > 0 ? Number(warn) : 0 };
         rows.forEach(r => {
           if (!codes.includes(r[0]) || r[1] !== rt) return;
           o.qty += r[7]; o.val += valOf(r[7], r[1], r[3]); o.lots++;
@@ -299,10 +299,15 @@
         if (!q) return '';
         return `<i class="wr-seg" data-w="${(q / max * 100).toFixed(2)}" style="background:${TYPE_COLOR[t] || '#64748b'}"></i>`;
       }).join('');
+      const warnTag = s.warn > 0
+        ? (s.qty > s.warn
+          ? ` · <span style="color:var(--danger);font-weight:700" title="在制 ${s.qty.toLocaleString('en-US')} 超过预警值 ${s.warn.toLocaleString('en-US')}（站点清单配置）">⚠ 超预警</span>`
+          : ` · <span class="muted" title="站点清单配置的预警值：${s.warn.toLocaleString('en-US')} 颗">预警 ${s.warn.toLocaleString('en-US')}</span>`)
+        : '';
       return `<div class="wr-item" data-step="${esc(s.step)}" style="animation-delay:${(i * 0.05).toFixed(2)}s">
-        <div class="wr-line"><span class="wr-name" title="进入二级筛选">${esc(s.step)}</span>
+        <div class="wr-line"><span class="wr-name" title="进入二级筛选"${s.warn > 0 && s.qty > s.warn ? ' style="color:var(--danger)"' : ''}>${esc(s.step)}</span>
           <span class="wr-val">${fmtVal(s.val)}</span><span class="small muted">${unitLabel()}</span>
-          <span class="wr-meta">${s.lots} 批${s.hold ? ` · <span style="color:var(--danger)">Hold ${s.hold}</span>` : ''}${s.otd ? ` · <span style="color:var(--danger)">OTD ${s.otd}</span>` : ''}</span></div>
+          <span class="wr-meta">${s.lots} 批${s.hold ? ` · <span style="color:var(--danger)">Hold ${s.hold}</span>` : ''}${s.otd ? ` · <span style="color:var(--danger)">OTD ${s.otd}</span>` : ''}${warnTag}</span></div>
         <div class="wr-bar" title="进入 ${esc(s.step)} 二级筛选">${segs}</div></div>`;
     }).join('') + (rest.length ? `<div class="wr-rest">其余 ${rest.length} 个工序合计 ${fmtVal(rest.reduce((a, s) => a + s.val, 0))}${unitLabel()}（${rest.map(s => esc(s.step)).join(' · ')}）</div>` : '');
 
@@ -359,7 +364,7 @@
 
   function openDrawer(step) {
     try {
-      dr = { step, types: rankType ? [rankType] : selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, thawOnly: false, kw: '', sort: 'otd', page: 1 };
+      dr = { step, types: rankType ? [rankType] : selTypes().slice(), size: '', outline: '', loc: '', bank: '', holdOnly: false, thawOnly: false, kw: '', sort: 'otd', page: 1, sel: [] };
       buildDrawer();
       document.getElementById('wipMask').classList.add('open');
       document.getElementById('wipDrawer').classList.add('open');
@@ -470,14 +475,16 @@
             <option value="ct" ${dr.sort === 'ct' ? 'selected' : ''}>BE CT 降序（在制最久优先）</option>
             <option value="qty" ${dr.sort === 'qty' ? 'selected' : ''}>数量降序</option>
           </select>
+          <button class="btn btn-sm" id="btnCalcMan" title="先在列表勾选批次，再计算所选批次的金额与总价">${icon('check', 15)} 人工计算${dr.sel.length ? `（${dr.sel.length}）` : ''}</button>
+          <button class="btn btn-sm" id="btnCalcAuto" title="输入目标总价或需求数量，系统按当前排序自动挑选批次">${icon('zap', 15)} 自动计算</button>
           <span class="flex-1"></span>
           ${canExport ? `<button class="btn btn-sm btn-primary" id="wdExport">${icon('download', 15)} 导出 Excel（${list.length} 批）</button>` : '<span class="chip">只读（无导出权限）</span>'}
         </div>
 
         <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
-          <table class="table wdt" style="width:100%;border:0;min-width:980px">
-            <thead><tr><th>批次号</th><th>PKG Type</th><th>尺寸</th><th>封装料号</th><th>器件</th>
-              <th class="num">数量</th><th>机台/位置</th><th class="num">BE CT(天)</th><th class="num">ASSY CT(天)</th>
+          <table class="table wdt" style="width:100%;border:0;min-width:1060px">
+            <thead><tr><th style="width:36px"><input type="checkbox" id="ckAll" title="全选 / 取消本页"></th><th>批次号</th><th>PKG Type</th><th>尺寸</th><th>封装料号</th><th>器件</th>
+              <th class="num">数量</th><th class="num">金额(元)</th><th>机台/位置</th><th class="num">BE CT(天)</th><th class="num">ASSY CT(天)</th>
               <th class="num">OTD 余量(天)</th><th>Hold</th><th>塑封料解冻 <span class="tag-hint warn">演示</span></th><th>Bank</th><th>线材</th></tr></thead>
             <tbody>${view.map(r => {
               const ct = r[10], otdV = r[12];
@@ -491,12 +498,14 @@
               const twTitle = `物料批号 ${tw.matLot} · 解冻开始 ${CompoundThaw.hhmm(tw.start)} · 预计就绪 ${CompoundThaw.hhmm(tw.ready)}${tw.status === 'overtime' ? ' · 已超时 ' + tw.overtime + ' 小时' : ''} · 演示补充数据`;
               const extraStyle = tw.status === 'overtime' ? 'box-shadow: inset 3px 0 0 #b45309;' : '';
               return `<tr class="${rowCls}" style="${extraStyle}">
+                <td><input type="checkbox" class="ck-row" data-b="${esc(r[6])}" ${dr.sel.includes(r[6]) ? 'checked' : ''}></td>
                 <td style="font-family:ui-monospace,Consolas,monospace">${esc(r[6])}</td>
                 <td><span style="color:${TYPE_COLOR[r[1]] || 'var(--text-3)'};font-weight:700">${esc(typeName(r[1]))}</span></td>
                 <td>${esc(r[2]) || '—'}</td>
                 <td style="font-family:ui-monospace,Consolas,monospace">${esc(r[3])}</td>
                 <td title="${esc(r[4])}">${esc(r[4].length > 16 ? r[4].slice(0, 15) + '…' : r[4])}</td>
                 <td class="num">${r[7].toLocaleString('en-US')}</td>
+                <td class="num" title="数量 × 单价（单价随 OP 配置联动）"><b>${Math.round(r[7] * priceOfSub(r[1], r[3])).toLocaleString('en-US')}</b></td>
                 <td>${esc(r[9]) || '—'}</td>
                 <td class="num">${ct == null ? '—' : `<span class="ct-badge ${ctCls}">${ct.toFixed(1)}</span>`}</td>
                 <td class="num">${r[11] == null ? '—' : r[11].toFixed(1)}</td>
@@ -509,7 +518,7 @@
                   </div>
                 </td>
                 <td>${esc(r[15])}</td><td>${esc(r[16]) || '—'}</td></tr>`;
-            }).join('') || '<tr><td colspan="14" class="center muted" style="padding:26px">当前筛选条件下无批次。</td></tr>'}</tbody>
+            }).join('') || '<tr><td colspan="16" class="center muted" style="padding:26px">当前筛选条件下无批次。</td></tr>'}</tbody>
           </table>
         </div>
 
@@ -556,6 +565,32 @@
     drawer.querySelector('#aReset').onclick = () => {
       Object.assign(alarmCfg, ALARM_DEF); saveAlarm(); toast('已恢复默认报警阈值', 'primary'); buildDrawer();
     };
+    /* ---- 批次勾选（跨页保留，供人工计算） ---- */
+    const updCalcManBtn = () => {
+      const bm = drawer.querySelector('#btnCalcMan');
+      if (bm) bm.innerHTML = `${icon('check', 15)} 人工计算${dr.sel.length ? `（${dr.sel.length}）` : ''}`;
+    };
+    const ckAll = drawer.querySelector('#ckAll');
+    if (ckAll) ckAll.onchange = () => {
+      view.forEach(r => {
+        const i = dr.sel.indexOf(r[6]);
+        if (ckAll.checked && i < 0) dr.sel.push(r[6]);
+        if (!ckAll.checked && i >= 0) dr.sel.splice(i, 1);
+      });
+      drawer.querySelectorAll('.ck-row').forEach(c => { c.checked = ckAll.checked; });
+      updCalcManBtn();
+    };
+    drawer.querySelectorAll('.ck-row').forEach(c => {
+      c.onchange = () => {
+        const b = c.dataset.b, i = dr.sel.indexOf(b);
+        if (c.checked && i < 0) dr.sel.push(b);
+        if (!c.checked && i >= 0) dr.sel.splice(i, 1);
+        if (ckAll) ckAll.checked = view.every(r => dr.sel.includes(r[6]));
+        updCalcManBtn();
+      };
+    });
+    drawer.querySelector('#btnCalcMan').onclick = manCalc;
+    drawer.querySelector('#btnCalcAuto').onclick = autoCalc;
     const ex = drawer.querySelector('#wdExport');
     if (ex) ex.onclick = () => {
       const headers = ['批次号', 'PKG Type', 'PKG SIZE', '封装料号', '器件', '产品族', '数量(颗)', 'Qty by I/O', '机台/位置',
@@ -568,6 +603,92 @@
     drawer.querySelector('#pgPrev').onclick = () => { if (dr.page > 1) { dr.page--; buildDrawer(); } };
     drawer.querySelector('#pgNext').onclick = () => { if (dr.page < pages) { dr.page++; buildDrawer(); } };
     drawer.querySelectorAll('[data-pg]').forEach(b => { b.onclick = () => { dr.page = +b.dataset.pg; buildDrawer(); }; });
+  }
+
+  /* ---------------- 批次计算：人工 / 自动（金额 = 数量 × 单价，单价随 OP 配置联动） ---------------- */
+  function calcTableHtml(items) {
+    const totQ = items.reduce((a, x) => a + x.qty, 0);
+    const totA = items.reduce((a, x) => a + x.qty * x.price, 0);
+    return `<div style="overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);max-height:430px">
+      <table class="table wdt" style="width:100%;border:0;min-width:660px">
+        <thead><tr><th>#</th><th>批次号</th><th>PKG Type</th><th>封装料号</th><th class="num">数量(颗)</th><th class="num">单价(元/粒)</th><th class="num">金额(元)</th></tr></thead>
+        <tbody>${items.map((x, i) => `<tr>
+          <td class="num muted">${i + 1}</td>
+          <td style="font-family:ui-monospace,Consolas,monospace">${esc(x.batch)}</td>
+          <td><span style="color:${TYPE_COLOR[x.type] || 'var(--text-3)'};font-weight:700">${esc(typeName(x.type))}</span></td>
+          <td style="font-family:ui-monospace,Consolas,monospace">${esc(x.outline)}</td>
+          <td class="num">${x.qty.toLocaleString('en-US')}</td>
+          <td class="num">${x.price.toFixed(4)}</td>
+          <td class="num"><b>${Math.round(x.qty * x.price).toLocaleString('en-US')}</b></td>
+        </tr>`).join('') || '<tr><td colspan="7" class="center muted" style="padding:22px">无批次</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="mt10" style="font-size:14px;line-height:1.8">
+      合计：<b>${items.length}</b> 批 · 总数量 <b>${totQ.toLocaleString('en-US')}</b> 颗 · 总价 <b style="color:#1d4ed8">${Math.round(totA).toLocaleString('en-US')}</b> 元
+    </div>`;
+  }
+
+  function manCalc() {
+    const selSet = new Set(dr.sel);
+    const picked = drRows().filter(r => selSet.has(r[6]));
+    if (!picked.length) { toast('请先在列表中勾选批次', 'warn'); return; }
+    const miss = dr.sel.length - picked.length;
+    openDialog({
+      title: `人工计算 · ${esc(dr.step)}`,
+      sub: `已选 ${picked.length} 批${miss ? ` · 另有 ${miss} 批已不在当前筛选范围，已忽略` : ''} · 单价随 OP 配置联动（金额 = 数量 × 单价）`,
+      width: 880,
+      okText: '关闭',
+      body: calcTableHtml(picked.map(r => ({ batch: r[6], type: r[1], outline: r[3], qty: r[7], price: priceOfSub(r[1], r[3]) })))
+    });
+  }
+
+  function autoCalc() {
+    const sortName = { otd: 'OTD 余量升序（最急优先）', ct: 'BE CT 降序（在制最久优先）', qty: '数量降序' }[dr.sort] || '';
+    const mask = openDialog({
+      title: `自动计算 · ${esc(dr.step)}`,
+      sub: `按当前排序「${sortName}」依次取批，最后一批可部分取用 · 单价随 OP 配置联动`,
+      width: 880,
+      okText: '开始计算',
+      cancelText: '关闭',
+      body: `
+        <div class="flex acenter gap12" style="flex-wrap:wrap">
+          <label class="flex acenter gap6 small" style="cursor:pointer"><input type="radio" name="acMode" value="qty" checked> 按需求数量（颗）</label>
+          <label class="flex acenter gap6 small" style="cursor:pointer"><input type="radio" name="acMode" value="amt"> 按目标总价（元）</label>
+          <input class="input" type="number" id="acNeed" min="1" step="any" placeholder="输入目标值" style="width:170px;height:32px">
+        </div>
+        <div id="acResult" class="mt12"><div class="small muted">输入目标值后点「开始计算」，系统按当前排序自动挑选所需批次。</div></div>`,
+      onOk: m => runAutoCalc(m)
+    });
+    mask.querySelector('#acNeed').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); runAutoCalc(mask); }
+    });
+  }
+
+  function runAutoCalc(m) {
+    const mode = (m.querySelector('input[name="acMode"]:checked') || {}).value || 'qty';
+    const raw = Number(m.querySelector('#acNeed').value);
+    if (!raw || raw <= 0) { toast('请输入大于 0 的目标值', 'warn'); return; }
+    const need = mode === 'qty' ? Math.round(raw) : raw;
+    let remaining = need;
+    const items = [];
+    for (const r of drRows()) {
+      if (remaining <= 0) break;
+      const price = priceOfSub(r[1], r[3]);
+      if (price <= 0) continue;
+      const take = mode === 'qty'
+        ? Math.min(r[7], remaining)
+        : Math.min(r[7], Math.floor(remaining / price));
+      if (take <= 0) continue;
+      items.push({ batch: r[6], type: r[1], outline: r[3], qty: take, price });
+      remaining = mode === 'qty' ? remaining - take : remaining - take * price;
+    }
+    if (!items.length) { toast('当前筛选条件下无可取批次', 'warn'); return; }
+    const totQ = items.reduce((a, x) => a + x.qty, 0);
+    const totA = items.reduce((a, x) => a + x.qty * x.price, 0);
+    const note = mode === 'qty'
+      ? (totQ < need ? `<span class="red-inline">在制库存不足：目标 ${need.toLocaleString('en-US')} 颗，还差 ${(need - totQ).toLocaleString('en-US')} 颗</span>` : `<span style="color:#0b8a5a;font-weight:700">已满足需求数量 ${need.toLocaleString('en-US')} 颗</span>`)
+      : `剩余预算 <b>${Math.max(0, Math.round(need - totA)).toLocaleString('en-US')}</b> 元（按整颗取用，整除有余时向下取）`;
+    m.querySelector('#acResult').innerHTML = calcTableHtml(items) + `<div class="mt6 small">${note}</div>`;
   }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawerOpen) closeDrawer(); });

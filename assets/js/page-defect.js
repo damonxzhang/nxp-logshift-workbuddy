@@ -14,6 +14,8 @@
     document.getElementById('content').innerHTML = '<div class="notice" style="--nc:var(--danger)">未加载真实数据文件 assets/js/defect-real-data.js</div>';
     return;
   }
+  // 隐藏「SAW污染(外来物/粉尘)」类别（SAW SS7）：不作为可筛选 chip 展示，各级钻取与合计自动排除
+  D.cats = (D.cats || []).filter(c => c.key !== 'SAW SS7');
 
   // ---------- 常量 / 状态 ----------
   const RED = 2000, WARN = 3000; // PPM：红线(良率0.998) / 预警线(CWAAY0.997)
@@ -35,7 +37,7 @@
   // 次品类别 → 部门 归属（与「次品项配置（主数据）」一致；演示默认，用户可在配置页改部门）
   const DEFECT_DEPT_MAP = {
     'MMS AL01': 'LEAD', 'MMS AL02': 'LEAD', 'MMS AL03': 'LEAD', 'MMS AL06': 'LEAD',
-    'MOLD BMD2': 'LEAD', 'MOLD BMD3': 'LEAD', 'SAW SS7': 'LEAD',
+    'MOLD BMD2': 'LEAD', 'MOLD BMD3': 'LEAD',
     'MMS AL05': 'NON-LEAD', 'MMS AL07': 'NON-LEAD', 'MMS AL08': 'NON-LEAD', 'MMS AL09': 'NON-LEAD',
     'MMS AL11': 'NON-LEAD', 'MMS AL12': 'NON-LEAD', 'MOLD BMD9': 'NON-LEAD', 'IQC&Supplier': 'NON-LEAD',
     'ICOS BMD12': 'PLATING'
@@ -76,6 +78,13 @@
   }
   const statusOf = p => (p == null ? 'none' : p >= WARN ? 'red' : p >= RED ? 'warn' : 'good');
   const statusColor = s => (s === 'red' ? 'var(--danger)' : s === 'warn' ? 'var(--warn)' : s === 'good' ? 'var(--success)' : 'var(--text-2)');
+  // 机台预警值（PPM）：三级透视表「预警设置」列按机台配置，localStorage 持久化，超过时 PPM 标 ⚠
+  const DevWarnStore = {
+    KEY: 'defect_dev_warn_v1',
+    all() { try { const v = store.get(this.KEY, {}); return (v && typeof v === 'object') ? v : {}; } catch (e) { return {}; } },
+    get(dev) { const v = Number(this.all()[dev]); return v > 0 ? v : null; },
+    set(dev, ppm) { const a = this.all(); if (ppm > 0) a[dev] = Number(ppm); else delete a[dev]; store.set(this.KEY, a); }
+  };
   function breaches() {
     const list = [];
     D.weeks.forEach((w, i) => { const p = weeklyTotalPPM(i); if (p != null && p >= RED) list.push({ w, p }); });
@@ -284,6 +293,31 @@
   function showDevTip(dev, type) { const t = ensureDevTip(); t.innerHTML = devTipHtml(dev, type); t.style.display = 'block'; }
   function hideDevTip() { const t = document.getElementById('defectDevTip'); if (t) t.style.display = 'none'; }
 
+  // 设备角标点击弹窗：报修 / 换模 近 24h 明细（数据源 device-events.js）
+  function devEventsDlg(dev, type) {
+    const isRep = type === 'repair';
+    const ev = window.DeviceEvents ? DeviceEvents.of(dev, Date.now()) : null;
+    const list = ev ? (isRep ? ev.repair : ev.mold) : [];
+    const th = 'padding:7px 10px;border-bottom:2px solid var(--line,#e1e7f0);font-size:11.5px;color:var(--text-2);text-align:left;white-space:nowrap';
+    const td = 'padding:7px 10px;border-bottom:1px solid var(--line,#eef1f6);white-space:nowrap';
+    const head = isRep
+      ? `<tr><th style="${th}">时间</th><th style="${th}">报修单号</th><th style="${th}">故障描述</th></tr>`
+      : `<tr><th style="${th}">时间</th><th style="${th}">工单号</th><th style="${th}">模具更换</th></tr>`;
+    const rows = list.map(x => isRep
+      ? `<tr><td style="${td};font-weight:700">${DeviceEvents.hhmm(x.t)}</td><td style="${td}">${esc(x.id)}</td><td style="${td};color:var(--text-2);white-space:normal">${esc(x.reason)}</td></tr>`
+      : `<tr><td style="${td};font-weight:700">${DeviceEvents.hhmm(x.t)}</td><td style="${td}">${esc(x.id)}</td><td style="${td};color:var(--text-2)">${esc(x.from)} → ${esc(x.to)}</td></tr>`
+    ).join('');
+    openDialog({
+      title: `${esc(dev)} · ${isRep ? '近 24h 设备报修' : '近 24h 模具更换'}`,
+      sub: ev ? `设备报修系统 / 模具管理系统实时快照 · 近 24h 报修 ${ev.nRep} 单 · 换模 ${ev.nMold} 次` : '设备报修 / 模具管理数据未接入',
+      width: 520,
+      okText: '关闭',
+      body: list.length
+        ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">${head}${rows}</table>`
+        : `<div class="muted" style="padding:18px 0;text-align:center">近 24 小时无记录</div>`
+    });
+  }
+
   // 机台树状图：根=次品类别，二级节点=机台（点击进三级料号透视）
   function devTreeChart(el, catKey, weekIdx) {
     ensureDefCss();
@@ -340,7 +374,7 @@
     el.querySelectorAll('.dev-badge').forEach(g => {
       g.addEventListener('mouseover', () => showDevTip(g.dataset.d, g.dataset.type));
       g.addEventListener('mouseout', hideDevTip);
-      g.addEventListener('click', e => { e.stopPropagation(); showDevTip(g.dataset.d, g.dataset.type); });
+      g.addEventListener('click', e => { e.stopPropagation(); devEventsDlg(g.dataset.d, g.dataset.type); });
     });
   }
 
@@ -507,24 +541,29 @@
     const all = devRows(catKey, weekIdx);
     if (!all) return '';
     const rows = onlyDev ? all.filter(r => r.d === onlyDev) : all;
-    let html = `<table class="table"><thead><tr><th>机台 / 料号（PkgCode）</th><th class="num">ICOS结料数量</th><th class="num">次品数</th><th class="num">PPM</th><th>同料号跨机台 PPM（反查）</th><th style="width:120px">操作</th></tr></thead><tbody>`;
+    let html = `<table class="table"><thead><tr><th>机台 / 料号（PkgCode）</th><th class="num">ICOS结料数量</th><th class="num">次品数</th><th class="num">PPM</th><th>同料号跨机台 PPM（反查）</th><th class="num" style="width:110px">预警设置</th><th style="width:120px">操作</th></tr></thead><tbody>`;
     rows.forEach(r => {
       const dred = r.ppm != null && r.ppm >= DEV_RED;
+      const wv = DevWarnStore.get(r.d);
+      const over = wv && r.ppm != null && r.ppm >= wv;
       html += `<tr style="background:#f4f7fb"><td style="font-weight:700">${esc(r.d)}</td><td class="num" style="font-weight:700">${fmt(r.out)}</td><td class="num" style="font-weight:700">${fmt(r.n)}</td>` +
-        `<td class="num" style="font-weight:700;${dred ? 'color:var(--danger)' : ''}">${r.ppm == null ? '—' : Math.round(r.ppm)}</td>` +
-        `<td class="muted small">每行反查该料号 →</td><td></td></tr>`;
+        `<td class="num" style="font-weight:700;${dred || over ? 'color:var(--danger)' : ''}">${r.ppm == null ? '—' : Math.round(r.ppm)}${over ? ' <span title="PPM 超过预警值 ' + wv + '" style="font-weight:700">⚠</span>' : ''}</td>` +
+        `<td class="muted small">每行反查该料号 →</td>` +
+        `<td class="num"><input class="dw-input" type="number" min="0" step="any" data-dev="${esc(r.d)}" value="${wv || ''}" placeholder="PPM" title="该机台 PPM 预警阈值，PPM 达到或超过该值时标记 ⚠（留空不预警）" style="width:88px;padding:4px 6px;border:1px solid var(--line,#e1e7f0);border-radius:7px;font-size:12px;text-align:right;background:#fff;color:var(--text)"></td>` +
+        `<td></td></tr>`;
       const cs = onlyDev ? devCodes(catKey, weekIdx, r.d) : r.subs;
       cs.forEach(sb => {
         const sred = sb.ppm >= DEV_WARN, zero = !sb.n;
         html += `<tr><td style="padding-left:26px;${zero ? 'color:var(--text-2)' : ''}">└ ${esc(sb.c)}</td><td class="num" style="${zero ? 'color:var(--text-2)' : ''}">${fmt(sb.out)}</td><td class="num">${fmt(sb.n)}</td>` +
           `<td class="num" style="${sred ? 'color:var(--danger);font-weight:700' : ''}">${Math.round(sb.ppm)}</td>` +
           `<td style="font-size:12px">${revCellHtml(catKey, weekIdx, sb.c, onlyDev)}</td>` +
+          `<td></td>` +
           `<td><button class="chip" data-l4="${esc(sb.c)}" data-l4dev="${esc(r.d)}" title="进入四级：该料号在各机台上的 PPM 表现分析" style="cursor:pointer;white-space:nowrap">四级分析 ›</button></td></tr>`;
       });
     });
     if (!onlyDev) {
       const tout = rows.reduce((a, r) => a + r.out, 0), tn = rows.reduce((a, r) => a + r.n, 0);
-      html += `<tr style="background:#eef3fa"><td style="font-weight:700">合计</td><td class="num" style="font-weight:700">${fmt(tout)}</td><td class="num" style="font-weight:700">${fmt(tn)}</td><td class="num" style="font-weight:700">${tout ? Math.round(tn / tout * 1e6) : '—'}</td><td class="num">—</td><td></td></tr>`;
+      html += `<tr style="background:#eef3fa"><td style="font-weight:700">合计</td><td class="num" style="font-weight:700">${fmt(tout)}</td><td class="num" style="font-weight:700">${fmt(tn)}</td><td class="num" style="font-weight:700">${tout ? Math.round(tn / tout * 1e6) : '—'}</td><td class="num">—</td><td></td><td></td></tr>`;
     }
     return html + '</tbody></table>';
   }
@@ -727,8 +766,8 @@
             <div class="si"><div class="si-label">次品数 / 产出</div><div class="si-value" style="font-size:19px">${me ? fmt(me.n) + ' / ' + fmt(me.out) : '—'}</div></div>
             <div class="si"><div class="si-label">最差料号</div><div class="si-value" style="font-size:19px">${worstCode ? esc(worstCode.c) + `<span style="font-size:13px;margin-left:4px;color:${worstCode.ppm >= DEV_WARN ? 'var(--danger)' : 'var(--text-2)'}">${Math.round(worstCode.ppm)}</span>` : '—'}</div></div>
             <div class="si"><div class="si-label">机台 PPM 排名</div><div class="si-value">${rank >= 0 ? (rank + 1) + ' / ' + all.length : '—'}</div></div>
-            <div class="si" title="${esc(repTitle)}"><div class="si-label">近 24h 报修</div><div class="si-value" style="color:${ev3.nRep ? 'var(--danger)' : 'var(--text-2)'}">${ev3.nRep}</div></div>
-            <div class="si" title="${esc(molTitle)}"><div class="si-label">近 24h 换模</div><div class="si-value" style="color:${ev3.nMold ? '#2563eb' : 'var(--text-2)'}">${ev3.nMold}</div></div>
+            <div class="si" id="siRep24" title="${esc(repTitle)}" style="cursor:pointer"><div class="si-label">近 24h 报修</div><div class="si-value" style="color:${ev3.nRep ? 'var(--danger)' : 'var(--text-2)'}">${ev3.nRep}</div></div>
+            <div class="si" id="siMold24" title="${esc(molTitle)}" style="cursor:pointer"><div class="si-label">近 24h 换模</div><div class="si-value" style="color:${ev3.nMold ? '#2563eb' : 'var(--text-2)'}">${ev3.nMold}</div></div>
           </div>
           <div class="flex acenter gap8" style="margin:4px 0 10px">
             <button class="chip" id="devPrev3">‹ 上一周</button>
@@ -772,6 +811,11 @@
     const ss = stage.querySelector('#stepSeg'); if (ss) ss.querySelectorAll('button').forEach(b => { b.onclick = () => setStepFilter(b.dataset.step); });
     stage.querySelectorAll('[data-l4]').forEach(b => { b.onclick = () => { drillCode = b.dataset.l4; drillDev = b.dataset.l4dev || drillDev; render(); }; });
     const b4 = stage.querySelector('#l4Back'); if (b4) b4.onclick = () => { drillCode = null; render(); };
+    const sr24 = stage.querySelector('#siRep24'); if (sr24) sr24.onclick = () => devEventsDlg(drillDev, 'repair');
+    const sm24 = stage.querySelector('#siMold24'); if (sm24) sm24.onclick = () => devEventsDlg(drillDev, 'mold');
+    stage.querySelectorAll('.dw-input').forEach(inp => {
+      inp.onchange = () => { DevWarnStore.set(inp.dataset.dev, Number(inp.value)); render(); };
+    });
     [['#devSel', '#devPrev', '#devNext'], ['#devSel3', '#devPrev3', '#devNext3'], ['#devSel4', '#devPrev4', '#devNext4']].forEach(([sid, pid, nid]) => {
       const dsel = stage.querySelector(sid);
       if (!dsel) return;

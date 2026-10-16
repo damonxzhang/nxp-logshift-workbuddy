@@ -10,9 +10,13 @@
     .wt-heat-on { display:inline-flex; align-items:center; gap:5px; color:#0d6b4b; font-weight:600; }
     .wt-heat-off { display:inline-flex; align-items:center; gap:5px; color:var(--text-3); }
     .st-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .st-row .st-drag { cursor:grab; color:var(--text-3); font-size:14px; user-select:none; padding:0 1px; }
+    .st-row .st-drag:hover { color:#1d4ed8; }
+    .st-row.dragging { opacity:.45; }
     .st-row input { height:32px; border:1px solid var(--border); border-radius:8px; padding:0 10px; font-size:13px; }
     .st-row .st-name { flex:0 0 150px; }
     .st-row .st-codes { flex:1; font-family:'JetBrains Mono',Consolas,monospace; }
+    .st-row .st-warn { flex:0 0 86px; }
     .st-row .st-rm { border:0; background:transparent; color:var(--text-3); font-size:17px; cursor:pointer;
       width:24px; height:24px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; }
     .st-row .st-rm:hover { background:#fdecea; color:var(--danger); }
@@ -30,7 +34,7 @@
 <script src="assets/js/data.js?v=20261008r"></script>
 <script src="assets/js/wip-real-data.js?v=20261008r"></script>
 <script src="assets/js/output-core.js?v=20261014d"></script>
-<script src="assets/js/wip-type-store.js?v=20261015a"></script>
-<script src="assets/js/page-wip-config.js?v=20261015c"></script>
+<script src="assets/js/wip-type-store.js?v=20261015b"></script>
+<script src="assets/js/page-wip-config.js?v=20261015e"></script>
 </body>
 </html>

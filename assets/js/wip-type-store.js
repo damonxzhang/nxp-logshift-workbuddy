@@ -5,7 +5,7 @@
      color      品类颜色（矩阵列头 / 筛选 chip / 排行堆叠条共用）
      priceKey   OP 单价口径（对应「OP 目标与权限配置」里的 PKG Type id，用于 Earn 折算）
      showInHeat 是否在热力矩阵显示该品类列头（LGA 默认不显示，其数量仍计入合计/排行/KPI）
-     stations   排行联动站点清单 [ [站点显示名, [工序代码...]] ]；为空时沿用 BGA 清单
+     stations   排行联动站点清单 [ [站点显示名, [工序代码...], 预警值(颗,可空)] ]；为空时沿用 BGA 清单
    配置写入 localStorage（WipTypeStore），wip.html 与 wip-config.html 共用同一份。 */
 (function (global) {
   'use strict';
@@ -89,7 +89,7 @@
     return WIP_TYPES_SEED.map(t => ({
       key: t.key, name: t.name, color: t.color, priceKey: t.priceKey,
       showInHeat: t.showInHeat !== false,
-      stations: (t.stations || []).map(s => [s[0], (s[1] || []).slice()])
+      stations: (t.stations || []).map(s => [s[0], (s[1] || []).slice(), s[2] > 0 ? Number(s[2]) : null])
     }));
   }
 
@@ -114,7 +114,8 @@
           showInHeat: t.showInHeat !== false,
           stations: (Array.isArray(t.stations) ? t.stations : []).map(s => [
             String((s && s[0]) || '').trim(),
-            ((s && Array.isArray(s[1])) ? s[1] : String((s && s[1]) || '').split(/[,，\s]+/)).map(c => String(c).trim()).filter(Boolean)
+            ((s && Array.isArray(s[1])) ? s[1] : String((s && s[1]) || '').split(/[,，\s]+/)).map(c => String(c).trim()).filter(Boolean),
+            (s && Number(s[2]) > 0) ? Number(s[2]) : null
           ]).filter(s => s[0])
         })).filter(t => t.key);
       }
@@ -125,7 +126,7 @@
         types: (types || []).map(t => ({
           key: t.key, name: t.name, color: t.color, priceKey: t.priceKey,
           showInHeat: t.showInHeat !== false,
-          stations: (t.stations || []).map(s => [s[0], (s[1] || []).slice()])
+          stations: (t.stations || []).map(s => [s[0], (s[1] || []).slice(), Number(s[2]) > 0 ? Number(s[2]) : null])
         }))
       });
     },

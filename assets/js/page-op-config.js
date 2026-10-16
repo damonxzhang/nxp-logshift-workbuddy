@@ -171,14 +171,25 @@
   /* =========================================================
      ① PKG Type 维护
      ========================================================= */
+  /* 大分类折算单价（元/粒）：按料号占比加权生效单价（料号价 → 大分类兜底价），与 Earn 金额口径一致 */
+  function opTypeUnitPrice(t) {
+    if (!t) return 1.0;
+    const ratios = opSubRatios(t.id, types);
+    const ids = Object.keys(ratios);
+    if (!ids.length) return opPriceOf(t.id, types);
+    let sum = 0;
+    ids.forEach(sid => { sum += ratios[sid] * opSubPriceOf(t.id, sid, types); });
+    return sum;
+  }
+
   function viewTypes() {
     return `
       <div class="card">
         <div class="card-head">
-            <div class="card-title">${icon('layers', 19)} PKG Type 维护（大分类）
-              <span class="card-sub">客户后台可增删改 · 默认周目标用于未单独配置周别的场景 · <strong>报警阈值逐品类维护</strong> · <strong>单价可细分到小分类（封装料号）</strong></span></div>
+            <div class="card-title">${icon('layers', 19)} PKG Type 维护（大分类）</div>
           <div class="flex acenter gap8">
-            ${canEdit ? `<button class="btn btn-sm" id="btnTypeAdd">${icon('plus', 16)} 新增 PKG Type</button>
+            ${canEdit ? `<button class="btn btn-sm" id="btnTypeImport">${icon('upload', 16)} 导入 Excel</button>
+            <button class="btn btn-sm" id="btnTypeAdd">${icon('plus', 16)} 新增 PKG Type</button>
             <button class="btn btn-sm btn-primary" id="btnTypeSave">${icon('check', 16)} 保存</button>` : '<span class="chip">只读</span>'}
           </div>
         </div>
@@ -190,7 +201,7 @@
               <th class="center">默认周目标 [K]</th>
               <th class="center" style="width:120px">黄灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
               <th class="center" style="width:120px">红灯阈值 [K]<div class="small muted" style="font-weight:400">缺口 ≥ 此值报警</div></th>
-              <th class="center">启用</th><th class="center">本周状态</th>${canEdit ? '<th class="center">操作</th>' : ''}
+              <th class="center">启用</th>${canEdit ? '<th class="center">操作</th>' : ''}
             </tr></thead>
             <tbody>${typeRows()}</tbody>
           </table>
@@ -204,11 +215,9 @@
   }
 
   function typeRows() {
-    const w = genOpWeek(goalYear, goalWeek);
     return types.map((t, i) => {
       const y = t.yellowK == null ? OP_DEFAULTS.alarm.yellowK : Number(t.yellowK);
       const r = t.redK == null ? OP_DEFAULTS.alarm.redK : Number(t.redK);
-      const a = opTypeAlarm(t.id, w, { yellowK: y, redK: r, mode: 'diff' });
       const sl = opSubsOf(t.id, types);
       const priced = sl.filter(s => s.price != null).length;
       return `<tr data-i="${i}">
@@ -228,10 +237,9 @@
         <td class="center"><input class="input num t-th${thCls(y, r)}" type="number" step="0.5" min="0" data-k="yellowK" value="${y}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center" title="缺口 ≥ ${y}K 时黄灯报警"></td>
         <td class="center"><input class="input num t-th${thCls(y, r)}" type="number" step="1" min="0" data-k="redK" value="${r}" ${canEdit ? '' : 'readonly'} style="width:90px;text-align:center" title="缺口 ≥ ${r}K 时红灯报警"></td>
         <td class="center"><input type="checkbox" data-k="enabled" ${t.enabled !== false ? 'checked' : ''} ${canEdit ? '' : 'disabled'}></td>
-        <td class="center" data-role="alarm">${alarmBadge(a)}</td>
         ${canEdit ? `<td class="center"><button class="btn btn-sm btn-danger" data-rm="${i}">${icon('trash', 14)}</button></td>` : ''}
       </tr>`;
-    }).join('') || `<tr><td colspan="${canEdit ? 9 : 8}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
+    }).join('') || `<tr><td colspan="${canEdit ? 8 : 7}" class="center muted">暂无 PKG Type，请点击「新增 PKG Type」</td></tr>`;
   }
 
   /* =========================================================
@@ -242,38 +250,29 @@
   function openSubDlg(i) {
     const t = types[i]; if (!t) return;
     const list = opSubsOf(t.id, types);
-    const mix = opRealSubMix(t.id);
-    const totMix = Object.keys(mix).reduce((a, k) => a + (Number(mix[k]) || 0), 0);
     const base = OP_EARN_PRICE[t.id] != null ? OP_EARN_PRICE[t.id] : 1.0;  // 系统默认单价（大分类不再维护兜底单价字段）
 
     const rowHtml = s => {
-      const share = (mix[s.id] != null && totMix > 0) ? (Number(mix[s.id]) / totMix * 100) : null;
       return `<tr data-s="${esc(s.id)}">
         <td><input class="input" data-k="sid" value="${esc(s.id)}" style="min-width:140px"></td>
-        <td class="center">${share == null ? '<span class="small muted">—</span>' : '<span class="small">' + share.toFixed(1) + '%</span>'}</td>
         <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="sprice"
-             value="${s.price == null ? '' : s.price}" placeholder="留空=${base}" style="width:110px;text-align:center"></td>
-        <td class="center"><span class="small ${s.price == null ? 'muted' : 'ok'}">${s.price == null ? '兜底 ' + base : '料号价 ' + s.price}</span></td>
+             value="${s.price == null ? '' : s.price}" style="width:110px;text-align:center"></td>
         <td class="center"><button class="btn btn-sm btn-danger" data-srm="${esc(s.id)}">${icon('trash', 14)}</button></td>
       </tr>`;
     };
 
     openDialog({
       title: '小分类（封装料号）单价 · ' + esc(t.name || t.id),
-      sub: 'PKG Type「' + esc(t.id) + '」为<strong>大分类</strong>；下面每个<strong>封装料号</strong>可配各自的单价，留空则沿用本品类<strong>系统默认单价 ' + base + ' 元/粒</strong>',
       width: 720,
       okText: '确定',
       body: `
-        <div class="cfg-note mb12">${icon('alert', 15)}
-          料号来自客户报表 <code>PackageOutline</code> 列。「占比」为该料号在真实产出数据中的数量占比，仅作参考；
-          <strong>未维护料号单价时，Earn 金额按本品类系统默认单价折算，数值不会失真。</strong></div>
         <table class="table" id="tblSubs">
           <thead><tr>
-            <th>封装料号（小分类）</th><th class="center">产出占比<div class="small muted" style="font-weight:400">真实数据</div></th>
-            <th class="center">单价（元/粒）</th><th class="center">生效价</th><th class="center">操作</th>
+            <th>封装料号（小分类）</th>
+            <th class="center">单价（元/粒）</th><th class="center">操作</th>
           </tr></thead>
           <tbody>${list.map(rowHtml).join('') ||
-            '<tr><td colspan="5" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'}</tbody>
+            '<tr><td colspan="3" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'}</tbody>
         </table>
         <div class="flex acenter gap8 mt12">
           <button class="btn btn-sm" id="btnSubAdd">${icon('plus', 16)} 新增料号</button>
@@ -303,7 +302,7 @@
     const tb = () => document.querySelector('#tblSubs tbody');
     const bindRow = tr => {
       const rm = tr.querySelector('[data-srm]');
-      if (rm) rm.onclick = () => { tr.remove(); const b = tb(); if (b && !b.querySelector('tr[data-s]')) b.innerHTML = '<tr><td colspan="5" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'; };
+      if (rm) rm.onclick = () => { tr.remove(); const b = tb(); if (b && !b.querySelector('tr[data-s]')) b.innerHTML = '<tr><td colspan="3" class="center muted">暂无料号，点「新增料号」手工添加</td></tr>'; };
     };
     document.querySelectorAll('#tblSubs tbody tr[data-s]').forEach(bindRow);
     const bAdd = document.getElementById('btnSubAdd');
@@ -313,9 +312,7 @@
       const tr = document.createElement('tr');
       tr.setAttribute('data-s', '');
       tr.innerHTML = `<td><input class="input" data-k="sid" value="" placeholder="如 98ASA00855D" style="min-width:140px"></td>
-        <td class="center"><span class="small muted">—</span></td>
-        <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="sprice" value="" placeholder="留空=${base}" style="width:110px;text-align:center"></td>
-        <td class="center"><span class="small muted">—</span></td>
+        <td class="center"><input class="input num" type="number" step="0.01" min="0" data-k="sprice" value="" style="width:110px;text-align:center"></td>
         <td class="center"><button class="btn btn-sm btn-danger" data-srm="">${icon('trash', 14)}</button></td>`;
       b.appendChild(tr); bindRow(tr); tr.querySelector('[data-k="sid"]').focus();
     };
@@ -331,26 +328,12 @@
     };
   }
 
-  function alarmBadge(a) {
-    return a.red > 0 ? '<span class="badge b-danger">红灯 ' + a.red + ' 天</span>'
-      : (a.yellow > 0 ? '<span class="badge b-warn">黄灯 ' + a.yellow + ' 天</span>'
-        : '<span class="badge b-success">达标</span>');
-  }
-
-  /* 阈值 / 单价等改动后，就地重算该行的「本周状态」，无需先保存 */
+  /* 阈值改动后就地校验（红灯阈值需 ≥ 黄灯阈值），高亮非法输入，不必先保存 */
   function refreshRowAlarm(tr) {
-    const cell = tr.querySelector('[data-role="alarm"]');
-    if (!cell) return;
-    const idx = Number(tr.dataset.i);
-    const t = types[idx]; if (!t) return;
     const val = k => { const el = tr.querySelector(`[data-k="${k}"]`); return el ? (el.type === 'checkbox' ? el.checked : el.value) : null; };
     const y = Number(val('yellowK')); const r = Number(val('redK'));
     const bad = isFinite(y) && isFinite(r) && r > 0 && r <= y;
     tr.querySelectorAll('.t-th').forEach(el => el.classList.toggle('input-bad', bad));
-    /* 复用引擎同一套判定，只是把阈值换成行内当前值 */
-    const w2 = genOpWeek(goalYear, goalWeek);
-    const a = opTypeAlarm(t.id, w2, { yellowK: isFinite(y) ? y : OP_DEFAULTS.alarm.yellowK, redK: isFinite(r) ? r : OP_DEFAULTS.alarm.redK, mode: 'diff' });
-    cell.innerHTML = alarmBadge(a) + (bad ? '<div class="small" style="color:var(--danger)">红灯阈值需 ≥ 黄灯阈值</div>' : '');
   }
 
   function collectTypes() {
@@ -375,6 +358,178 @@
       });
     });
     return out;
+  }
+
+  /* =========================================================
+     ① 补 Excel 导入（2026-10-16）
+     支持 .xlsx / .xls（SheetJS CDN 解析）与 .csv（零依赖原生解析，与 exportExcel 风格呼应）。
+     表头按列名自动识别：PKG Type（必填）+ 显示名 / 周目标 / 黄灯 / 红灯 / 料号 / 单价（均可选）；
+     同一 PKG Type 多行时自动合并料号。导入先弹预览确认，再合并到表格工作副本，点「保存」写入仓库。
+     ========================================================= */
+  const IMP_ERR = '未识别到「PKG Type」列：表头需包含 PKG Type / 类型 / 大分类，可含 显示名、周目标、黄灯、红灯、料号、单价';
+
+  /* 极简 CSV 解析：支持引号转义、逗号/换行分隔，跳过全空行 */
+  function parseCsvText(text) {
+    const rows = [];
+    let row = [], cur = '', q = false;
+    const push = () => {
+      row.push(cur); cur = '';
+      if (row.some(c => c !== '')) rows.push(row);
+      row = [];
+    };
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ',') { row.push(cur); cur = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; push(); }
+      else cur += c;
+    }
+    if (cur !== '' || row.length) push();
+    return rows;
+  }
+
+  /* 网格 → { map, order }：按表头列名识别字段；id 列缺失返回 null */
+  function parseImportRows(grid) {
+    if (!grid || grid.length < 2) return null;
+    const norm = s => String(s == null ? '' : s).replace(/^\uFEFF/, '').toLowerCase()
+      .replace(/[\s（）()：:，,．.\[\]【】]/g, '');
+    const COLS = {
+      id: ['pkgtype', '类型', '大分类', 'pkg', 'type', 'id', '分类'],
+      name: ['显示名', '显示名称', '名称', 'displayname', 'name'],
+      goal: ['默认周目标', '周目标', '目标', 'goal', 'weeklygoal', '默认目标'],
+      yellow: ['黄灯阈值', '黄灯', 'yellowk', 'yellow'],
+      red: ['红灯阈值', '红灯', 'redk', 'red'],
+      sub: ['料号', '封装料号', '小分类', 'partnumber', 'pkgcode', '封装代码', 'sub'],
+      price: ['单价', '料号单价', '价格', 'price', '单价元每粒']
+    };
+    const colIdx = {};
+    (grid[0] || []).forEach((h, j) => {
+      const n = norm(h); if (!n) return;
+      const keys = Object.keys(COLS);
+      for (let ki = 0; ki < keys.length; ki++) {
+        const k = keys[ki];
+        if (colIdx[k] == null && COLS[k].indexOf(n) >= 0) { colIdx[k] = j; break; }
+      }
+    });
+    if (colIdx.id == null) return null;
+    const toNum = v => {
+      const s = String(v == null ? '' : v).replace(/[,，\s]/g, '');
+      if (s === '') return null;
+      const n = Number(s); return isFinite(n) ? n : null;
+    };
+    const map = {}, order = [];
+    for (let i = 1; i < grid.length; i++) {
+      const r = grid[i] || [];
+      const id = String(r[colIdx.id] == null ? '' : r[colIdx.id]).trim();
+      if (!id) continue;
+      const nameV = colIdx.name != null ? String(r[colIdx.name] || '').trim() : '';
+      const goal = colIdx.goal != null ? toNum(r[colIdx.goal]) : null;
+      const y = colIdx.yellow != null ? toNum(r[colIdx.yellow]) : null;
+      const rd = colIdx.red != null ? toNum(r[colIdx.red]) : null;
+      const sub = colIdx.sub != null ? String(r[colIdx.sub] || '').trim() : '';
+      const price = colIdx.price != null ? toNum(r[colIdx.price]) : null;
+      if (!map[id]) { map[id] = { id, name: nameV, goal, yellowK: y, redK: rd, subs: [] }; order.push(id); }
+      else {
+        if (nameV && !map[id].name) map[id].name = nameV;
+        if (goal != null) map[id].goal = goal;
+        if (y != null) map[id].yellowK = y;
+        if (rd != null) map[id].redK = rd;
+      }
+      if (sub) {
+        const ex = map[id].subs.find(s => s.id === sub);
+        if (ex) { if (price != null) ex.price = price; } else map[id].subs.push({ id: sub, price });
+      }
+    }
+    return order.length ? { map, order } : null;
+  }
+
+  function importExcelFile(file) {
+    const fail = msg => toast(msg, 'warn');
+    const reader = new FileReader();
+    if (/\.csv$/i.test(file.name)) {
+      reader.onload = () => {
+        const parsed = parseImportRows(parseCsvText(String(reader.result)));
+        if (!parsed) return fail(IMP_ERR);
+        applyImport(parsed, file.name, '');
+      };
+      reader.readAsText(file, 'utf-8');
+      return;
+    }
+    if (typeof XLSX === 'undefined') return fail('Excel 解析组件未加载（需联网加载 CDN），可先把文件另存为 CSV 再导入');
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], { header: 1, defval: '' });
+          const parsed = parseImportRows(grid);
+          if (parsed) return applyImport(parsed, file.name, wb.SheetNames[i]);
+        }
+        fail(IMP_ERR);
+      } catch (e) { toast('解析失败：' + (e && e.message || e), 'danger'); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* 合并策略：按大分类 id 匹配 → 更新名称/周目标/阈值/料号单价（未提供的字段保留原值）；
+     新 id → 追加新行（取默认阈值与轮换色标）。先合并进工作副本，用户点「保存」后才写仓库。 */
+  function applyImport(parsed, fileName, sheetName) {
+    types = collectTypes();                       // 保留表格中未保存的手工修改
+    const IMP_COLORS = ['#1d4ed8', '#0b8a5a', '#8b5cf6', '#0b6a86', '#a8620b', '#b91c1c', '#0369a1', '#4d7c0f'];
+    const nextColor = () => IMP_COLORS.find(c => !types.some(t => t.color === c)) || '#64748b';
+    const preview = []; let addN = 0, updN = 0;
+    parsed.order.forEach(id => {
+      const m = parsed.map[id];
+      const ex = types.find(t => t.id === id);
+      if (ex) {
+        updN++;
+        if (m.name) ex.name = m.name;
+        if (m.goal != null) ex.goal = Math.max(0, m.goal);
+        if (m.yellowK != null) ex.yellowK = m.yellowK;
+        if (m.redK != null) ex.redK = m.redK;
+        m.subs.forEach(s => {
+          const es = (ex.subs || (ex.subs = [])).find(x => x.id === s.id);
+          if (es) es.price = s.price; else ex.subs.push({ id: s.id, price: s.price });
+        });
+      } else {
+        addN++;
+        types.push({
+          id, name: m.name || id, color: nextColor(), subs: m.subs,
+          goal: Math.max(0, m.goal || 0),
+          yellowK: m.yellowK != null ? m.yellowK : OP_DEFAULTS.alarm.yellowK,
+          redK: m.redK != null ? m.redK : OP_DEFAULTS.alarm.redK,
+          enabled: true
+        });
+      }
+      preview.push(Object.assign({}, m, { st: ex ? '更新' : '新增' }));
+    });
+    openDialog({
+      title: `Excel 导入预览 · ${esc(fileName)}${sheetName ? '（' + esc(sheetName) + '）' : ''}`,
+      width: 760,
+      okText: '合并到表格',
+      body: `
+        <table class="table">
+          <thead><tr><th>PKG Type</th><th>显示名</th><th class="center">周目标 [K]</th>
+            <th class="center">黄灯 / 红灯 [K]</th><th class="center">料号</th><th class="center">状态</th></tr></thead>
+          <tbody>${preview.map(p => `<tr>
+            <td><strong>${esc(p.id)}</strong></td>
+            <td>${esc(p.name || p.id)}</td>
+            <td class="center num">${p.goal == null ? '—' : Math.round(p.goal).toLocaleString()}</td>
+            <td class="center num">${p.yellowK == null ? '—' : p.yellowK} / ${p.redK == null ? '—' : p.redK}</td>
+            <td class="center">${p.subs.length ? `<span class="chip">${p.subs.length} 个料号</span>` : '<span class="small muted">—</span>'}</td>
+            <td class="center"><span class="badge ${p.st === '新增' ? 'b-info' : 'b-neutral'}">${p.st}</span></td>
+          </tr>`).join('')}</tbody>
+        </table>
+        <div class="cfg-note mt12">${icon('alert', 15)} 合并规则：按 PKG Type 匹配更新（名称 / 周目标 / 阈值 / 料号单价），未提供的字段保留原值。
+          确认后先合并到下方表格，再点「保存」写入配置仓库。</div>`,
+      onOk: (_m, close) => {
+        render();
+        toast(`已导入 ${preview.length} 类（新增 ${addN} · 更新 ${updN}），请核对后点「保存」写入配置`, 'success');
+        close();
+      }
+    });
   }
 
   /* =========================================================
@@ -749,7 +904,15 @@
       types = list; OPTypeStore.save(list);
       toast('PKG Type 已保存（共 ' + list.length + ' 类，阈值逐品类生效）', 'success'); render();
     };
-    /* 阈值 / 单价改动后就地重算该行「本周状态」，不必先保存 */
+    /* Excel 导入：选择文件 → 解析 → 预览确认 → 合并到工作副本（再点「保存」写入仓库） */
+    const bimp = document.getElementById('btnTypeImport');
+    if (bimp) bimp.onclick = () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.xlsx,.xls,.csv';
+      inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) importExcelFile(f); };
+      inp.click();
+    };
+    /* 阈值改动后就地校验输入合法性，不必先保存 */
     document.querySelectorAll('#tblTypes tbody tr[data-i]').forEach(tr => {
       tr.querySelectorAll('[data-k="yellowK"], [data-k="redK"]').forEach(el => {
         el.oninput = () => refreshRowAlarm(tr);

@@ -83,7 +83,7 @@
 
     const priceOpts = ['<option value="">（不折算 Earn，按品类代码直查）</option>']
       .concat(priceKeys.map(k => `<option value="${esc(k)}"${k === it.priceKey ? ' selected' : ''}>${esc(k)}</option>`)).join('');
-    const stHtml = it.stations.map(s => stRowHtml(s[0], s[1].join(', '))).join('');
+    const stHtml = it.stations.map(s => stRowHtml(s[0], s[1].join(', '), s[2])).join('');
 
     openDialog({
       title: editing ? `编辑品类 · ${esc(it.key)}` : '新增品类',
@@ -102,7 +102,7 @@
 
             <div class="flex gap12 mt16">
               <div style="flex:1">
-                <label class="field-label">单价口径（OP PKG Type）</label>
+                <label class="field-label">OP PKG Type</label>
                 <select class="input" id="wtPrice" style="width:100%">${priceOpts}</select>
               </div>
             </div>
@@ -117,7 +117,7 @@
             <label class="field-label">排行联动站点清单 <span class="small muted">（点击矩阵列头时右侧排行按此清单展示）</span></label>
             <div id="stRows">${stHtml}</div>
             <button class="btn btn-sm mt8" id="stAdd" type="button">${icon('plus', 14)} 添加站点</button>
-            <div class="small muted mt8">站点显示名随意（如 mold / Ship）；工序代码需与 WIP 数据的 Station 一致，多个代码用逗号分隔（如 BMOLD, QMOLD）。
+            <div class="small muted mt8">站点显示名随意（如 mold / Ship）；工序代码需与 WIP 数据的 Station 一致，多个代码用逗号分隔（如 BMOLD, QMOLD）；预警值 = 该站点在制数量超过此值时排行标记 ⚠（颗，留空不预警）。
               清单留空时，联动排行沿用 BGA 的站点清单。</div>
           </div>
         </div>`,
@@ -129,7 +129,8 @@
         const stations = Array.from(document.querySelectorAll('#stRows .st-row')).map(row => {
           const nm = row.querySelector('.st-name').value.trim();
           const codes = row.querySelector('.st-codes').value.split(/[,，\s]+/).map(x => x.trim()).filter(Boolean);
-          return [nm, codes];
+          const warn = Number(row.querySelector('.st-warn').value);
+          return [nm, codes, warn > 0 ? warn : null];
         }).filter(s => s[0] && s[1].length);
         if (!key) { toast('请填写品类代码', 'warn'); return; }
         if (!editing && cfg.some(c => c.key === key)) { toast('品类代码「' + key + '」已存在', 'danger'); return; }
@@ -147,15 +148,39 @@
       }
     });
 
-    /* 站点清单行的增删（弹窗打开后绑定） */
+    /* 站点清单行的增删 + 拖拽排序（弹窗打开后绑定） */
+    const stBox = document.getElementById('stRows');
     const bindSt = () => {
-      document.querySelectorAll('#stRows .st-rm').forEach(b => {
+      stBox.querySelectorAll('.st-rm').forEach(b => {
         b.onclick = () => { b.closest('.st-row').remove(); };
       });
     };
     bindSt();
+    /* 拖拽排序：按住行首 ⠿ 手柄拖动，松开即按新顺序保存（onOk 按 DOM 顺序收集） */
+    let dragRow = null;
+    stBox.addEventListener('mousedown', e => {
+      const handle = e.target.closest('.st-drag');
+      if (handle) { const row = handle.closest('.st-row'); if (row) row.draggable = true; }
+    });
+    stBox.addEventListener('dragstart', e => {
+      dragRow = e.target.closest('.st-row');
+      if (dragRow) dragRow.classList.add('dragging');
+    });
+    stBox.addEventListener('dragover', e => {
+      if (!dragRow) return;
+      e.preventDefault();
+      const target = e.target.closest('.st-row');
+      if (!target || target === dragRow) return;
+      const rect = target.getBoundingClientRect();
+      stBox.insertBefore(dragRow, e.clientY < rect.top + rect.height / 2 ? target : target.nextSibling);
+    });
+    stBox.addEventListener('drop', e => e.preventDefault());
+    stBox.addEventListener('dragend', () => {
+      if (dragRow) { dragRow.classList.remove('dragging'); dragRow.draggable = false; }
+      dragRow = null;
+    });
     document.getElementById('stAdd').onclick = () => {
-      document.getElementById('stRows').insertAdjacentHTML('beforeend', stRowHtml('', ''));
+      stBox.insertAdjacentHTML('beforeend', stRowHtml('', ''));
       bindSt();
     };
   }
@@ -164,10 +189,12 @@
   const PALETTE = ['#1d4ed8', '#0b8a5a', '#8b5cf6', '#0b6a86', '#a8620b', '#b91c1c', '#0369a1', '#4d7c0f'];
   const nextColor = () => PALETTE.find(c => !cfg.some(t => t.color === c)) || '#64748b';
 
-  function stRowHtml(name, codes) {
+  function stRowHtml(name, codes, warn) {
     return `<div class="st-row">
+      <span class="st-drag" title="拖动排序">⠿</span>
       <input class="st-name" placeholder="站点显示名" value="${esc(name)}">
       <input class="st-codes" placeholder="工序代码，逗号分隔" value="${esc(codes)}">
+      <input class="st-warn" type="number" min="0" step="any" placeholder="预警值" title="该站点在制数量超过此值时排行标记预警（颗，留空不预警）" value="${warn > 0 ? esc(warn) : ''}">
       <button class="st-rm" type="button" title="删除该站点">×</button>
     </div>`;
   }

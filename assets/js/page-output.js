@@ -213,13 +213,16 @@
           ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数（K）</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
           —— 其中 <b>BGA/LGA 按颗数并入（不计 ÷225 I/O 当量）</b>；本周目标与实际同量纲可直接比。</div>`
           : `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：颗数（K）</strong>${p.ids.length ? '（' + p.ids.map(esc).join('、') + '）' : ''}
-          —— 不含 BGA/LGA（仅 LEAD 视图合并）；本周目标与实际同量纲可直接比。</div>`;
+          —— 数据口径含 BGA/LGA；本周目标与实际同量纲可直接比。</div>`;
       } else {
         caliberTag = bgIn
           ? `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含全部 ${p.ids.length} 个品类；其中 <b>BGA/LGA 按颗数（不计 ÷225）× 单价</b>计算。</div>`
-          : `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含 ${p.ids.length} 个品类（不含 BGA/LGA，仅 LEAD 视图合并）。</div>`;
+          : `<div class="small muted mt8">${icon('info', 13)} <strong>本图口径：金额（万元）</strong>，含 ${p.ids.length} 个品类，数据口径含 BGA/LGA。</div>`;
       }
-      const title = `${isG ? icon('activity', 20) : icon('database', 20)} ${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K · 颗数）' : '累计 Earn 目标 vs 实际（万元）'}`;
+      /* PLATING 部门：两张图表表头固定为 PLATING（颗数）/ DEFLASH（金额） */
+      const title = `${isG ? icon('activity', 20) : icon('database', 20)} ` + (p.dept === 'PLATING'
+        ? (isG ? 'PLATING' : 'DEFLASH')
+        : `${isDual ? esc(p.dept) + ' · ' : ''}${isG ? '累计 goal vs total 曲线对比（K · 颗数）' : '累计 Earn 目标 vs 实际（万元）'}`);
       return `<div class="card op-chart-card">
           <div class="card-head">
             <div class="card-title">${title}
@@ -258,7 +261,7 @@
             </div>
             <div class="fi">
               <label class="field-label">图表视图</label>
-              <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（颗数 / 金额）；单部门：当前视角部门两张。注：BGA/LGA 仅在 LEAD 视图按颗数（不计 ÷225）并入两张主图，其余部门主图不含 BGA/LGA">
+              <div class="seg" id="segView" title="双部门 2×2：LEAD / NON-LEAD ×（颗数 / 金额）；单部门：当前视角部门两张。注：数据口径含 BGA/LGA（LEAD 视图按颗数、不计 ÷225 并入）">
                 <button data-v="dual" class="${isDual ? 'active' : ''}">BE</button>
                 <button data-v="single" class="${isDual ? '' : 'active'}">单部门</button>
               </div>
@@ -282,7 +285,7 @@
       <div class="grid ${isDual ? 'g-2 op-chart-grid' : ''} op-chart-stack mt16" id="chartStack">
         ${panels.map(panelCard).join('')}
       </div>
-      ${isDual ? `<div class="sub-note mt8">2×2 排布：行 = 口径（<b>颗数</b> / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。<b>BGA/LGA 仅在 LEAD 视图按颗数（不计 ÷225 I/O 当量）并入两张主图；其余部门主图不含 BGA/LGA</b>。</div>` : `<div class="sub-note mt8">上图 = 颗数口径${dept === 'LEAD' ? '（含 BGA/LGA，按颗数不计 ÷225）' : '（不含 BGA/LGA）'}，下图 = 金额（万元）${dept === 'LEAD' ? '（含 BGA/LGA）' : '（不含 BGA/LGA）'}；<b>BGA/LGA 仅在 LEAD 视图合并</b>。</div>`}
+      ${isDual ? `<div class="sub-note mt8">2×2 排布：行 = 口径（<b>颗数</b> / 金额），列 = 部门（LEAD / NON-LEAD）；同一行两部门共用 Y 轴上限，可直接横向比高低。<b>数据口径含 BGA/LGA</b>。</div>` : `<div class="sub-note mt8">上图 = 颗数口径${dept === 'LEAD' ? '（BGA/LGA 按颗数、不计 ÷225 并入）' : ''}，下图 = 金额（万元）；<b>数据口径含 BGA/LGA</b>。</div>`}
 
       <div class="card mt16 no-print">
         <div class="card-head"><div class="card-title">${icon('refresh', 19)} 数据刷新

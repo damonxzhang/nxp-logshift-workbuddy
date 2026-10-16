@@ -24,7 +24,6 @@
     { code: 'MMS AL06', name: '印字缺陷', dept: 'LEAD', process: 'MARK', equip: [] },
     { code: 'MOLD BMD2', name: '外来物', dept: 'LEAD', process: 'MOLD', equip: DEFECT_EQUIP_SEED.slice() },
     { code: 'MOLD BMD3', name: '未充满', dept: 'LEAD', process: 'MOLD', equip: DEFECT_EQUIP_SEED.slice() },
-    { code: 'SAW SS7', name: 'SAW污染(外来物/粉尘)', dept: 'LEAD', process: 'MOLD', equip: [] },
     { code: 'MMS AL05', name: '印字面外来物', dept: 'NON-LEAD', process: 'MARK', equip: [] },
     { code: 'MMS AL07', name: '印字/表面划伤', dept: 'NON-LEAD', process: 'MARK', equip: [] },
     { code: 'MMS AL08', name: '印字/污染', dept: 'NON-LEAD', process: 'MARK', equip: [] },
@@ -65,7 +64,7 @@
             dept: DEFECT_DEPARTMENTS.indexOf(i.dept) >= 0 ? i.dept : DEFECT_DEPARTMENTS[0],
             process: String(i.process || '').trim(),
             equip: Array.isArray(i.equip) ? i.equip.slice() : []
-          })).filter(i => i.code)
+          })).filter(i => i.code && i.code !== 'SAW SS7') // 同步清除 localStorage 旧配置中已下线的 SAW SS7
         };
         return out;
       }
