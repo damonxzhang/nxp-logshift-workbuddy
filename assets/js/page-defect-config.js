@@ -2,7 +2,7 @@
    按 部门 / 工序 维护次品项（名称 + 代码）及其与设备（机台）的绑定关系。
    配置写入 localStorage（DefectCfgStore），与次品管理大屏共用同一份主数据。
    权限：需「Output（OP）/ 次品」编辑权限（沿用 OP 配置页口径，仅管理员可编辑）；否则整页只读。
-   部门固定为 LEAD / NON-LEAD / PLATING（项目口径，不可编辑）。 */
+   部门口径：2026-10-16 客户确认统一为 NON-LEAD。 */
 (function () {
   renderShell('defectcfg');
 
@@ -11,8 +11,18 @@
   const DEPTS = (typeof DEFECT_DEPARTMENTS !== 'undefined' && DEFECT_DEPARTMENTS.length) ? DEFECT_DEPARTMENTS : ['LEAD', 'NON-LEAD', 'PLATING'];
 
   let cfg = DefectCfgStore.all();
-  let fDept = 'ALL';                       // ALL | LEAD | NON-LEAD | PLATING
   let fProc = 'ALL';                       // ALL | <process>
+  let fCode = '';                          // 代码关键字（模糊，忽略大小写）
+  let fName = '';                          // 名称关键字（模糊，忽略大小写）
+
+  // 统一筛选：工序 + 代码/名称关键字（主数据表格与 Excel 导出共用）
+  const filteredRows = () => {
+    const kCode = fCode.trim().toLowerCase(), kName = fName.trim().toLowerCase();
+    return cfg.items.filter(i =>
+      (fProc === 'ALL' || i.process === fProc) &&
+      (!kCode || String(i.code).toLowerCase().indexOf(kCode) >= 0) &&
+      (!kName || String(i.name).toLowerCase().indexOf(kName) >= 0));
+  };
 
   function render() {
     document.getElementById('content').innerHTML = `
@@ -29,37 +39,31 @@
     const procOpts = ['<option value="ALL"' + (fProc === 'ALL' ? ' selected' : '') + '>全部工序</option>']
       .concat(cfg.processes.map(p => `<option value="${esc(p)}"${fProc === p ? ' selected' : ''}>${esc(p)}</option>`)).join('');
 
-    const rows = cfg.items.filter(i => (fDept === 'ALL' || i.dept === fDept) && (fProc === 'ALL' || i.process === fProc));
+    const rows = filteredRows();
 
     const body = rows.length ? rows.map((it, idx) => {
       const gi = cfg.items.indexOf(it);
-      const eqChips = it.equip.length
-        ? it.equip.slice(0, 4).map(e => `<span class="chip lang">${esc(e)}</span>`).join('') + (it.equip.length > 4 ? `<span class="chip">+${it.equip.length - 4}</span>` : '')
-        : '<span class="muted small">未绑定</span>';
       const procChip = it.process ? `<span class="chip">${esc(it.process)}</span>` : '<span class="muted small">未分类</span>';
       return `<tr data-gi="${gi}">
         <td><span class="lang" style="font-family:'JetBrains Mono',Consolas,monospace;font-weight:600">${esc(it.code)}</span></td>
         <td>${esc(it.name)}</td>
         <td>${deptBadge(it.dept)}</td>
         <td>${procChip}</td>
-        <td><div class="flex acenter gap5" style="flex-wrap:wrap">${eqChips}</div></td>
         ${canEdit ? `<td class="center"><div class="flex acenter gap6" style="justify-content:center">
             <button class="btn btn-sm" data-edit="${gi}">${icon('settings', 14)} 编辑</button>
             <button class="btn btn-sm btn-danger" data-rm="${gi}">${icon('trash', 14)}</button>
           </div></td>` : '<td class="center muted small">只读</td>'}
       </tr>`;
-    }).join('') : `<tr><td colspan="${canEdit ? 6 : 6}" class="center muted">当前筛选条件下无次品项，点击「新增次品项」添加。</td></tr>`;
+    }).join('') : `<tr><td colspan="5" class="center muted">当前筛选条件下无次品项，点击「新增次品项」添加。</td></tr>`;
 
     return `
       <div class="card">
         <div class="card-head">
           <div class="card-title">${icon('layers', 19)} 次品项主数据
-            <span class="card-sub">按部门 / 工序筛选 · 共 ${cfg.items.length} 项 · 当前显示 ${rows.length} 项</span></div>
+            <span class="card-sub">按工序筛选 · 共 ${cfg.items.length} 项 · 当前显示 ${rows.length} 项</span></div>
           <div class="flex acenter gap8">
-            <div class="seg" id="segDept">
-              <button data-d="ALL" class="${fDept === 'ALL' ? 'active' : ''}">全部</button>
-              ${DEPTS.map(d => `<button data-d="${d}" class="${fDept === d ? 'active' : ''}">${d}</button>`).join('')}
-            </div>
+            <input class="input lang" id="fltCode" placeholder="按代码筛选" style="width:120px" value="${esc(fCode)}">
+            <input class="input" id="fltName" placeholder="按名称筛选" style="width:120px" value="${esc(fName)}">
             <select class="input" id="selProc" style="width:170px">${procOpts}</select>
             <button class="btn btn-sm" id="btnExport">${icon('download', 16)} 导出 Excel</button>
             ${canEdit ? `<button class="btn btn-sm btn-primary" id="btnAddItem">${icon('plus', 16)} 新增次品项</button>` : '<span class="chip">只读</span>'}
@@ -69,7 +73,7 @@
           <table class="table" id="tblItems">
             <thead><tr>
               <th>代码</th><th>名称</th><th class="center">部门</th><th class="center">工序</th>
-              <th>绑定设备（机台）</th>${canEdit ? '<th class="center">操作</th>' : '<th class="center">操作</th>'}
+              ${canEdit ? '<th class="center">操作</th>' : '<th class="center">操作</th>'}
             </tr></thead>
             <tbody>${body}</tbody>
           </table>
@@ -162,20 +166,31 @@
      ========================================================= */
   function bind() {
     // ① 次品项
-    const sd = document.getElementById('segDept');
-    if (sd) sd.querySelectorAll('button').forEach(b => b.onclick = () => { fDept = b.dataset.d; render(); });
     const sp = document.getElementById('selProc');
     if (sp) sp.onchange = () => { fProc = sp.value; render(); };
+
+    // 代码 / 名称关键字实时筛选（重绘后恢复焦点与光标位置，保证连续输入）
+    const bindFlt = id => {
+      const el = document.getElementById(id);
+      if (el) el.oninput = () => {
+        const pos = el.selectionStart;
+        if (id === 'fltCode') fCode = el.value; else fName = el.value;
+        render();
+        const ne = document.getElementById(id);
+        if (ne) { ne.focus(); try { ne.setSelectionRange(pos, pos); } catch (e) {} }
+      };
+    };
+    bindFlt('fltCode'); bindFlt('fltName');
 
     const bai = document.getElementById('btnAddItem');
     if (bai) bai.onclick = () => openItemDlg(null);
 
     const be = document.getElementById('btnExport');
     if (be) be.onclick = () => {
-      const rows = cfg.items.filter(i => (fDept === 'ALL' || i.dept === fDept) && (fProc === 'ALL' || i.process === fProc));
+      const rows = filteredRows();
       const headers = ['代码', '名称', '部门', '工序', '绑定设备', '设备数'];
       const data = rows.map(i => [i.code, i.name, i.dept, i.process, i.equip.join(' / '), i.equip.length]);
-      exportExcel('次品项主数据_' + (fDept === 'ALL' ? '全部部门' : fDept) + '_' + fmtDateCN(new Date()) + '.xls', headers, data);
+      exportExcel('次品项主数据_全部部门_' + fmtDateCN(new Date()) + '.xls', headers, data);
       toast('已导出 ' + rows.length + ' 条次品项', 'success');
     };
 

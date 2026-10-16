@@ -11,6 +11,8 @@
   'use strict';
 
   // 默认品类配置（与历史硬编码口径完全一致，可作为「恢复默认」基准）
+  // Ship 口径 = BE_DT / BE_MT / BE_KESFT / BE_TTJBI / BE_DC 五个工序之和（2026-10-16 客户确认）
+  const SHIP_CODES = ['BE_DT', 'BE_MT', 'BE_KESFT', 'BE_TTJBI', 'BE_DC'];
   const WIP_TYPES_SEED = [
     {
       key: 'BGA', name: 'BGA', color: '#1d4ed8', priceKey: 'BGA/LGA', showInHeat: true,
@@ -85,11 +87,15 @@
     }
   ];
 
+  // Ship 站点旧口径（仅 BE_DC）自动扩为五工序之和（兼容已保存的旧 localStorage 配置）
+  const fixCodes = (name, codes) =>
+    (name === 'Ship' && codes.length === 1 && codes[0] === 'BE_DC') ? SHIP_CODES.slice() : codes;
+
   function seed() {
     return WIP_TYPES_SEED.map(t => ({
       key: t.key, name: t.name, color: t.color, priceKey: t.priceKey,
       showInHeat: t.showInHeat !== false,
-      stations: (t.stations || []).map(s => [s[0], (s[1] || []).slice(), s[2] > 0 ? Number(s[2]) : null])
+      stations: (t.stations || []).map(s => [s[0], fixCodes(s[0], (s[1] || []).slice()), s[2] > 0 ? Number(s[2]) : null])
     }));
   }
 
@@ -106,18 +112,24 @@
     all() {
       const v = this.raw();
       if (v && Array.isArray(v.types)) {
-        return v.types.map(t => ({
-          key: String(t.key || '').trim(),
-          name: String(t.name || t.key || '').trim(),
-          color: String(t.color || '#64748b').trim(),
-          priceKey: String(t.priceKey || t.key || '').trim(),
-          showInHeat: t.showInHeat !== false,
-          stations: (Array.isArray(t.stations) ? t.stations : []).map(s => [
-            String((s && s[0]) || '').trim(),
-            ((s && Array.isArray(s[1])) ? s[1] : String((s && s[1]) || '').split(/[,，\s]+/)).map(c => String(c).trim()).filter(Boolean),
-            (s && Number(s[2]) > 0) ? Number(s[2]) : null
-          ]).filter(s => s[0])
-        })).filter(t => t.key);
+        return v.types.map(t => {
+          const name = String(t.name || t.key || '').trim();
+          return {
+            key: String(t.key || '').trim(),
+            name,
+            color: String(t.color || '#64748b').trim(),
+            priceKey: String(t.priceKey || t.key || '').trim(),
+            showInHeat: t.showInHeat !== false,
+            stations: (Array.isArray(t.stations) ? t.stations : []).map(s => {
+              const codes = ((s && Array.isArray(s[1])) ? s[1] : String((s && s[1]) || '').split(/[,，\s]+/)).map(c => String(c).trim()).filter(Boolean);
+              return [
+                String((s && s[0]) || '').trim(),
+                fixCodes(name, codes),
+                (s && Number(s[2]) > 0) ? Number(s[2]) : null
+              ];
+            }).filter(s => s[0])
+          };
+        }).filter(t => t.key);
       }
       return seed();
     },
