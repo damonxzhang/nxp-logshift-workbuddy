@@ -170,7 +170,7 @@
           </div>
         </section>
         <section class="card">
-          <div class="card-head"><div class="card-title">${icon('activity', 19)} 工序 WIP 排行
+          <div class="card-head"><div class="card-title">${icon('activity', 19)} 工序 WIP
             <span class="card-sub" id="rankSub">堆叠条按品类构成 · 自动巡检高亮 · 点击进入</span></div></div>
           <div class="card-body wip-rank" id="wrList" style="max-height:680px;overflow:auto"></div>
           <div class="card-foot" style="padding:8px 16px 12px;color:#64748b;font-size:12px;border-top:1px dashed #e2e8f0">备注：Ship 的数值是 BE_DT、BE_MT、BE_KESFT、BE_TTJBI、BE_DC 这五个的总和。</div>
