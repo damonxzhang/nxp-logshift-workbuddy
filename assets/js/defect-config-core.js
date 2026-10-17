@@ -63,6 +63,79 @@
     };
   }
 
+  // 报警阈值（PPM）：次品管理大屏与配置页共用
+  //   processes[工序] = { warn, alarm }：按工序设置次品类预警（黄）/ 报警（红）
+  //   items[次品代码] = { warn, alarm }：单个次品项覆盖所属工序阈值（可选）
+  //   devWarn / devAlarm：机台级（设备维度）预警（黄）/ 报警（红），全局统一
+  //   全厂合计（本周总 PPM 等）不属于单一工序，沿用 DEFECT_WARN_TOTAL 口径
+  const DEFECT_WARN_TOTAL = { warn: 2000, alarm: 3000 };
+  const DEFECT_WARN_SEED = {
+    processes: {},
+    items: {},
+    devWarn: 350,
+    devAlarm: 500
+  };
+  DEFECT_PROCESS_SEED.forEach(p => { DEFECT_WARN_SEED.processes[p] = { warn: 2000, alarm: 3000 }; });
+
+  const DefectWarnStore = {
+    KEY: 'defect_warn_v2',
+    raw() {
+      try { return store.get(this.KEY, null); } catch (e) { return null; }
+    },
+    all() {
+      const raw = this.raw();
+      const v = (raw && typeof raw === 'object') ? raw : {};
+      const num = (x, d) => { const n = Number(x); return isFinite(n) && n > 0 ? n : d; };
+      const src = (v.processes && typeof v.processes === 'object') ? v.processes : {};
+      const keys = DEFECT_PROCESS_SEED.slice();
+      Object.keys(src).forEach(k => { if (keys.indexOf(k) < 0) keys.push(k); });
+      const processes = {};
+      keys.forEach(k => {
+        const p = src[k] || {};
+        const warn = num(p.warn, DEFECT_WARN_TOTAL.warn);
+        processes[k] = { warn, alarm: Math.max(warn, num(p.alarm, DEFECT_WARN_TOTAL.alarm)) };
+      });
+      const items = {};
+      const itemsSrc = (v.items && typeof v.items === 'object') ? v.items : {};
+      Object.keys(itemsSrc).forEach(code => {
+        const p = itemsSrc[code] || {};
+        const warn = Number(p.warn), alarm = Number(p.alarm);
+        if (isFinite(warn) && warn > 0 && isFinite(alarm) && alarm > warn) items[code] = { warn, alarm };
+      });
+      return {
+        processes,
+        items,
+        devWarn: num(v.devWarn, DEFECT_WARN_SEED.devWarn),
+        devAlarm: Math.max(num(v.devWarn, DEFECT_WARN_SEED.devWarn), num(v.devAlarm, DEFECT_WARN_SEED.devAlarm))
+      };
+    },
+    save(v) {
+      const cur = this.all();
+      v = v || {};
+      if (v.processes) {
+        Object.keys(v.processes).forEach(k => {
+          const p = v.processes[k] || {};
+          const warn = Number(p.warn), alarm = Number(p.alarm);
+          if (isFinite(warn) && warn > 0 && isFinite(alarm) && alarm > warn) cur.processes[k] = { warn, alarm };
+        });
+      }
+      if (v.items) {
+        Object.keys(v.items).forEach(code => {
+          const p = v.items[code];
+          if (p == null) { delete cur.items[code]; return; }
+          const warn = Number(p.warn), alarm = Number(p.alarm);
+          if (isFinite(warn) && warn > 0 && isFinite(alarm) && alarm > warn) cur.items[code] = { warn, alarm };
+        });
+      }
+      ['devWarn', 'devAlarm'].forEach(k => {
+        const n = Number(v[k]);
+        if (isFinite(n) && n > 0) cur[k] = n;
+      });
+      store.set(this.KEY, cur);
+    },
+    reset() { store.set(this.KEY, JSON.parse(JSON.stringify(DEFECT_WARN_SEED))); }
+  };
+
   const DefectCfgStore = {
     KEY: 'defect_cfg_v3',
     raw() {
@@ -103,5 +176,8 @@
   global.DEFECT_EQUIP_SEED = DEFECT_EQUIP_SEED;
   global.DEFECT_PROCESS_SEED = DEFECT_PROCESS_SEED;
   global.DEFECT_ITEMS_SEED = DEFECT_ITEMS_SEED;
+  global.DEFECT_WARN_SEED = DEFECT_WARN_SEED;
+  global.DEFECT_WARN_TOTAL = DEFECT_WARN_TOTAL;
+  global.DefectWarnStore = DefectWarnStore;
   global.DefectCfgStore = DefectCfgStore;
 })(typeof window !== 'undefined' ? window : globalThis);

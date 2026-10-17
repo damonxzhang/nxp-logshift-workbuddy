@@ -469,7 +469,7 @@
             <option value="qty" ${dr.sort === 'qty' ? 'selected' : ''}>数量降序</option>
           </select>
           <button class="btn btn-sm" id="btnCalcMan" title="先在列表勾选批次，再计算所选批次的金额与总价">${icon('check', 15)} 人工计算${dr.sel.length ? `（${dr.sel.length}）` : ''}</button>
-          <button class="btn btn-sm" id="btnCalcAuto" title="输入目标总价或需求数量，系统按当前排序自动挑选批次">${icon('zap', 15)} 自动计算</button>
+          <button class="btn btn-sm" id="btnCalcAuto" title="可同时填写目标数量与目标总价，系统按当前排序自动挑选批次直到两项都满足">${icon('zap', 15)} 自动计算</button>
           <span class="flex-1"></span>
           ${canExport ? `<button class="btn btn-sm btn-primary" id="wdExport">${icon('download', 15)} 导出 Excel（${list.length} 批）</button>` : '<span class="chip">只读（无导出权限）</span>'}
         </div>
@@ -634,26 +634,172 @@
     });
   }
 
+  /* ---------------- 自动计算：当前 OP 累计差距（Output 数量 / Earn 金额） ----------------
+     口径与 OP 大屏一致：本周（周六起）累计目标 vs 累计实际，取「最后一个有数据的日子」为基准日；
+     数量统一按颗数口径（BGA/LGA 用 qtyGoalCum / qtyTotalCum，不按 I/O 当量折算），
+     Earn 复用 OP 的料号单价与金额口径。品类范围 = 当前抽屉筛选的 PKG Type。 */
+  function acEffWeek(week, ids) {
+    const byType = {};
+    ids.forEach(id => {
+      const t = week.byType[id];
+      if (!t) return;
+      byType[id] = t.ioMode ? Object.assign({}, t, {
+        goalCum: t.qtyGoalCum.slice(),
+        totalCum: t.qtyTotalCum.slice(),
+        subCum: t.qtySubCum || t.subCum,
+        weekGoal: t.qtyWeekGoal != null ? t.qtyWeekGoal : t.weekGoal,
+        ioMode: false
+      }) : t;
+    });
+    return Object.assign({}, week, { byType });
+  }
+
+  function acGapNow(typeIds) {
+    const cw = opCurrentWeek();
+    const week = genOpWeek(cw.year, cw.week);
+    /* WIP 品类 → OP 单价口径（如 WIP 的 BGA / LGA 都对应 OP 的「BGA/LGA」），去重后取品类 */
+    const ids = [];
+    (typeIds || []).forEach(t => {
+      const k = cfgOf(t).priceKey || t;
+      if (week.byType[k] && ids.indexOf(k) < 0) ids.push(k);
+    });
+    const todayIdx = week.days.findIndex(d => d.isToday);
+    const last = opLastActualIdx(week);
+    const idx = last >= 0 ? last : (todayIdx >= 0 ? todayIdx : 6);
+    const eff = acEffWeek(week, ids);
+    let goalQ = 0, actQ = 0;
+    ids.forEach(id => {
+      const t = eff.byType[id];
+      goalQ += t.goalCum[idx] || 0;
+      if (t.totalCum[idx] != null) actQ += t.totalCum[idx];
+    });
+    const cfgAll = Object.assign({}, OP_DEFAULTS, store.get('op_cfg', {}));
+    const earn = opEarnSeriesCfg(ids, eff, OPTypeStore.all(), cfgAll);
+    const goalA = earn.goalCum[idx] || 0;
+    const actA = earn.totalCum[idx];
+    return {
+      year: cw.year, week: cw.week,
+      dayLabel: week.days[idx] ? week.days[idx].label : '',
+      ids, goalQ, actQ, gapQ: Math.max(0, goalQ - actQ),
+      goalA, actA, gapA: Math.max(0, goalA - (actA == null ? 0 : actA))
+    };
+  }
+
+  function acGapHtml(g) {
+    const fmt = v => Math.round(v).toLocaleString('en-US');
+    const label = d => d > 0 ? '超出 ' + fmt(d) : d < 0 ? '缺口 ' + fmt(-d) : '持平';
+    const tile = (title, diff, unit, goalTxt, actTxt) => `
+      <div style="flex:1 1 250px;background:#fff;border:1px solid ${diff >= 0 ? '#bfe8d5' : '#f3c2bf'};border-radius:10px;padding:10px 12px">
+        <div class="small muted" style="font-weight:700">${title}</div>
+        <div style="font-size:21px;font-weight:800;margin-top:2px;color:${diff >= 0 ? '#0b8a5a' : '#b3261e'}">${label(diff)} <small style="font-size:12px;font-weight:600">${unit}</small></div>
+        <div class="small muted" style="margin-top:3px">目标 ${goalTxt} · 累计实际 ${actTxt} · 差值 ${diff >= 0 ? '+' : '-'}${fmt(Math.abs(diff))} ${unit}</div>
+      </div>`;
+    return `<div class="flex gap12" style="flex-wrap:wrap">
+      ${tile('Output · 产量（颗）', Math.round((g.actQ - g.goalQ) * 1000), '颗',
+        fmt(g.goalQ * 1000) + ' 颗', fmt(g.actQ * 1000) + ' 颗')}
+      ${tile('Earn · 金额（元）', Math.round(((g.actA == null ? 0 : g.actA) - g.goalA) * 10000), '元',
+        fmt(g.goalA * 10000) + ' 元', g.actA == null ? '—' : fmt(g.actA * 10000) + ' 元')}
+    </div>`;
+  }
+
+  function renderAcGap(m, autofill) {
+    const g = acGapNow(dr.types);
+    m._acGap = g;
+    m.querySelector('#acGapMeta').textContent =
+      `第 ${g.week} 周 · 截至 ${g.dayLabel} · ${g.ids.length} 个品类（${g.ids.join(' / ')}）`;
+    m.querySelector('#acGapBox').innerHTML = acGapHtml(g);
+    if (autofill) {
+      m.querySelector('#acNeedQ').value = g.gapQ > 0 ? Math.round(g.gapQ * 1000) : '';
+      m.querySelector('#acNeedA').value = g.gapA > 0 ? Math.round(g.gapA * 10000) : '';
+    }
+    return g;
+  }
+
+  function acNeedsOf(m) {
+    const num = sel => {
+      const v = Number(m.querySelector(sel).value);
+      return isFinite(v) && v > 0 ? v : 0;
+    };
+    return { q: Math.round(num('#acNeedQ')), a: Math.round(num('#acNeedA')) };
+  }
+
+  /* 按当前排序取批：数量 / 总价两项同时填写时按「双上限」取批——
+     每批取用量同时受两项剩余量约束，任一项先满足即停止（不超出任何一项目标）；
+     只填一项时等价于原来的单目标计算。 */
+  function acPick(items, need) {
+    const used = new Set(items.map(x => x.batch));
+    let rq = need.q ? Math.max(0, need.q - items.reduce((a, x) => a + x.qty, 0)) : 0;
+    let ra = need.a ? Math.max(0, need.a - items.reduce((a, x) => a + x.qty * x.price, 0)) : 0;
+    for (const r of drRows()) {
+      if (need.q && rq <= 0) break;
+      if (need.a && ra <= 0) break;
+      if (used.has(r[6])) continue;
+      const price = priceOfSub(r[1], r[3]);
+      if (price <= 0) continue;
+      let take = r[7];
+      if (need.q && rq > 0) take = Math.min(take, rq);
+      if (need.a && ra > 0) take = Math.min(take, Math.floor(ra / price));
+      if (take <= 0) continue;
+      items.push({ batch: r[6], type: r[1], outline: r[3], qty: take, price });
+      used.add(r[6]);
+      if (need.q) rq -= take;
+      if (need.a) ra -= take * price;
+    }
+    return items;
+  }
+
   function autoCalc() {
     const sortName = { otd: 'OTD 余量升序（最急优先）', ct: 'BE CT 降序（在制最久优先）', qty: '数量降序' }[dr.sort] || '';
     const mask = openDialog({
       title: `自动计算 · ${esc(dr.step)}`,
-      sub: `按当前排序「${sortName}」依次取批，最后一批可部分取用 · 结果可手动增删批次后「再次计算」 · 单价随 OP 配置联动`,
-      width: 880,
+      sub: `按当前排序「${sortName}」依次取批，最后一批可部分取用 · 同时填写「数量」「总价」时两项都要满足 · 结果可手动增删批次后「再次计算」 · 单价随 OP 配置联动`,
+      width: 900,
       okText: '开始计算',
       cancelText: '关闭',
       body: `
-        <div class="flex acenter gap12" style="flex-wrap:wrap">
-          <label class="flex acenter gap6 small" style="cursor:pointer"><input type="radio" name="acMode" value="qty" checked> 按需求数量（颗）</label>
-          <label class="flex acenter gap6 small" style="cursor:pointer"><input type="radio" name="acMode" value="amt"> 按目标总价（元）</label>
-          <input class="input" type="number" id="acNeed" min="1" step="any" placeholder="输入目标值" style="width:170px;height:32px">
+        <div class="card" style="border-radius:12px;background:#f6fbfd;border-color:#bfe0ea">
+          <div class="card-body" style="padding:12px 14px">
+            <div class="flex acenter gap8" style="flex-wrap:wrap">
+              <b style="font-size:13.5px">当前 OP 累计差距</b>
+              <span class="small muted" id="acGapMeta"></span>
+              <span class="flex-1"></span>
+              <button class="btn btn-sm" id="acRefresh" title="重新读取 OP 目标 / 实际与单价配置">${icon('refresh', 14)} 刷新</button>
+            </div>
+            <div id="acGapBox" class="mt10"></div>
+          </div>
         </div>
-        <div id="acResult" class="mt12"><div class="small muted">输入目标值后点「开始计算」，系统按当前排序自动挑选所需批次；之后可手动增删批次并「再次计算」，逐步逼近目标。</div></div>`,
+        <div class="flex acenter gap12 mt12" style="flex-wrap:wrap">
+          <label class="flex acenter gap6 small"><b>按数量（颗）</b>
+            <input class="input" type="number" id="acNeedQ" min="0" step="any" placeholder="如 1200000" style="width:150px;height:32px"></label>
+          <label class="flex acenter gap6 small"><b>按总价（元）</b>
+            <input class="input" type="number" id="acNeedA" min="0" step="any" placeholder="如 500000" style="width:150px;height:32px"></label>
+          <button class="btn btn-sm btn-ghost" id="acFill">填入当前缺口</button>
+        </div>
+        <div class="small muted" style="margin-top:6px">两项同时填写时，系统按当前排序取批直到「数量」与「总价」都满足；只填一项则只按该项计算。</div>
+        <div id="acResult" class="mt12"><div class="small muted">默认已按当前缺口填入目标值，点「开始计算」按当前排序挑选批次。</div></div>`,
       onOk: m => runAutoCalc(m)
     });
-    mask.querySelector('#acNeed').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); runAutoCalc(mask); }
+    mask._acTouched = false;
+    renderAcGap(mask, true);
+    ['#acNeedQ', '#acNeedA'].forEach(sel => {
+      mask.querySelector(sel).addEventListener('input', () => { mask._acTouched = true; });
+      mask.querySelector(sel).addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); runAutoCalc(mask); }
+      });
     });
+    mask.querySelector('#acFill').onclick = () => {
+      renderAcGap(mask, true);
+      mask._acTouched = false;
+      toast('已按当前缺口填入目标值', 'primary');
+    };
+    mask.querySelector('#acRefresh').onclick = () => {
+      renderAcGap(mask, !mask._acTouched);
+      if (mask._ac) {
+        mask._ac.items.forEach(x => { x.price = priceOfSub(x.type, x.outline); });
+        renderAcResult(mask);
+      }
+      toast('已刷新 OP 累计差距与单价配置', 'success');
+    };
   }
 
   function acTotals(items) {
@@ -663,18 +809,20 @@
   function renderAcResult(m) {
     const st = m._ac; if (!st) return;
     const { totQ, totA } = acTotals(st.items);
-    let note;
-    if (st.mode === 'qty') {
-      note = totQ === st.need
-        ? `<span style="color:#0b8a5a;font-weight:700">已满足需求数量 ${st.need.toLocaleString('en-US')} 颗</span>`
-        : totQ < st.need
-          ? `<span class="red-inline">还差 ${(st.need - totQ).toLocaleString('en-US')} 颗，点「再次计算」自动补批</span>`
-          : `<span style="color:#b45309;font-weight:700">已超出目标 ${(totQ - st.need).toLocaleString('en-US')} 颗，可移除部分批次</span>`;
-    } else {
-      note = totA <= st.need
-        ? `剩余预算 <b>${Math.round(st.need - totA).toLocaleString('en-US')}</b> 元（按整颗取用，整除有余时向下取）`
-        : `<span style="color:#b45309;font-weight:700">已超出预算 ${Math.round(totA - st.need).toLocaleString('en-US')} 元，可移除部分批次</span>`;
+    const need = st.need;
+    const notes = [];
+    if (need.q) {
+      notes.push(totQ >= need.q
+        ? `<span style="color:#0b8a5a;font-weight:700">数量已满足 ${need.q.toLocaleString('en-US')} 颗${totQ > need.q ? `（超出 ${(totQ - need.q).toLocaleString('en-US')} 颗）` : ''}</span>`
+        : `<span class="red-inline">数量还差 ${(need.q - totQ).toLocaleString('en-US')} 颗${need.a && totA >= need.a ? '（已达总价上限，可调高总价目标）' : '，点「再次计算」自动补批'}</span>`);
     }
+    if (need.a) {
+      notes.push(Math.round(totA) >= need.a
+        ? `<span style="color:#0b8a5a;font-weight:700">总价已满足 ${need.a.toLocaleString('en-US')} 元${Math.round(totA) > need.a ? `（超出 ${(Math.round(totA) - need.a).toLocaleString('en-US')} 元）` : ''}</span>`
+        : `<span class="red-inline">总价还差 ${(need.a - Math.round(totA)).toLocaleString('en-US')} 元${need.q && totQ >= need.q ? '（已达数量上限，可调高数量目标）' : '，点「再次计算」自动补批'}</span>`);
+    }
+    const allOk = (!need.q || totQ >= need.q) && (!need.a || Math.round(totA) >= need.a);
+    const note = `${allOk && need.q && need.a ? '<span style="color:#0b8a5a;font-weight:700">两项目标均已满足</span> · ' : ''}${notes.join(' · ')}`;
     m.querySelector('#acResult').innerHTML = `
       <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);max-height:330px">
         <table class="table wdt" style="width:100%;border:0;min-width:720px">
@@ -751,53 +899,26 @@
   function recalcAuto(m) {
     const st = m._ac;
     if (!st) { runAutoCalc(m); return; }
-    const mode = (m.querySelector('input[name="acMode"]:checked') || {}).value || 'qty';
-    const raw = Number(m.querySelector('#acNeed').value);
-    if (!raw || raw <= 0) { toast('请输入大于 0 的目标值', 'warn'); return; }
-    st.mode = mode;
-    st.need = mode === 'qty' ? Math.round(raw) : raw;
+    const need = acNeedsOf(m);
+    if (!need.q && !need.a) { toast('请至少填写「按数量」或「按总价」', 'warn'); return; }
+    st.need = need;
     const { totQ, totA } = acTotals(st.items);
-    let remaining = mode === 'qty' ? st.need - totQ : st.need - totA;
-    if (remaining <= 0) {
+    if ((!need.q || totQ >= need.q) && (!need.a || Math.round(totA) >= need.a)) {
       renderAcResult(m);
-      toast(mode === 'qty' ? '已达/超出目标数量，可手动移除部分批次' : '预算已用尽/超出，可手动移除部分批次', 'warn');
+      toast('当前清单已满足填写的目标，可手动移除部分批次', 'warn');
       return;
     }
-    const used = new Set(st.items.map(x => x.batch));
-    for (const r of drRows()) {
-      if (remaining <= 0) break;
-      if (used.has(r[6])) continue;
-      const price = priceOfSub(r[1], r[3]);
-      if (price <= 0) continue;
-      const take = mode === 'qty' ? Math.min(r[7], remaining) : Math.min(r[7], Math.floor(remaining / price));
-      if (take <= 0) continue;
-      st.items.push({ batch: r[6], type: r[1], outline: r[3], qty: take, price });
-      remaining -= mode === 'qty' ? take : take * price;
-      used.add(r[6]);
-    }
+    acPick(st.items, need);
     renderAcResult(m);
   }
 
   function runAutoCalc(m) {
-    const mode = (m.querySelector('input[name="acMode"]:checked') || {}).value || 'qty';
-    const raw = Number(m.querySelector('#acNeed').value);
-    if (!raw || raw <= 0) { toast('请输入大于 0 的目标值', 'warn'); return; }
-    const need = mode === 'qty' ? Math.round(raw) : raw;
-    let remaining = need;
-    const items = [];
-    for (const r of drRows()) {
-      if (remaining <= 0) break;
-      const price = priceOfSub(r[1], r[3]);
-      if (price <= 0) continue;
-      const take = mode === 'qty'
-        ? Math.min(r[7], remaining)
-        : Math.min(r[7], Math.floor(remaining / price));
-      if (take <= 0) continue;
-      items.push({ batch: r[6], type: r[1], outline: r[3], qty: take, price });
-      remaining = mode === 'qty' ? remaining - take : remaining - take * price;
-    }
+    const need = acNeedsOf(m);
+    if (!need.q && !need.a) { toast('请至少填写「按数量」或「按总价」', 'warn'); return; }
+    const items = acPick([], need);
     if (!items.length) { toast('当前筛选条件下无可取批次', 'warn'); return; }
-    m._ac = { mode, need, items };
+    m._ac = { need, items };
+    m._acTouched = true;
     renderAcResult(m);
   }
 

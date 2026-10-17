@@ -40,31 +40,47 @@
       .concat(cfg.processes.map(p => `<option value="${esc(p)}"${fProc === p ? ' selected' : ''}>${esc(p)}</option>`)).join('');
 
     const rows = filteredRows();
+    const wv = DefectWarnStore.all();
+    const procTip = cfg.processes.map(p => {
+      const t = wv.processes[p] || { warn: 2000, alarm: 3000 };
+      return p + ' ' + t.warn + '/' + t.alarm;
+    }).join(' · ');
 
     const body = rows.length ? rows.map((it, idx) => {
       const gi = cfg.items.indexOf(it);
       const procChip = it.process ? `<span class="chip">${esc(it.process)}</span>` : '<span class="muted small">未分类</span>';
+      const ov = wv.items[it.code];
+      const th = ov || wv.processes[it.process] || DEFECT_WARN_TOTAL;
+      const warnCell = it.process
+        ? `<button class="btn btn-sm" data-warn="${gi}" title="设置次品项「${esc(it.code)}」的预警 / 报警值（PPM）${ov ? ' · 当前为单独设置' : ' · 当前沿用工序「' + esc(it.process) + '」默认'}">
+             <span style="color:#b45309;font-weight:700">${th.warn}</span><span class="muted"> / </span><span style="color:#b3261e;font-weight:700">${th.alarm}</span>
+             ${ov ? '<span class="chip" style="font-size:10px;padding:1px 6px;color:#1a3f9e">自定义</span>' : ''}
+             ${icon('settings', 12)}
+           </button>`
+        : '<span class="muted small">—</span>';
       return `<tr data-gi="${gi}">
         <td><span class="lang" style="font-family:'JetBrains Mono',Consolas,monospace;font-weight:600">${esc(it.code)}</span></td>
         <td>${esc(it.name)}</td>
         <td>${deptBadge(it.dept)}</td>
         <td>${procChip}</td>
+        <td class="center">${warnCell}</td>
         ${canEdit ? `<td class="center"><div class="flex acenter gap6" style="justify-content:center">
             <button class="btn btn-sm" data-edit="${gi}">${icon('settings', 14)} 编辑</button>
             <button class="btn btn-sm btn-danger" data-rm="${gi}">${icon('trash', 14)}</button>
           </div></td>` : '<td class="center muted small">只读</td>'}
       </tr>`;
-    }).join('') : `<tr><td colspan="5" class="center muted">当前筛选条件下无次品项，点击「新增次品项」添加。</td></tr>`;
+    }).join('') : `<tr><td colspan="6" class="center muted">当前筛选条件下无次品项，点击「新增次品项」添加。</td></tr>`;
 
     return `
       <div class="card">
         <div class="card-head">
           <div class="card-title">${icon('layers', 19)} 次品项主数据
-            <span class="card-sub">按工序筛选 · 共 ${cfg.items.length} 项 · 当前显示 ${rows.length} 项</span></div>
+            <span class="card-sub">按工序筛选 · 共 ${cfg.items.length} 项 · 当前显示 ${rows.length} 项 · <span title="${esc(procTip)}">报警值：按工序设置（${cfg.processes.length} 个工序，悬停查看）· 机台 ${wv.devWarn}/${wv.devAlarm} PPM</span></span></div>
           <div class="flex acenter gap8">
             <input class="input lang" id="fltCode" placeholder="按代码筛选" style="width:120px" value="${esc(fCode)}">
             <input class="input" id="fltName" placeholder="按名称筛选" style="width:120px" value="${esc(fName)}">
             <select class="input" id="selProc" style="width:170px">${procOpts}</select>
+            <button class="btn btn-sm" id="btnWarnCfg" title="设置次品类 / 机台级 PPM 的预警值与报警值" style="white-space:nowrap">${icon('shield', 16)} 报警值</button>
             <button class="btn btn-sm" id="btnExport">${icon('download', 16)} 导出 Excel</button>
             ${canEdit ? `<button class="btn btn-sm btn-primary" id="btnAddItem">${icon('plus', 16)} 新增次品项</button>` : '<span class="chip">只读</span>'}
           </div>
@@ -73,6 +89,7 @@
           <table class="table" id="tblItems">
             <thead><tr>
               <th>代码</th><th>名称</th><th class="center">部门</th><th class="center">工序</th>
+              <th class="center">报警值（预警 / 报警 PPM）</th>
               ${canEdit ? '<th class="center">操作</th>' : '<th class="center">操作</th>'}
             </tr></thead>
             <tbody>${body}</tbody>
@@ -161,6 +178,119 @@
     });
   }
 
+  /* 报警值（PPM）设置：按工序设置次品类预警 / 报警值，另设机台级阈值；保存后次品管理大屏立即生效 */
+  function openWarnDlg() {
+    const w = DefectWarnStore.all();
+    const ro = canEdit ? '' : 'readonly';
+    const procRows = cfg.processes.map(p => {
+      const t = w.processes[p] || { warn: 2000, alarm: 3000 };
+      return `<tr data-proc="${esc(p)}">
+        <td><b>${esc(p)}</b></td>
+        <td><input class="input w-warn" type="number" min="1" step="1" value="${t.warn}" ${ro} style="width:130px"></td>
+        <td><input class="input w-alarm" type="number" min="1" step="1" value="${t.alarm}" ${ro} style="width:130px"></td>
+      </tr>`;
+    }).join('');
+    openDialog({
+      title: '报警阈值设置',
+      sub: '单位 PPM（百万分之一）· 按工序分别设置次品类的预警值（黄）与报警值（红）· 保存后次品管理大屏立即生效',
+      width: 720,
+      okText: canEdit ? '保存' : '关闭',
+      body: `
+        <div class="flex between acenter">
+          <div style="font-weight:700;font-size:13.5px">按工序设置 · 次品类 PPM</div>
+          <span class="small muted">类别按其所属工序判定</span>
+        </div>
+        <table class="table" id="warnProcTbl" style="margin-top:8px">
+          <thead><tr><th style="width:34%">工序</th><th>预警值（黄，PPM）</th><th>报警值（红，PPM）</th></tr></thead>
+          <tbody>${procRows}</tbody>
+        </table>
+        <div class="mt16">
+          <div style="font-weight:700;font-size:13.5px;margin-bottom:6px">机台级 · 设备维度 PPM（全局）</div>
+          <div class="flex gap12">
+            <div style="flex:1"><label class="field-label">预警值（黄）</label>
+              <input class="input" type="number" id="wDevWarn" min="1" step="1" value="${w.devWarn}" ${ro} style="width:100%"></div>
+            <div style="flex:1"><label class="field-label">报警值（红）</label>
+              <input class="input" type="number" id="wDevAlarm" min="1" step="1" value="${w.devAlarm}" ${ro} style="width:100%"></div>
+          </div>
+        </div>
+        <div class="small muted mt12">默认值：各工序 2000 / 3000 PPM · 机台 350 / 500 PPM。每个工序的报警值需大于预警值；全厂合计（本周总 PPM）仍按 2000 / 3000 PPM 判定。</div>`,
+      onOk: (_m, close) => {
+        if (!canEdit) { close(); return; }
+        const processes = {};
+        let err = '';
+        document.querySelectorAll('#warnProcTbl tr[data-proc]').forEach(tr => {
+          const p = tr.dataset.proc;
+          const warn = Number(tr.querySelector('.w-warn').value);
+          const alarm = Number(tr.querySelector('.w-alarm').value);
+          if (!(warn > 0) || !(alarm > 0)) err = '工序「' + p + '」的预警值 / 报警值需为大于 0 的数字';
+          else if (alarm <= warn) err = '工序「' + p + '」的报警值需大于预警值';
+          processes[p] = { warn, alarm };
+        });
+        const devWarn = Number(getVal('wDevWarn'));
+        const devAlarm = Number(getVal('wDevAlarm'));
+        if (!err && (!(devWarn > 0) || !(devAlarm > 0))) err = '机台级预警值 / 报警值需为大于 0 的数字';
+        if (!err && devAlarm <= devWarn) err = '机台级报警值需大于预警值';
+        if (err) { toast(err, 'warn'); return; }
+        DefectWarnStore.save({ processes, devWarn, devAlarm });
+        toast('已保存 ' + cfg.processes.length + ' 个工序的报警阈值 · 机台 ' + devWarn + '/' + devAlarm + ' PPM', 'success');
+        render();
+        close();
+      }
+    });
+  }
+
+  /* 单次品项报警值：覆盖所属工序的默认阈值，仅对该代码生效 */
+  function openItemWarnDlg(code) {
+    const it = cfg.items.find(x => x.code === code);
+    if (!it) return;
+    const w = DefectWarnStore.all();
+    const base = w.processes[it.process] || DEFECT_WARN_TOTAL;
+    const ov = w.items[code];
+    const cur = ov || base;
+    const ro = canEdit ? '' : 'readonly';
+    const mask = openDialog({
+      title: '报警值设置 · ' + it.code,
+      sub: it.name + ' · 工序「' + it.process + '」· 仅对当前次品项代码生效',
+      width: 560,
+      okText: canEdit ? '保存' : '关闭',
+      body: `
+        <div class="flex gap12">
+          <div style="flex:1"><label class="field-label">预警值（黄，PPM）</label>
+            <input class="input" type="number" id="wiWarn" min="1" step="1" value="${cur.warn}" ${ro} style="width:100%"></div>
+          <div style="flex:1"><label class="field-label">报警值（红，PPM）</label>
+            <input class="input" type="number" id="wiAlarm" min="1" step="1" value="${cur.alarm}" ${ro} style="width:100%"></div>
+        </div>
+        <div class="small muted mt12">${ov
+          ? '当前为该次品项单独设置，覆盖工序「' + esc(it.process) + '」默认 ' + base.warn + ' / ' + base.alarm + ' PPM。'
+          : '当前沿用工序「' + esc(it.process) + '」默认 ' + base.warn + ' / ' + base.alarm + ' PPM。'}</div>
+        <div class="flex acenter gap8 mt12">
+          <button class="btn btn-sm" id="wiUseProc" ${canEdit ? '' : 'disabled'}>填入工序默认值</button>
+          <span class="small muted">保存为工序默认值时，将取消该次品项的单独设置</span>
+        </div>`,
+      onOk: (_m, close) => {
+        if (!canEdit) { close(); return; }
+        const warn = Number(getVal('wiWarn'));
+        const alarm = Number(getVal('wiAlarm'));
+        if (!(warn > 0) || !(alarm > 0)) { toast('预警值 / 报警值需为大于 0 的数字', 'warn'); return; }
+        if (alarm <= warn) { toast('报警值需大于预警值', 'warn'); return; }
+        if (warn === base.warn && alarm === base.alarm) {
+          DefectWarnStore.save({ items: { [code]: null } });
+          toast('已恢复工序「' + it.process + '」默认阈值', 'success');
+        } else {
+          DefectWarnStore.save({ items: { [code]: { warn, alarm } } });
+          toast('已保存次品项「' + code + '」报警值：' + warn + ' / ' + alarm + ' PPM', 'success');
+        }
+        render();
+        close();
+      }
+    });
+    const bp = mask.querySelector('#wiUseProc');
+    if (bp) bp.onclick = () => {
+      mask.querySelector('#wiWarn').value = base.warn;
+      mask.querySelector('#wiAlarm').value = base.alarm;
+    };
+  }
+
   /* =========================================================
      事件绑定
      ========================================================= */
@@ -185,14 +315,26 @@
     const bai = document.getElementById('btnAddItem');
     if (bai) bai.onclick = () => openItemDlg(null);
 
+    const bwc = document.getElementById('btnWarnCfg');
+    if (bwc) bwc.onclick = openWarnDlg;
+
     const be = document.getElementById('btnExport');
     if (be) be.onclick = () => {
       const rows = filteredRows();
-      const headers = ['代码', '名称', '部门', '工序', '绑定设备', '设备数'];
-      const data = rows.map(i => [i.code, i.name, i.dept, i.process, i.equip.join(' / '), i.equip.length]);
+      const wvx = DefectWarnStore.all();
+      const headers = ['代码', '名称', '部门', '工序', '预警值(PPM)', '报警值(PPM)', '绑定设备', '设备数'];
+      const data = rows.map(i => {
+        const t = wvx.items[i.code] || wvx.processes[i.process] || DEFECT_WARN_TOTAL;
+        return [i.code, i.name, i.dept, i.process, t.warn, t.alarm, i.equip.join(' / '), i.equip.length];
+      });
       exportExcel('次品项主数据_全部部门_' + fmtDateCN(new Date()) + '.xls', headers, data);
       toast('已导出 ' + rows.length + ' 条次品项', 'success');
     };
+
+    document.querySelectorAll('#tblItems [data-warn]').forEach(b => b.onclick = () => {
+      const it = cfg.items[Number(b.dataset.warn)];
+      if (it) openItemWarnDlg(it.code);
+    });
 
     document.querySelectorAll('#tblItems [data-edit]').forEach(b => b.onclick = () => openItemDlg(Number(b.dataset.edit)));
     document.querySelectorAll('#tblItems [data-rm]').forEach(b => b.onclick = () => {

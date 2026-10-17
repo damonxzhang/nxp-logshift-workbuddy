@@ -5,7 +5,7 @@
      - WWxx'26-M 原始明细：设备(Mold机台) × 料号(PkgCode) 产出与各缺陷代码计数 → 设备维度
      - WW40'26-abnormal 等：各周 Package 级 产出 / BE Reject / 良率
    四级钻取：一级 类别×52周 的**四种展现形式**（① 多系列折线 ② 帕累托贡献排序+累计占比80/20 ③ 小倍数趋势矩阵(独立量程) ④ 类别×周热力图，点击均下钻同一二级）→ 二级 选中类别 设备维度机台树状图(根=类别,子节点=机台,可切换周) → 三级 点机台节点进入「机台×料号」透视(参考客户 -M 透视表,含同料号跨机台反查) → 四级 末列「操作」进入该料号的跨机台 PPM 分析页 / 另可点折线数据点进入该周 Package 明细
-   PPM = 次品数 ÷ IQC Output × 100 万；红线 2000 PPM(良率 0.998)，预警线 3000 PPM(CWAAY 0.997)
+   PPM = 次品数 ÷ IQC Output × 100 万；预警 / 报警阈值在「次品项配置 → 报警值」维护（默认 2000 / 3000 PPM，机台级 350 / 500 PPM）
    本页全部为真实客户数据，无演示/伪随机。 */
 (function () {
   renderShell('defect');
@@ -18,7 +18,29 @@
   D.cats = (D.cats || []).filter(c => c.key !== 'SAW SS7');
 
   // ---------- 常量 / 状态 ----------
-  const RED = 2000, WARN = 3000; // PPM：红线(良率0.998) / 预警线(CWAAY0.997)
+  // 报警阈值（PPM）：在「次品项配置 → 报警值」按工序维护（DefectWarnStore），未配置时用默认口径
+  const WCFG = (typeof DefectWarnStore !== 'undefined' && DefectWarnStore) ? DefectWarnStore.all()
+    : { processes: {}, devWarn: 350, devAlarm: 500 };
+  const TOTAL_WARN = (typeof DEFECT_WARN_TOTAL !== 'undefined') ? DEFECT_WARN_TOTAL : { warn: 2000, alarm: 3000 };
+  const RED = TOTAL_WARN.warn, WARN = TOTAL_WARN.alarm; // 全厂合计口径（不按工序）
+  // 工序阈值：大屏 station 口径的 MARK 对应配置里的 Marking
+  const warnOfStation = st => {
+    const k = st === 'MARK' ? 'Marking' : st;
+    return (WCFG.processes && WCFG.processes[k]) || TOTAL_WARN;
+  };
+  // 类别阈值：优先取该次品代码的单独设置，否则回落到所属工序默认
+  const warnOfCat = c => {
+    const code = String((c && c.key) || '').split(' ').pop();
+    const it = (WCFG.items && WCFG.items[code]) || null;
+    const stName = (c && c.station) || '';
+    if (it) return { t: it, scope: '次品项「' + code + '」' };
+    return { t: warnOfStation(stName), scope: '工序「' + stName + '」' };
+  };
+  const statusOfCat = (p, c) => {
+    if (p == null) return 'none';
+    const t = warnOfCat(c).t;
+    return p >= t.alarm ? 'red' : p >= t.warn ? 'warn' : 'good';
+  };
   let latestIdx = D.output.findIndex(o => o != null);
   if (latestIdx < 0) latestIdx = 0;
   let drillCat = null, drillWeek = null, top5 = false;
@@ -249,7 +271,7 @@
   }
 
   // ---------- L2：设备维度（机台 PPM 条形 + 机台×料号 透视表，参考客户 -M 透视表） ----------
-  const DEV_RED = 500, DEV_WARN = 350; // 机台级展示口径：设备 PPM≥500 红 / ≥350 预警（对齐客户透视图的高亮形态）
+  const DEV_RED = WCFG.devAlarm, DEV_WARN = WCFG.devWarn; // 机台级：设备 PPM≥报警值 红 / ≥预警值 预警
   // 单次注入：树节点 hover 高亮
   function ensureDefCss() {
     if (document.getElementById('defectTreeCss')) return;
@@ -411,7 +433,7 @@
     const peak = across[0];
     const cur = across.find(a => a.d === onlyDev);
     const curIsPeak = !!(cur && peak.d === cur.d);
-    const pkCol = peak.ppm >= DEV_WARN ? 'var(--danger)' : (peak.ppm >= 350 ? 'var(--warn)' : 'var(--text-2)');
+    const pkCol = peak.ppm >= DEV_RED ? 'var(--danger)' : (peak.ppm >= DEV_WARN ? 'var(--warn)' : 'var(--text-2)');
     const tip = across.map(a => `${a.d === onlyDev ? '▶ ' : '  '}${a.d}: ${Math.round(a.ppm)} PPM（${fmt(a.n)}/${fmt(a.out)}）`).join('\n');
     const tag = (peak.ppm >= DEV_WARN)
       ? (curIsPeak ? '<span style="color:var(--danger);font-weight:700">本机最高</span>' : '<span style="color:var(--primary)">他机更高</span>')
@@ -608,7 +630,7 @@
     const latestPPM = weeklyScopePPM(latestIdx);
     const latestOut = D.output[latestIdx];
     const latestDef = visibleCats().reduce((a, c) => a + (D.counts[c.key][latestIdx] || 0), 0);
-    const overCats = visibleCats().filter(c => { const p = catPPM(c.key, latestIdx); return p != null && p >= RED; }).length;
+    const overCats = visibleCats().filter(c => { const p = catPPM(c.key, latestIdx); return p != null && p >= warnOfCat(c).t.warn; }).length;
     const br = breaches();
 
     // KPI
@@ -617,7 +639,7 @@
       <div class="si"><div class="si-label">本周总产出</div><div class="si-value">${fmt(latestOut)}</div></div>
       <div class="si"><div class="si-label">本周总次品</div><div class="si-value">${fmt(latestDef)}</div></div>
       <div class="si"><div class="si-label">超阈值类别</div><div class="si-value" style="color:${overCats ? 'var(--danger)' : 'var(--text)'}">${overCats}</div></div>
-      <div class="si"><div class="si-label">近52周超2000周数</div><div class="si-value" style="color:${br.length ? 'var(--warn)' : 'var(--success)'}">${br.length}</div></div>
+      <div class="si"><div class="si-label">近52周超${RED}周数</div><div class="si-value" style="color:${br.length ? 'var(--warn)' : 'var(--success)'}">${br.length}</div></div>
     </div>`;
 
     let body = '';
@@ -669,8 +691,8 @@
         <div class="card-head"><div class="card-title">${icon('layers', 19)} 二级 · ${esc(c.name)}（${esc(c.station)}）· 设备维度（机台树）</div></div>
         <div class="card-body">
           <div class="stat-strip" style="margin-bottom:10px">
-            <div class="si"><div class="si-label">最新周 PPM</div><div class="si-value" style="color:${statusColor(statusOf(latestCat))}">${latestCat == null ? '—' : latestCat}</div></div>
-            <div class="si"><div class="si-label">最差周</div><div class="si-value" style="color:${statusColor(statusOf(worst.p))}">${worst.w}${worst.p != null ? ' (' + worst.p.toFixed(0) + ')' : ''}</div></div>
+            <div class="si"><div class="si-label">最新周 PPM</div><div class="si-value" style="color:${statusColor(statusOfCat(latestCat, c))}">${latestCat == null ? '—' : latestCat}</div></div>
+            <div class="si"><div class="si-label">最差周</div><div class="si-value" style="color:${statusColor(statusOfCat(worst.p, c))}">${worst.w}${worst.p != null ? ' (' + worst.p.toFixed(0) + ')' : ''}</div></div>
             <div class="si"><div class="si-label">所选周最差机台</div><div class="si-value" style="font-size:19px">${worstDev ? esc(worstDev.d) + `<span style="font-size:13px;color:var(--danger);margin-left:4px">${Math.round(worstDev.ppm)}</span>` : '—'}</div></div>
             <div class="si"><div class="si-label">所属工序</div><div class="si-value">${esc(c.station)}</div></div>
           </div>
@@ -784,7 +806,7 @@
         <div class="card-head"><div class="card-title">${icon('table', 19)} 三级 · ${D.weeks[drillWeek]} Package 明细（上下文：${esc(c.name)}）</div></div>
         <div class="card-body">
           ${abnTable(drillWeek)}
-          <div class="sub-note mt12">良率 &lt; 0.998（即 ≥2000 PPM）标红。数据来自该周 -abnormal 明细。点击顶部面包屑可返回。</div>
+          <div class="sub-note mt12">良率 &lt; 0.998（即 ≥${warnOfCat(c).t.warn} PPM，按${warnOfCat(c).scope}阈值）标红。数据来自该周 -abnormal 明细。点击顶部面包屑可返回。</div>
         </div>
       </div>`;
     }
